@@ -1,0 +1,845 @@
+8.  KISS and FTP Packet Driver
+
+This Chapter contains information on two of the low level interface 
+interface standards available to the net suite.
+
+8.1.  The KISS Host to TNC Protocol
+
+8.1.1.  Introduction
+
+The purpose of the "Raw" (aka "KISS") TNC is to facilitate the use of 
+amateur packet radio controllers (TNCs) with host computers, particularly 
+in the development of experimental protocols and multi-user servers (e.g., 
+"bulletin boards").
+
+Current TNC software was written with human users in mind; unfortunately, 
+commands and responses well suited for human use are illadapted for host 
+computer use, and vice versa.  This is especially true for multi-user 
+servers such as bulletin boards which must multiplex data from several 
+network connections across the single host/TNC link.  In addition, 
+experimentation with new link level protocols is greatly hampered because 
+there may very well be no way at all to generate or receive frames in the 
+desired format without reprogramming the TNC.
+
+The Raw TNC solves these problems by eliminating as much as possible from 
+the TNC software, giving the attached host complete control over and 
+access to the contents of the HDLC frames transmitted and received over 
+the air.  The AX.25 protocol is removed entirely from the TNC, as are all 
+command interpreters and the like.  The TNC simply converts between 
+synchronous HDLC, spoken on the half duplex radio channel, and a special 
+asynchronous, full duplex frame format spoken on the host/TNC link.  Every 
+frame received on the HDLC link is passed intact to the host once it has 
+been translated to the asynchronous format; likewise, asynchronous frames 
+from the host are transmitted on the radio channel once they have been 
+converted to HDLC format.
+
+Of course, this means that the bulk of AX.25 (or another protocol) must 
+now be implemented on the host system.  This is acceptable, however, 
+considering the greatly increased flexibility and reduced overall 
+complexity that comes from allowing the protocol to reside on the same 
+machine with the applications to which it is closely coupled.
+
+8.1.2.  Asynchronous Frame Format
+
+The "asynchronous packet protocol" spoken between the host and TNC is very 
+simple, since its only function is delimiting frames.  Each frame is both 
+preceded and followed by a special FEND (frame end) character, analogous 
+to an HDLC flag.  No CRC or checksum is provided.
+
+The reason for both preceding and ending frames with FENDs is to improve 
+performance when there is noise on the asynch line.  The FEND at the 
+beginning of a frame serves to "flush out" any accumulated garbage into a 
+separate frame (which will be discarded by the upper layer protocol) 
+instead of prepending it to an otherwise good frame.  As with back-to-back 
+FLAGs in HDLC, two FEND characters in a row should not be interpreted as 
+delimiting an empty frame.
+
+8.1.3.  Transparency
+
+Frames are sent in 8-bit binary; if an FEND ever appears in the data, it 
+is translated into the two byte sequence FESC TFEND (frame escape, 
+transposed frame end).  Likewise, if the FESC character ever appears in 
+the user data, it is replaced with the two character sequence FESC TFESC 
+(frame escape, transposed frame escape).
+
+As characters arrive at the receiver, they are appended to a buffer 
+containing the current frame.  Receiving a FEND marks the end of the 
+current frame.  Receipt of a FESC puts the receiver into "escaped mode", 
+which causes the receiver to translate a following TFESC or TFEND back to 
+FESC or FEND, respectively, before adding it to the receive buffer and 
+leaving escaped mode.  (Receipt of any character other than TFESC or TFEND 
+while in escaped mode is an error; no action is taken and frame assembly 
+continues.  A TFEND or TESC received while not in escaped mode is treated 
+as an ordinary data character.)
+
+This procedure may seem somewhat complicated, but it is easy to implement 
+and recovers quickly from errors.  In particular, the FEND character is 
+never sent over the channel except as an actual end-of-frame indication.  
+This ensures that any intact frame (properly delimited by FEND characters) 
+will always be received properly regardless of the starting state of the 
+receiver or corruption of the preceding frame.
+
+The special characters are:
+
+ FEND (frame end) 300 (octal)
+ FESC (frame escape) 333 (octal)
+ TFEND (transposed frame end) 334 (octal)
+ TFESC (transposed frame escape) 335 (octal)
+
+(ARPA Internet hackers will recognize this protocol as identical to SLIP, 
+a popular method for sending IP datagrams across ordinary dialup modems).
+
+8.1.4.  Control of the Raw TNC
+
+Each asynchronous data frame sent to the TNC is converted back into "pure" 
+form and queued for transmission as a separate HDLC frame.  Although 
+removing the human interface and the AX.25 protocol from the TNC makes 
+most existing TNC commands unnecessary (i.e., they become host functions), 
+the TNC is still responsible for keying the transmitter's PTT line and 
+deferring to other activity on the radio channel.  It is therefore 
+necessary to allow the host to control a few TNC parameters, namely the 
+transmitter keyup delay and the transmitter persistence variables.
+
+It is also necessary to distinguish between command and data frames on the 
+host/TNC link.  This is done by defining the first byte of each 
+asynchronous frame between host and TNC as a "type" indicator.
+
+.pa
+The following types are defined in frames to the TNC:
+
+     Type Function       Comments
+
+     0    Data frame     Rest of frame is data destined for HDLC channel
+
+     1    TXDELAY        Second byte is TX keyup delay in 10 ms units
+
+     2    P              Second byte is persistence parameter, p:
+                         0: p = (0+1)/256, 255: p = (255+1)/256 = 1.0]
+
+     3    SLOTTIME       Second byte is slot interval in 10 ms units
+
+     4    TXtail         Second byte is time to hold up the TX after
+                         the FCS has been sent (time allowed to send the
+                         HDLC flag character; should be at least 2 for
+                         1200 bps operation).  In 10 ms units.
+
+   255    Return         Equivalent to telling the KISS code to "Return 
+                         From Subroutine".  Used in later TNCs that use 
+                         regular code as well as KISS code.  Entry into 
+                         the KISS code is done with the command, KISS ON, 
+                         followed by RESTART.  Return from KISS is done by 
+                         sending, param ax0 255, assuming the TNC is 
+                         connected to ax0.
+
+The following types are defined in frames to the host:
+
+     Type Function       Comments
+
+     0    Data frame     Rest of frame is data from the HDLC channel
+
+(No other types are defined; in particular, there is no provision for 
+acknowledging data or command frames sent to the TNC.)
+
+8.1.5.  Persistence
+
+The P and SLOTTIME parameters are used to implement true p-persistent 
+CSMA.  This works as follows:
+
+Whenever the host has queued data for transmission, the TNC begins 
+monitoring the carrier detect signal from the modem.  It waits 
+indefinitely for this signal to go inactive.  Once the channel is clear, 
+the TNC generates a random number between 0 and 255.  If this number is 
+less than or equal to P, the TNC asserts the transmitter PTT line, waits 
+0.01 * TXDELAY seconds, and transmits all frames in its queue.  The TNC 
+then releases PTT and goes back to the idle state.  If the random number 
+is greater than P, the TNC delays signal has gone active in the meantime, 
+the TNC again waits for it to clear before continuing).  Note that P=255 
+means always transmit as soon as possible, regardless of the random 
+number.
+
+The result is that the TNC waits for an exponentially-distributed random 
+interval after sensing that the channel has gone clear before attempting 
+to transmit.  The idea here is that with proper tuning of the parameters P 
+and SLOTTIME, several stations with traffic to send are much less likely 
+to collide with each other when they simultaneously see the channel go 
+clear.
+
+8.1.6.  The TNC-2 Implementation
+
+KISS is incorporated in all newer TNC-2 derived TNCs and is simply envoked 
+with the command KISS ON, followed by a restart.  Various methods are used 
+to return from the KISS protocol but the most universal method is to send 
+the command (hex) C0 FF C0.  This is achieved from net by using the 
+command, param <iface> 255.
+
+8.1.7.  The TNC-1 Implementation
+
+See the files included in the TNC-1 KISS Distribution.
+
+8.1.8.  The VADCG/ASHBY Implementation
+
+See the files included in the VADCG/ASHBY KISS Distribution.
+
+8.1.9.  The AEA Implemenation
+
+All PK-232 units with WEFAX, and PC-87 units of a similar vintage, are 
+capable of KISS operation.  See the installation instructions earlier in 
+Section 2.2.3. for more information.
+
+8.1.10.  The Kantronics Implemenation
+
+See your Kantronics TNC Documentation and installation instructions in 
+Section 2.2.5.
+
+8.2.  The FTP, Inc., Packet Driver Specification
+
+The KA9Q TCP/IP package includes a driver that allows use of any network 
+interface that is provided with a "packet driver" that is compatible with 
+the "PC/TCP Version 1.08 Packet Driver Specification", by FTP Software, 
+Inc.  The great benefit of the packet driver spec is that it allows a 
+manufacturer of a PC networking interface (an Ethernet card, etc), to 
+write one driver that can be loaded for use with a variety of networking 
+applications, including the KA9Q package.
+
+For the benefit of potential packet driver authors, a copy of the spec is 
+included here.  A prolific packet driver author is Russ Nelson, who may be 
+reached as nelson@sun.soe.clarkson.edu on the Internet.  Many of the 
+drivers in use with the KA9Q package have been written or are being 
+maintained by Russ.
+
+This section is derived from a public domain document created by FTP 
+Software, Inc.  FTP Software is gratefully acknowledged for both 
+developing the spec, and allowing use of their specification here.
+
+ FTP Software, Inc.
+ P.O.  Box 150
+ Kendall Sq.  Branch
+ Boston, MA 02142
+ (617) 868-4878
+
+Support of a hardware interface, or mention of an interface manufacturer, 
+by the Packet Driver specification does not necessarily indicate that the 
+manufacturer endorses this specification.
+
+8.2.1.  Introduction and Motivation
+
+This document describes the programming interface to PC/TCP packet 
+drivers.  Packet drivers provide a simple, common programming interface 
+that allows multiple applications to share a network interface at the data 
+link level.  The packet drivers demultiplex incoming packets amongst the 
+applications by using the network media type field.
+
+Different versions of PC/TCP exist for different network media (Ethernet, 
+802.5 ring, serial lines), but through the use of the packet driver, the 
+actual brand or model of the network interface can be hidden from the 
+application.
+
+The packet driver provides calls to initiate access to a specific packet 
+type, to end access to it, to send a packet, to get statistics on the 
+network interface and to get information about the interface.
+
+Protocol implementations that use the packet driver can completely coexist 
+on a PC and can make use of one another's services, whereas multiple 
+applications which do not use the driver do not coexist on one machine 
+properly.  Through use of the packet driver, a user could run TCP/IP, 
+DECnet, and a proprietary protocol implementation such as Banyan's, 
+LifeNet's, Novell's or 3COM's without the difficulties associated with 
+preempting the network interface.
+
+Applications which use the packet driver can also run on new network 
+hardware of the same class without being modified; only a new packet 
+driver need be supplied.
+
+Two levels of packet drivers are described in this specification.  The 
+first is the basic packet driver, which provides minimal functionality but 
+should be simple to implement and which uses very few host resources.  The 
+basic driver provides operations to broadcast and receive packets.  The 
+second driver is the extended packet driver, which is a superset of the 
+basic driver.  The extended driver supports less commonly used functions 
+of the network interface such as multicast, and also gathers statistics on 
+use of the interface and makes these available to the application.
+
+Functions which are available in only the extended packet driver are noted 
+as such in their descriptions.  All basic packet driver functions are 
+available in the extended driver.
+
+8.2.2.  Identifying network interfaces
+
+Network interfaces are named by a triplet of integers, <class, type, 
+number>.  The first is the class of interface.  The class tells what kind 
+of media the interface is for: DEC/Intel/Xerox/Ethernet, IEEE 802.3 
+Ethernet, IEEE 802.5/Token Ring, ProNET-10, Broadband Ethernet, Appletalk, 
+serial line, etc.
+
+The second number is the type of interface: this specifies a particular 
+instance of an interface supporting a class of medium.  Interface types 
+for Ethernet might name these interfaces: 3COM 3C501 or 3C505, Interlan 
+NI5010, Univation, BICC Data Networks ISOLAN, Ungermann-Bass NIC, etc.  
+Interface types for IEEE 802.5 might name these interfaces: IBM Token Ring 
+adapter, Proteon p1340, etc.
+
+The last number is the interface number.  If a machine is equipped with 
+more than one interface of a class and type, the interfaces must be 
+numbered to distinguish between them.
+
+An appendix details constants for classes and types.  The class of an 
+interface is an 8-bit integer, and its type is a 16 bit integer.  Class 
+and type constants are managed by FTP Software.  Contact FTP to register a 
+new class or type number.
+
+The type 0xFFFF is a wildcard type which matches any interface in the 
+specified class.  It is unnecessary to wildcard interface numbers, as 0 
+will always correspond to the first interface of the specified class and 
+type.
+
+This specification has no provision for the support of multiple network 
+interfaces (with similar or different characteristics) via a single Packet 
+Driver and associated interrupt.  We feel that this issue is best 
+addressed by loading several Packet Drivers, one per interface, with 
+different interrupts (although all may be included in a single TSR 
+software module).  Applications software must check the class and type 
+returned from a driver_info() call already, to make sure that the Packet 
+Driver is for the correct media and packet format.  This can easily be 
+generalized by searching for another Packet Driver if the first is not of 
+the right kind.
+
+8.2.3.  Initiating driver operations
+
+The packet driver is invoked via a software interrupt in the range 0x60 
+through 0x80.  This document does not specify a particular interrupt, but 
+describes a mechanism for locating which interrupt the driver uses.  The 
+interrupt must be configurable to avoid conflicts with other pieces of 
+software that also use software interrupts.  The program which installs 
+the packet driver should provide some mechanism for the user to specify 
+the interrupt.
+
+The handler for the interrupt is assumed to start with 3 bytes of 
+exectuable code; this can either be a 3-byte jump instruction, or a 2-byte 
+jump followed by a NOP (do not specify "jmp short" unless you also specify 
+an explicit NOP).  This must be followed by the null-terminated ASCII text 
+string "PKT DRVR".  To find the interrupt being used by the driver, an 
+application should scan through the handlers for vectors 0x60 through 0x80 
+until it finds one with the text string "PKT DRVR" in it.
+
+8.2.4.  Programming interface
+
+All functions are accessed via the software interrupt determined to be the 
+driver's via the mechanism described earlier.  On entry, register AH 
+contains the code of the function desired.
+
+The handle is an arbitrary integer value associated with each MAC-level 
+demultiplexing type that has been established via the access_type call.  
+Internally to the packet driver, it will probably be a pointer, or a table 
+offset.  The application calling the packet driver cannot depend on it 
+assuming any particular range, or any other characteristics.
+
+Note that some of the functions defined below are labelled as extended 
+driver functions.  Because these are not required for basic network 
+operations, their implementation may be considered optional.  Programs 
+wishing to use these functions should use the driver_info() function to 
+determine if they are available in a given packet driver.
+
+8.2.4.1.  Entry Conditions
+
+FTP Software applications which call the packet driver are coded in 
+Microsoft C and assembly language.  All necessary registers are saved by 
+FTP's routines before the INT instruction to call the packet driver is 
+executed.  Our current receiver() functions behave as follows: DS and the 
+flags are saved and restored.  All other registers may be modified, and 
+should be saved by the packet driver, if necessary.  Processor interrupts 
+may be enabled while in the upcall, but the upcall doesn't assume 
+interrupts are disabled on entry.  On entry, receiver() switches to a 
+local stack.  Current FTP Software receiver() routines may modify all 
+registers except DS, so the caller must save and restore any that must be 
+preserved across the call.
+
+Note that some older versions of PC/TCP may enable interrupts during the 
+upcall, and leave them enabled on return to the Packet Driver.
+
+8.2.4.2.  Byte ordering
+
+Developers should note that, on many networks and protocol families, the 
+byte-ordering of 16-bit quantities on the network is opposite to the 
+native byte-order of the PC.  (802.5 Token Ring is an exception).  This 
+means that DEC-Intel-Xerox ethertype values passed to access_type() must 
+be swapped (passed in network order).  The IEEE 802.3 length field needs 
+similar handling, and care should be taken with packets passed to 
+send_pkt(), so they are in the proper order.
+
+8.2.4.3.  driver_info()
+
+ driver_info(handle) AH == 1 AL == FF
+ int handle; BX /* Optional */
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ BAD_HANDLE /* older drivers only */
+
+ non-error return:
+ carry flag clear
+ version BX
+ class CH
+ type DX
+ number CL
+ name DS: SI
+ basic/extended AL
+
+ 1 == basic, 2 == extended, FF == not installed
+
+This function returns information about the interface.  The version is 
+assumed to be an internal hardware driver identifier.  In earlier versions 
+of this spec, the handle argument (which must have been obtained via 
+access_type()) was required.  It is now optional, but drivers developed 
+according to versions of this spec previous to 1.07 may require it, so 
+implementers should take care.
+
+8.2.4.4.  access_type()
+
+ int access_type(if_class, if_type, if_number, type, typelen,
+ receiver) AH == 2
+ int if_class; AL
+ int if_type; BX
+ int if_number; DL
+ char far *type; DS: SI
+ unsigned typelen; CX
+ int (far *receiver)(); ES: DI
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ NO_CLASS
+ NO_TYPE
+ NO_NUMBER
+ BAD_TYPE
+ NO_SPACE
+ TYPE_INUSE
+
+ non-error return:
+ carry flag clear
+ handle AX
+ receiver call:
+ (*receiver)(handle, flag, len [, buffer])
+ int handle; BX
+ int flag; AX
+ unsigned len; CX
+ if AX == 1,
+ char far *buffer; DS: SI
+
+Initiates access to packets of the specified type.  The argument type is a 
+pointer to a packet type specification.  The argument typelen is the 
+length in bytes of the type field.  The argument receiver is a pointer to 
+a subroutine which is called when a packet is received.  If the typelen 
+argument is 0, this indicates that the caller wants to match all packets 
+(match all requests may be refused by packet drivers developed to conform 
+to versions of this spec previous to 1.07).
+
+When a packet is received, receiver is called twice by the packet driver.  
+The first time is to request a buffer from the application to copy the 
+packet into.  AX == 0 on this call.  The application should return a 
+pointer to the buffer in ES: DI.  If the application has no buffers, it 
+may return 0: 0 in ES: DI, and the driver should throw away the packet and 
+not perform the second call.
+
+It is important that the packet length (CX) be valid on the AX == 0 call, 
+so that the receiver can allocate a buffer of the proper size.  This 
+length (as well as the copy performed prior to the AX == 1 call) must 
+include the Ethernet header and all received data, but not the trailing 
+checksum.
+
+On the second call, AX == 1.  This call indicates that the copy has been 
+completed, and the application may do as it wishes with the buffer.  The 
+buffer that the packet was copied into is pointed to by DS: SI.
+
+8.2.4.5.  release_type()
+
+ int release_type(handle) AH == 3
+ int handle; BX
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ BAD_HANDLE
+
+ non-error return:
+ carry flag clear
+
+This function ends access to packets associated with a handle returned by 
+access_type().  The handle is no longer valid.
+
+8.2.4.6.  send_pkt()
+
+ int send_pkt(buffer, length) AH == 4
+ char far *buffer; DS: SI
+ unsigned length; CX
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ CANT_SEND
+
+ non-error return:
+ carry flag clear
+
+Transmits length bytes of data, starting at buffer.  The application must 
+supply the entire packet, including local network headers.  Any MAC or LLC 
+information in use for packet demultiplexing (e.g.  the DEC-Intel-Xerox 
+Ethertype) must be filled in by the application as well.  This cannot be 
+performed by the driver, as no handle is specified in a call to the 
+send_packet() function.
+
+8.2.4.7.  terminate()
+
+ terminate(handle) AH == 5
+ int handle; BX
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ BAD_HANDLE
+ CANT_TERMINATE
+
+ non-error return:
+ carry flag clear
+
+Terminates the driver associated with handle.  If possible, the driver 
+will exit and allow MS-DOS to reclaim the memory it was using.
+
+8.2.4.8.  get_address()
+
+ get_address(handle, buf, len) AH == 6
+ int handle; BX
+ char far *buf; ES: DI
+ int len; CX
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ BAD_HANDLE
+ NO_SPACE
+
+ non-error return:
+ carry flag clear
+ length CX
+
+Copies the local net address associated with handle into buf.  The buffer 
+buf is len bytes long.  The actual number of bytes copied is returned in 
+CX.  If the NO_SPACE error is returned, this indicates that len was 
+insufficient to hold the local net address.
+
+8.2.4.9.  reset_interface()
+
+ reset_interface(handle) AH == 7
+ int handle; BX
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ BAD_HANDLE
+
+ non-error return:
+ carry flag clear
+
+Resets the interface associated with handle to a known state, aborting any 
+transmits in process and reinitializing the receiver.  This call has been 
+included primarily for circumstances where a highlevel protocol has 
+detected what it thinks may be an interface failure or hang.  If the 
+packet driver implementer has a high level of confidence in the hardware, 
+or the action would seriously disrupt other users of the interface, this 
+can be treated as a no-op.
+
+8.2.4.10.  set_rcv_mode()
+
+ extended driver function
+ set_rcv_mode(handle, mode) AH == 20
+ int handle; BX
+ int mode; CX
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ BAD_HANDLE
+ BAD_MODE
+
+ non-error return:
+ carry flag clear
+
+Sets the receive mode on the interface associated with handle.  The 
+following values are accepted for mode:
+
+ mode meaning
+
+ 1 turn off receiver
+ 2 receive only packets sent to this interface
+ 3 mode 2 plus broadcast packets
+ 4 mode 3 plus limited multicast packets
+ 5 mode 3 plus all multicast packets
+ 6 all packets
+
+Note that not all interfaces support all modes.  The receive mode affects 
+all packets received by this interface, not just packets associated with 
+the handle argument.  See the extended driver functions get_multicast_-
+list() and set_multicast_list() for programming "perfect filters" to re-
+ceive specific multicast addresses.
+
+Note that mode 3 is the default, and if the set_rcv_mode() function is not 
+implemented, mode 3 is assumed to be in force as long as any handles are 
+open (from the first access_type() to the last release_type()).
+
+.pa
+8.2.4.11.  get_rcv_mode()
+
+ extended driver function get_rcv_mode(handle, mode) AH == 21
+ int handle; BX
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ BAD_HANDLE
+
+ non-error return:
+ carry flag clear
+ mode AX
+
+Returns the current receive mode of the interface associated with handle.
+
+8.2.4.12.  set_multicast_list()
+
+ extended driver function set_multicast_list(addrlst, len)
+ AH == 22
+ char far *addrlst; ES: DI
+ int len; CX
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ NO_MULTICAST
+ NO_SPACE
+ BAD_ADDRESS
+
+ non-error return:
+ carry flag clear
+
+The addrlst argument is assumed to point to an len-byte buffer containing 
+a number of multicast addresses.  BAD_ADDRESS is returned if len modulo 
+the size of an address is not equal to 0, or the data is unacceptable for 
+some reason.  NO_SPACE is returned (and no addresses are set) if there are 
+more addresses than the hardware supports directly.
+
+The recommended procedure for setting multicast addresses is to issue a 
+get_multicast_list(), copy the information to a local buffer, add any 
+addresses desired, and issue a set_multicast_list().  This should be 
+reversed when the application exits.  If the set_multicast_list() fails 
+due to NO_SPACE, use set_rcv_mode() to set mode 5 instead.
+
+.pa
+8.2.4.13.  get_multicast_list()
+
+ extended driver function get_multicast_list() AH == 23
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ NO_MULTICAST
+
+ non-error return:
+ carry flag clear
+ char far *addrlst; ES: DI
+ int len; CX
+
+On a successful return, addrlst points to len bytes of multicast addresses 
+currently in use.  The application program must not modify this 
+information in-place.
+
+8.2.4.14.  get_statistics()
+
+ extended driver function get_statistics(handle) AH == 24
+ int handle; BX
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ BAD_HANDLE
+
+ non-error return:
+ carry flag clear
+ char far *stats; DS: SI
+
+ statistics structure:
+ field byte length
+ packets in 4
+ packets out 4
+ bytes in 4
+ bytes out 4
+ errors in 4
+ errors out 4
+ packets dropped 4
+
+Returns a pointer to a statistics structure for this handle.
+
+.pa
+8.2.4.15.  set_address()
+
+ extended driver function set_address(addr, len) AH == 25
+ char far *addr; ES: DI
+ int len; CX
+
+ error return:
+ carry flag set
+ error code DH
+ possible errors:
+ CANT_SET
+ BAD_ADDRESS
+
+ non-error return:
+ carry flag clear
+ length CX
+
+This call is used when the application or protocol stack needs to use a 
+specific LAN address.  For instance, DECnet protocols on Ethernet encode 
+the protocol address in the Ethernet address, requiring that it be set 
+when the protocol stack is loaded.  A BAD_ADDRESS error indicates that the 
+Packet Driver doesn't like the len (too short or too long), or the data 
+itself.  Note that packet drivers should refuse to change the address 
+(with a CANT_SET error) if more than one handle is open (lest it be 
+changed out from under another protocol stack).
+
+8.2.5.  Interface classes and types
+
+The following are defined as network interface classes, with their 
+individual types listed immediately following the class.
+
+ DEC/Intel/Xerox "Bluebook"     ProNET-10 2
+             Ethernet 1                                               
+                                Proteon p1300 1
+ 3COM 3C500/3C501 1
+ 3COM 3C505 2                   IEEE 802.5/ProNET-4 3
+ MICOM-Interlan NI5010 3
+ BICC Data Networks 4110 4      IBM Token ring adapter 1
+ BICC Data Networks 4117 5      Proteon p1340 2
+ MICOM-Interlan NP600 6         Proteon p1344 3
+ Ungermann-Bass PC-NIC 8        Gateway PC-bus 4
+ Univation NC-516 9             Gateway AT-bus 5
+ TRW PC-2000 10                 Gateway MCA-bus 6
+ MICOM-Interlan NI5210 11
+ 3COM 3C503 12                  Omninet 4
+ 3COM 3C523 13
+ Western Digital WD8003 14      Appletalk 5
+ Spider Systems S4 15
+ Torus Frame Level 16           Serial line 6
+ 10NET Communications 17
+ Gateway PC-bus 18              Starlan 7 (NOTE: subsumed by Ethernet)
+ Gateway AT-bus 19
+ Gateway MCA-bus 20
+ IMC PCnic 21
+ IMC PCnic II 22
+ IMC PCnic 8bit 23
+ ArcNet 8
+
+ Datapoint RIM 1
+
+ AX.25 9
+
+ KISS 10
+
+ IEEE 802.3 w/802.2 hdrs 11
+
+ Types as given under DIX Ethernet, See Appendix D.
+
+8.2.6.  Function call numbers
+
+The following numbers are used to specify which operation the packet 
+driver should perform.  The number is stored in register AH on call to the 
+packet driver.
+
+ driver_info 1
+ access_type 2
+ release_type 3
+ send_pkt 4
+ terminate 5
+ get_address 6
+ reset_interface 7
+ *set_rcv_mode 20
+ *get_rcv_mode 21
+ *set_multicast_list 22
+ *get_multicast_list 23
+ *get_statistics 24
+ *set_address 25
+
+ * indicates an extended packet driver function
+
+8.2.7.  Error codes
+
+Packet driver calls indicate error by setting the carry flag on return.  
+The error code is returned in register DH (a register not used to pass 
+values to functions must be used to return the error code).  The following 
+error codes are defined:
+
+ 1 BAD_HANDLE invalid handle number
+
+ 2 NO_CLASS no interfaces of specified class found
+
+ 3 NO_TYPE no interfaces of specified type found
+
+ 4 NO_NUMBER no interfaces of specified number found
+
+ 5 BAD_TYPE bad packet type specified
+
+ 6 NO_MULTICAST this interface does not support multicast
+
+ 7 CANT_TERMINATE this packet driver cannot terminate
+
+ 8 BAD_MODE an invalid receiver mode was specified
+
+ 9 NO_SPACE operation failed because of insufficient space
+
+ 10 TYPE_INUSE the type had previously been accessed, and not released.
+
+ 11 BAD_COMMAND the command was out of range, or not implemented
+
+ 12 CANT_SEND the packet couldn't be sent (usually hardware error)
+
+ 13 CANT_SET hardware address couldn't be changed (more than 1 handle 
+    open)
+
+ 14 BAD_ADDRESS hardware address has bad length or format
+
+8.2.8.  802.3 vs.  Blue Book Ethernet
+
+One weakness of the present specification is that there is no provision 
+for simultaneous support of 802.3 and Blue Book (the old DEC-Intel-Xerox 
+standard) Ethernet headers via a single Packet Driver (as defined by its 
+interrupt).  The problem is that the Ethertype of Blue Book packets is in 
+bytes 12 and 13 of the header, and in 802.3 the corresponding bytes are 
+interpreted as a length.  In 802.3, the field which would appear to be 
+most useful to begin the type check in is the 802.2 header, starting at 
+byte 14.  This is only a problem on Ethernet and variants (e.g.  Starlan), 
+where 802.3 headers and Blue Book headers are likely to need co-exist for 
+many years to come.
+
+One solution is to redefine class 1 as Blue Book Ethernet, and define a 
+parallel class for 802.3 with 802.2 packet headers.  This requires that a 
+2nd Packet Driver (as defined by its interrupt) be implemented where it is 
+necessary to handle both kinds of packets, although they could both be 
+part of the same TSR module.
+
+As of this draft, class 11 has been assigned to 802.3 using 802.2 headers, 
+to implement the above.
+
+Note: According to this scheme, an application wishing to receive IP 
+encapsulated per RFC 1042 would specify an typelen argument of 8, and type 
+would point to:
+
+ char iee_ip[] = {0xAA, 0xAA, 3, 0, 0, 0, 0x08, 0x00};

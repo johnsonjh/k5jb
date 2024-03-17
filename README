@@ -1,0 +1,123 @@
+This note explains what all the k5jb* stuff is about.  KA9Q NET is the
+TCP/IP suite that preceeded NOS.  I use it because it is smaller, runs
+on both my MS-DOS and Unix machines, and does what I want to do.  Also,
+it is mature and meets the standards you would expect from profession-
+ally prepared software.  In other words, it doesn't crash.
+
+The k31 release of the KA9Q NET doesn't have any major changes that
+would affect Unix or Coherent users, but has been worked over by N0QBJ
+and me to make it compile and operate correctly under OS9/OSK.  BM was
+likewise worked over.
+
+All the source files are new with this release, except for the sample
+startup files that were thrown together at the request of one user.  You
+should download all the files to have a complete kit.
+
+                   k5jb.k31.txt (and preface in unix.note)
+
+Version k31 of the K5JB NET kit is a complete set of Unix and Coherent source 
+code files for the KA9Q NET (pre NOS TCP/IP).  It is NOT necessary to get 
+earlier source files to have a complete kit, but it IS necessary to get
+k5jb.bm.tar.Z to have a coordinated version of the mailer, BM.  Thus, a
+complete k31 kit consists of:
+
+k5jb.k31.txt   -- This file
+k5jb.k31.tar.Z -- Source code for Unix KA9Q NET
+k5jb.dock31.tar.Z -- Complete user documentation for same.
+k5jb.bmk31.tar.Z  -- Source code for BM, the mailer.
+k5jb.samp.tar.Z -- Optional, Sample startup files for beginners.
+
+(These files on ucsd.edu are either in /hamradio/packet/tcpip/incoming, or in 
+/hamradio/packet/tcpip/k5jb.)
+
+These files were compressed with plain vanilla compress, and tarred with
+plain, old tar.  Hint:  Use tar xvfo <tarfile> to extract files with
+their original timestamps entact.
+
+                        Brief description of Unix NET
+
+NET is designed as an MS-DOS application, so does not make full use of Unix's 
+multi-tasking ability but runs quite well in Unix.  You can use it in a Unix 
+windowing environment (or in shell layers) but you must prevent blocking on 
+input if you make the window session inactive.  See the doc on how to do 
+this.  Also, a casual user shouldn't shell out of NET for an extended period 
+of time, as NET suspends operation during shell escapes.  If you operate a 
+heavily used machine, use your system's background methods and switch to 
+another terminal session to do other things.
+
+If you are unfamiliar with NET (the TCP/IP suite, written by Phil Karn, KA9Q, 
+and preceding his current project, NOS), you need to break out the files in 
+k5jb.dock31.tar.Z and browse them.  k5jb.k31.tar.Z contains a file,
+srcnote.unix, which has modification information, and note.unix that is
+specific to Unix setup.
+
+                          Brief description of kit
+
+More detail on files contained in this set:
+
+k5jb.k31.tar.Z
+Contains files needed to compile NET under various System V, Release 3 
+versions of Unix (I use AT&T), under Coherent, version 4.0.1 and under
+OS9/OSK.  This file also contains srcnote.unix, a collection of revision
+notes, and note.unix for information specific to Unix and Coherent that
+I not yet included in the main documentation.  (This .txt file is also
+the preface to note.unix.) W5GFE compiled NET and BM under SCO Unix (80386)
+Sys V, release 3, both with the native compiler and with GNU.  Others
+report compiling it under various versions of Unix, but were not specific
+on versions used.  See note.os9 for information on how to compile under
+OS9/OSK.
+
+k5jb.bmk31.tar.Z
+Contains source for Bdale's Mailer (BM).  Works with same environmental 
+variables as K5JB version of NET.  Has been sanitized to prevent memory 
+violations.  This is not really version k31, but was updated at the same
+time as NET version k31 to compile and run correctly under OS9/OSK.
+
+k5jb.dock31.tar.Z
+Contains NET and BM user's documentation.  Targeted for MS-DOS users, but 
+contains essential Unix information.
+
+k5jb.samp.tar.Z
+Contains a rough set of sample configuration files for setup.  I didn't
+make any particular effort to cover all instances so you must look at
+chapter0 and decide if you want to go on from there.  This file was
+unchanged with the k31 release.
+
+(The following footnote was added to the k5jb.k28.txt and that file was
+sent to ucsd.edu after the tar was uploaded.  I made the change and made
+a new tar but did not reload it to ucsd.edu.  sys/fcntl.h is missing in
+only the latest versions of Coherent.  As a policy, I will not be making
+changes to my files that would cause them to no longer work with the
+first version of Coherent 4 that I received, thus preventing portability
+problems.  You can do anything you want with your copy.)
+
+(Footnote)  Since I uploaded k5jb.k28.tar.Z, two possible problems for
+Coherent users were reported to me.  In the file, telunix.c, the line,
+#include <sys/fcntl.h> may need to be changed to #include <fcntl.h>.
+The other possible problem is related to the use of the quit signal to
+prepare NET for background operation under shl, the shell layer manager.
+If you see a message to the effect that keyboard input is ignored...
+use a Ctrl-\ to toggle the condition.  A quit signal sent to a process
+from another active window may have been also received by NET.  (I
+couldn't easily duplicate this.)
+
+While we are adding afterthoughts, I want to remind you that files from
+this suite are used to make executables for MS-DOS computers which use
+the IBM PC bus so some modules relate to accessory cards for that machine.
+Defining compiler directives like DRSI, or PC_EC, will cause your compile
+to fail.
+
+Also, globally defining things like "NOTUSED" or "LATER" will have unpre-
+dictible consequences.
+
+Coherent users have no need to use the Ctrl-\ (quit) switch on NET if
+they are using virtual terminals.  NET runs fine when its window is not
+active.  In fact, using the quit signal removes one of the two places
+where the CPU is released to do other tasks.  If you start NET with no
+serial ports attached (like if you have no startup.net file), and issue
+a quit signal to ignore keyboard input, NET will become a CPU hog,
+consuming an enormous amount of the machine's resources.
+
+(End of k5jb.k31.txt)
+
+

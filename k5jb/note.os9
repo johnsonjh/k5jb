@@ -1,0 +1,39 @@
+													19 Sept 1993
+
+The net and bm binary files here are compiled to work on a 68000 osk box.
+They do not use the math or cio modules. The OS9 version was 2.4 and the C
+compiler version was 3.2. This was compiled on a Peripheral Technology
+PT68K4 w/ 4 megs ram and a 68000 @ 16 mhz.
+
+The baud rate parameter in the startup.net file is not implemented, I 
+decided setting it within the program is counter to the OS9 philosophy.
+The current baud rate will be printed on a sucessful open.
+Use xmode to set the baud rate before using net. Also, use xmode to set the
+number of bits to 8 and 1 stop bit.
+
+The AX25 and SLIP interfaces are the only ones implemented.
+
+The telunix (telnet login) function is not implemented because of a lack
+of a working pseudo-tty package for osk. It would be easy to implement though
+if a working pseudo-tty package ever shows up. If anyone runs into one, let
+me know!
+
+This was compiled from a excellently debugged version of NET for unix
+by Joe Buswell, K5JB (see the docs).
+
+I have included the startup.net file I used for testing and the other
+setup files (hosts.net, bm files, etc). See the docs for more info.
+
+Set the following env vars, NETHOME and NETSPOOL. TMPDIR can be set to
+a ramdisk for faster tempfile operations.
+
+Check out the unix instructions in the DOCS.
+
+Please direct any comments or bug reports to me.
+
+Robert E. Brose II
+internet: bob@jriver.com
+uucp: ...uunet!jriver!os9!bob
+packet: N0QBJ@WB0GDB.#STP.MN.USA
+cis: 72067,3021
+

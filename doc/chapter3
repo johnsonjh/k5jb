@@ -1,0 +1,250 @@
+3.  Taking NET for a Test Drive
+
+For the quick introduction to NET provided in this section, we assume that 
+you are using the MS-DOS version on an IBM PC or clone and you have 
+configured your files as suggested in Chapter 2.  Also, we assume a TNC 
+has been set up as interface 'ax0'.
+
+Start by typing 'NET' to get the program up and running.  You should be 
+presented with a banner including revision information and copyright 
+statements, followed by a prompt of 'net>'.  If you don't get this, some- 
+thing is horribly wrong.  Go back and check the installation instructions 
+in Chapter 2 or find a friend and ask for help.
+
+If you set up the files and environmental variables as recommended in 
+Chapter 2, you can run NET from any directory or drive on your computer.  
+You can also use an alternative startup file instead of autoexec.net.  If 
+you have a file called "auto1" with special startup commands, and it is 
+located in the NETHOME directory, you can use it with the NET startup 
+command, "net auto1".
+
+If you are adventuresome, try any of the NET commands, or part of a NET 
+command.  Normally if you make a mistake the correct syntax will be 
+returned so you can get it right.  Making a deliberate mistake like "arp 
+crap" is a good way to get a reminder of what the command needs.  When you 
+figure out what you need help on you can make up a file, help.net, put it 
+in the NET home directory, and ask for help when you need it.  There is a 
+sample in samples.com.
+
+Many of the commands, ftp, telnet, finger, etc. can be issued at your 
+console to your own station as though you were remote.  Some examples are 
+given below.
+
+3.1.  Trying out the AX.25 Support
+
+Once you have the program going at all, the first thing you'll probably 
+want to do is to figure out if the TNC is hooked up correctly, and whether 
+you're getting out at all.  To get connected, you do basically the same 
+thing you'd do with a raw TNC.  Type 'connect ax0 <callsign>', where 
+<callsign> is someone's callsign who is known to be on the air.  You can 
+also specify a digipeater string.  For example, you could type one of:
+
+ connect ax0 n3eua (connect using the ax0 TNC to N3EUA)
+ connect ax0 n3eua n1fed n0ccz (conn to N3EUA via N1FED and N0CCZ)
+
+If all is well, you should get "Conn Pending" and then "Connected" mes- 
+sages.  At this point, you're connected just like using a plain old TNC.  
+Kind of boring, huh? It'll get more exciting soon!
+
+There are some line editing commands you can use when typing a command 
+line, or while in an active session.  Use Ctrl-R to re-display the current 
+line, Ctrl-H (backspace) to delete the previous character, Ctrl-W to 
+delete the previous word, and Ctrl-Y or Ctrl-U to delete the whole line.  
+You can redisplay the previous line typed with a Ctrl-E.  (Current line is 
+lost.)  When editing a previous line, you can use the non-destructive 
+cursor movement keys: Ctrl-S, one character backward; Ctrl-A, one word 
+backward, Ctrl-D, one character forward, and Ctrl-F, one word forward.  
+NET executes or sends the that portion of the line that is left of the 
+cursor when you hit the RTN or ENTER key.  If you want to send one of 
+these editing control characters, preface it with a Ctrl-V.
+
+If you want to save what you receive to a disk file you can use the record 
+command.  Record only works after you have established a session and you 
+use it by specifying a file name, e.g. "record story".  To stop recording 
+without closing the session, type "record off".  Record works in any 
+session except FTP (File Transfer Protocol).  See Chapter 6.
+
+When you're ready to disconnect, use the <F10> key to escape from the 
+session back to the 'net>' prompt, and then type 'disconnect'.  You will 
+discover that all commands can be abbreviated, and you can type a "d" to 
+get the same results as "disconnect".
+
+If things don't work, watch the lights on the TNC to see if you're 
+transmitting at all, then go read up on the "trace" command so you can see 
+what the program thinks it's doing.  Even easier, if there's someone else 
+using TCP in your area, ask for help!
+
+3.2.  Trying out the NET/ROM Support
+
+If you have configured to attach NET/ROM (See Chapters 5 and 6) you can 
+try a NET/ROM connect.  You will have to wait until your neighbor NET/ROM 
+has broadcast a routing table before you can make a NET/ROM connection 
+beyond your neighbor NET/ROM (or you created an explicit NET/ROM route, in 
+which case you have progressed beyond the advise contained here).  If the 
+netrom route command (n ro for short) yields a list of NET/ROM stations, 
+try:
+
+ netrom connect okc (connect using the NET/ROM protocol to OKC NET/ROM   
+ node.)
+
+or for short, and showing an alternative destination:
+
+  n c wd5hjl-1 (connect to the OKC NET/ROM using its amateur call)
+
+After you are finished playing NET/ROM you can either disconnect the AX.25 
+link or issue the close command (this is a session).  In either case, hit 
+the F-10 key to get the prompt and type disc, or close.
+
+3.3.  Trying out the Finger Command
+
+If you have installed any "finger" files in your finger sub-directory, you 
+can try "putting the finger" on the call sign associated with that file.  
+If your host name was w1aw and you had a file called, k5jb.txt, you would 
+use the command:
+
+ finger k5jb@w1aw
+
+And it would return the contents of that file.  From this perspective you 
+can see the results at both the requesting and the target stations, since 
+you are both.  You can find more on finger in Chapters 5 and 6.
+
+3.4.  The Telnet Command
+
+If there's someone else on the air in your area already using TCP/IP, then 
+the next most easy thing to do is to try a keyboard connection using the 
+Telnet protocol.  The end result will be the same as doing an AX.25 
+connect in most cases, but you'll be taking advantage of a couple of neat 
+attributes of having more protocol horsepower to help you out.
+
+First, you need to either know the numeric IP address of your friend's 
+system, or you need to have updated HOSTS.NET to include the system name 
+and the numeric address.  Then all you have to do is call your friend on 
+the phone and get him to go to his console (an incoming telnet session 
+otherwise falls on deaf ears), and type:
+
+ telnet n3eua (talk to N3EUA, address in HOSTS.NET), or,
+ telnet [44.32.0.4] (use the numeric address directly)
+
+Now you can type back and forth just as if you were connected with a 
+normal TNC.  When you're done, use the <F10> key to escape back to command 
+mode, and then type 'close' to close the connection gracefully, or 'reset' 
+if you're really in a hurry.
+
+If you are using Unix, use the escape character you defined in 
+startup.net.  If you didn't define one, the default is Ctrl-].
+
+The reason for the remark about phoning first is that most telnet 
+implementations fall on deaf ears unless the party on the other end is 
+there to open a session on the incoming connect.  What you send during a 
+telnet session to an unattended computer goes into a bitbucket.  If there 
+is no one else to play telnet with, do a telnet to your own host name and 
+you can see the results coming and going.  (If the other party is using 
+NET, version K28 or later, the incoming telnet automatically makes the 
+session active and typed data is sent to the screen.)
+
+When you are in a telnet session, you can use the same line editing, and 
+session recording as described in 3.1. above.
+
+3.5.  The FTP Command
+
+So far, all we've done is to use more software and work harder to do the 
+same things we can do with a plain old TNC.  The FTP command isn't like 
+that!  To get a file from your friends' machine, you can type the command:
+
+ ftp n3eua
+
+to start a file transfer session to the N3EUA machine.  When the connec- 
+tion is opened, you'll get a banner from the remote machine, followed by a 
+prompt for your user name.  If you've negotiated with your friend to have 
+a special username and password set up for you in his FTPUSERS file, use 
+that.  If not, many machines allow arbitrary users to get limited access 
+to the files available with a special username 'anonymous.  If you want to 
+use the 'anonymous' login, when you're prompted for a password enter your 
+callsign or something else recognizable, as many folks keep a log of FTPs 
+so they know what files people care about, and being able to associate 
+your activities with you sometimes helps.
+
+If you guess the user or pass words wrong, your program will loop and 
+continue to ask for these two things until you either get them right, or 
+escape back to the command prompt and close the session.  In MS-DOS, 
+escape with F-10 key.  In Unix use your defined escape key.
+
+Try ftp with yourself as host, and when you get logged in, try,
+
+  get /net/autoexec.net con
+
+The file, autoexec.net will go to your screen!  (CON is the standard 
+output device in MS-DOS.  In Unix send the output to your connected tty 
+port.)
+
+3.6.  The Mail System
+
+The mail system is a subject unto itself.  It is also one of the truly 
+nifty things about running TCP/IP.  Look in Chapter 4 for a complete run-
+down on how to install and operate the BM mailer, and the portions of NET 
+related to it.  Enter a mail message to yourself with BM.  For example, m 
+k5jb@k5jb.  Quit BM, and to hurry things along, at the NET prompt, type 
+smtp kick.  You will see a message that mail arrived.  Restart BM and you 
+will be able to read that message.  It is not immediately intuitive, but 
+if you have more than one message, you can read a particular message by 
+just typing its number in the list.
+
+3.7.  Tracing and Status Commands
+
+The tracing and status commands provide a great deal of information about 
+what is going on in the system.  All we'll attempt to do here is raise 
+your interest level.
+
+If you want to find out what sessions are active to and from your machine, 
+you can type 'sessions' and you'll get a list.  If you want to get 
+information about all of the TCP connections open to and from your 
+machine, including mail transfers and other things that don't directly 
+interact with your keyboard and screen, you can type "tcp status" and 
+you'll get a list of connections.
+
+It is a good idea to do a tcp stat command and then an ax25 stat command 
+to make sure someone is not using NET before you exit.
+
+If you're not sure what's happening on an interface, or you'd like to 
+"read the mail" (watch what other folks are doing on the channel), then 
+use the "trace" command.  The form is described in the command reference 
+in Chapter 6.  For example:
+
+     trace ax0 111 (activity on ax0, including ASCII dump)
+     trace ax0 211 (activity on ax0, including hex dump) 
+     trace ax0 11 (activity on ax0, printing only the headers)
+
+Note that you also have control over whether tracing can bother you in a 
+session, see the trace command summary in Chapter 6 for more details.
+
+.pa
+3.8. Unix and shell layers
+
+If you are running this under Unix, there are provisions to run it in the 
+background with the shell layer manager.  This enables you to run NET, run 
+BM, or send a letter to your grandmother, from one terminal without 
+interrupting NET.  To use it invoke the shell layer manager, shl.  At the 
+>>> prompt, create a shell with "c".  It will return with the first layer 
+prompt, "(1)" and you can start NET.
+
+Before you put NET in the background you must first disable its keyboard 
+input by issuing a Ctrl-\ (Ctrl-backslash) and NET will respond that it is 
+OK to go in background.  Use Ctrl-Z (or the "swtch" character defined in 
+your environment) to get the shl prompt, >>>.  Now you can create another 
+shell with the "c" command or switch to an already running one.  Net is 
+still running and if you left trace on, or someone fingers you, NET's 
+output will appear on your screen even if you are in another shell layer.  
+Don't tell shl to block this or NET will suspend when it has output.
+
+When you are ready to send commands to NET, go to that shell layer and 
+issue another Ctrl-\ which will signal NET to restart scanning for input.  
+Operation is normal until you use Ctrl-\ again.  Refer to the Unix shl(1) 
+instructions for more on shl.
+
+Coherent users have no need to user the Ctrl-\ (quit) switch on NET if 
+they are using virtual terminals.  NET runs fine when its window is not 
+active.  In fact, using the quit signal removes one of the two places 
+where the CPU is released to do other tasks.  If you start NET with no 
+serial ports attached (like if you have no startup.net file), and issue a 
+quit signal to ignore keyboard input, NET will become a CPU hog, consuming 
+an enormous amount of the machine's resources.

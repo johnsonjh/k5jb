@@ -1,0 +1,1082 @@
+2.  Installation
+
+2.1.  What an IP Address Is, and How to Get One
+
+IP Addresses are 32 bit numbers that uniquely identify a given machine (or 
+"host") running the TCP/IP protocol suite.  All of the possible 32 bit 
+numbers are coordinated by an entity known as the Network Information 
+Center, or NIC.  Amateur Radio operators are fortunate in that a "Class A 
+Subnet" consisting of 24 bits of address, in the range 44.X.X.X, has been 
+reserved for our use.  By general consensus, Brian Kantor, WB6CYT, of San 
+Diego, CA, now serves as the top level administrator of the 44.X.X.X 
+address space, and assigns blocks of addresses to regional coordinators 
+from around the world.
+
+You need to have a unique address before you can link in with the rest of 
+the networked world.  The best way to get one is to ask around the local 
+packet community and find out who your local address coordinator is.  Your 
+local coordinator will then assign you an address from the block for your 
+area.
+
+If you can't find out who your local coordinator is, post a message on the 
+local packet bulletin board network, or ask someone to check Compuserve's 
+Hamnet, in the packet section.  Current lists of coordinators are freely 
+available.
+
+If none of these sources yield results, Brian Kantor can be reached as 
+brian@ucsd.edu on the Internet.
+
+2.2.  Configuring a TNC for TCP/IP Operation
+
+This section describes the procedure for configuring various packet radio 
+Terminal Node Controller units (TNCs) for operation with the KA9Q 
+package.  Readers who will be using the package with only SLIP or Ethernet 
+(wired) connections can feel free to skip ahead to Chapter 3.
+
+With later versions of the TNC-2 code, simply issue the KISS ON code and 
+then send the command "restart".  If using an older TNC, read on.
+
+There are now several choices for TNCs to be used with the TCP/IP network 
+code.  Versions of the Keep It Simple Stupid TNC interface software (KISS) 
+are available for the TNC-1, the TNC-2, the VADCG board and clones 
+(Ashby), the Kantronics family of TNCs, and the AEA TNCs.  Following are 
+the different setup/configuration modes for the different TNCs.
+
+2.2.1.  TAPR TNC-1 and Clones
+
+The firmware for the TNC-1 is available in either a downloadable version 
+or a stand alone version.  I will describe only the stand alone version 
+here.  Locate the ROM labeled E000 and remove it.  Insert the KISS PROM in 
+its place making sure that you orient the prom in the same direction 
+(failure to do so will result in smoked PROM).  Connect your TNC-1 to your 
+computer using an RS-232 cable.  A cable that passes the signals from pins 
+2, 3, and 7 is sufficient.
+
+Since the TNC-1 has no switches for setting the baud rate to the computer 
+the firmware has been "hard wired" to 4800 baud.  See the documentation 
+that comes with the TNC-1 version of KISS for instructions on how to patch 
+the .HEX file for other baud rates.
+
+There is also a newer version of the TNC-1 KISS firmware that is 
+documented in the TNC_TNC1.ARC file available from your librarian.  TAPR 
+can provide programmed TNC-1 KISS EPROMs.
+
+2.2.2.  TAPR TNC-2 and Clones
+
+The standard firmware for the TNC-2 now supports a 'KISS' command to turn 
+on KISS support.  If you wish to use the KISS command included in 1.1.6 
+(and later) firmware, simply establish serial communication with your TNC, 
+issue the commands "kiss on" and "restart".  If you have your battery 
+installed you will need to exit KISS by using the "param ax0 255" command.  
+Your TNC documentation contains more for more info.  
+
+From time to time, comments are heard about some versions of KISS being 
+better than others.  For the purpose of running net, any version of KISS 
+will work fine so don't go looking for any "magic" versions.  Some 
+versions don't do full duplex, but we don't do that anyway and none of 
+them have conventional hardware handshaking, which is inherent in the 
+"simple" philosophy of KISS.  (There are signals on some of the signal 
+lines besides transmit and receive data but we don't use them.  See below 
+for cable requirements.)
+
+There is little reason to use a KISS only TNC-2 ROM, but if that is what 
+you want to do, here is how to do it:
+
+If you want to run KISS only, or have an older TNC-2 without the KISS 
+command, ask your librarian for the TNC_TNC2.ARC package and read the docs 
+included on how to program an EPROM with the firmware (or buy a ROM from 
+TAPR), and then proceed.
+
+Open up your TNC and locate the ROM.  It is in the socket labeled "U23." 
+Using a small nail file or screwdriver gently pry up the existing EPROM.  
+Carefully press the new EPROM into place being sure that the orientation 
+is the same.  If you are installing the 2764 type of EPROM you will need 
+to make a small modification to the TNC.  There is a location on the board 
+just above the first RAM socket labeled JMP-6.  Turn the board over and 
+cut the trace joining the two pads.  Solder a two-pin jumper header in 
+place.  When using a type 2764 the jumper at JMP-6 should be removed and 
+installed when a type 27256 EPROM is being used.  That should complete the 
+hardware part of the installation.  As an alternative you may choose to 
+burn the KISS code into a 27256 and not bother with jumpers.  (The best 
+alternative is to just upgrade the EPROM to have both KISS and Howie's 
+code in it.)
+
+If you are in a hurry, attach your TNC to your PC using the same cable 
+that you were using to connect your PC to your TNC.  Eventually, to make 
+sure net works correctly, check your cable against the requirements in 
+Section 2.3.1, or for Unix, Section 2.5.
+
+Now to verify that the TNC still works.  Apply power to the TNC and turn 
+it on.  The STA, CON, and PWR LEDs should come on and the STA and CON 
+lights should go out again about 1 second later.  If you have the type 
+2764 EPROM with the KISS code in it one or both of the STA and CON LEDs 
+will begin to flash.  If the CON LED flashes you have 8Kb of RAM in the 
+TNC.  If the STA LED flashes you have 16Kb of RAM.  If both LEDs flash you 
+have 32 Kb of RAM.  The flashing of the LEDs verifies the proper operation 
+of the TNC.
+
+2.2.3.  AEA PK-232 and PK-87
+
+In later versions of PK-232 and PK-87 firmware, the command is simply KISS 
+ON, and RESTART.  If you have an older version, read on.
+
+KISS is a standard feature in the PK-232 if you have a recent release of 
+the firmware, 4-MAR-87 or later for the PK-232, or 21-JAN-87 or later for 
+the PK-87.  To make it work first ensure that your computer can communi- 
+cate with the TNC in standard packet mode.  This will ensure that the 
+computer, TNC, cabling, and radio are all operating properly.
+
+[Please note that one of the commands "PACKET" is not valid on the PK-87 
+and will only elicit a "Huh?" response.  Please note that comments have 
+been added to the commands.  Do not type the information following the 
+double dash or type the double dash itself.]
+
+Here is the sequence of commands that will turn on the KISS mode for the 
+(Older) AEA products (see note below):
+
+ AWLEN 8 -- ensure it can speak 8 bit data
+ PARITY 0 -- no parity
+ RESTART -- warm reset; make commands take effect
+ PACKET -- PK-232 or Heath only
+ TONE 3 -- PK-87 only
+ START 0 -- disable software flow control
+ STOP 0
+ XON 0
+ XOFF 0
+ XFLOW off
+ CONMODE trans -- pass through all characters
+ HPOLL off -- disable host polling
+ KISS on -- enable KISS version of host mode
+ RAWHDLC on -- turn off AX25L2 (now handled by the PC)
+ PPERSIST on -- turn off DWAIT and enable p-persistence
+ HOST on -- start KISS running
+
+The PK-87 or the PK-232 will remain in the KISS mode until you send a 
+break (~200ms of spacing) or until you send the command character three 
+times (^C ^C ^C) in quick succession.  Beware! Some terminal emulators 
+(like YAPP) will send a break signal when you exit from them.  That will 
+undo your work and cause all manner of confusion.  The terminal program 
+PROCOMM seems to work just fine.  The TNC may also be switched back to 
+ordinary AX.25 mode by issuing the following command from within NET.EXE:
+
+ param ax0 255
+
+.pa
+2.2.4.  DRSI PC Packet Adapter
+
+DRSI executable probably isn't included in the version supplied because it 
+adds almost 7.5k to the code size.  Source code for the DRSI driver is 
+included however if you got it from me (K5JB) or TAPR.  In options.h, 
+#define DRSI to include DRSI code, or contact me and I'll compile you one.  
+Backing this code out of NOS and making it work correctly was one of my 
+proud achievements!  N6TTO sent me his DRSI driver for NOS while he was 
+developing it and I finished it and adapted it to net.
+
+Manufacturer's instructions for setting up DRSI hardware are adequate.  
+Parameter settings are included in Chapter 6.  The following is from notes 
+I supplied to DRSI when I sent them the driver.  
+
+The only suggestion I have about setting parameters on the PC*PA is to not 
+overdo the receive buffer size if you are running in restricted memory, 
+such as with DESQview, along with other processes.  This version of net 
+runs in a 170k window OK unless you pick a large buffer size and let large 
+netrom route tables build.  With only limited testing I can advise that a 
+buffer size of 512 and two netrom nodefilter call entries work well.  With 
+a 2048 byte buffer, and three netrom stations contributing to the node 
+table, the dynamic memory allocation began failing after about 12 hours of 
+operation.  Syntax of the attach command I have been using is:
+
+     attach drsi 0x300 7 ax25 dr0 512 256 1200
+
+This means attach, as an asynchronous device, at address 300, using inter-
+rupt 7, a device to be called dr0, having a receive buffer size of 512 
+bytes, maximum transmit packet size of 256 bytes, operating at 1200 bps on 
+both channels.
+
+If you want to set the second channel to a different speed, say 300 bps, 
+add another argument, like:
+
+     attach drsi 0x300 7 ax25 dr0 512 256 1200 300
+
+Note that I have been using the printer interrupt (7) so the other inter-
+rupts would be available for the async ports.  Choose the interrupt to 
+agree with the one you selected on the card.  You can attach a maximum 
+of two DRSI cards.  Name the second one dr1.  (k30)
+
+If you try to attach a non-existent DRSI PC*PA with the attach command, 
+net will tell you of the errors in your ways.
+
+If you run net in unrestricted memory you will have over 30k of memory 
+pool available.  I find it working well with 20k of space as left with the 
+Desqview window described above.
+
+If you use one of the other async ports in addition to the PC*PA card, you 
+may have to keep the baud rate down to 2400 if you are not running an AT.  
+In testing on a 10MHz XT clone I had a lot of CRC errors on a slip link 
+running 4800 bps while the PC*PA was processing AX.25 frames.  At 2400 bps 
+on the slip link the computer handled simultaneous data on both ports 
+well.
+
+The PC*PA doesn't miss a lick at 1200 bps on the radio circuit but it may 
+not work as well at higher rates.  I haven't tested it yet.
+
+There are a couple of net commands that are peculiar to the PC*PA driver 
+implementation.  One of them, drsistat (or just drsi) shows a lot of stat-
+istical information that may not be of much use to you unless you read the 
+source code in drsi.c to see what all those numbers are.  It doesn't take 
+but about a day for mine to show a million receiver interrupts.
+
+To check the KISS-like parameters, use the command,
+
+     param (interface)
+
+and to change parameters, use the command,
+
+     param (interface) (a) (b)
+
+where (interface) is the interface name (dr0a or dr0b), (a) is the param-
+eter number, and (b) is the parameter value.  The command, param dr0a, (or 
+param dr0b) will show, in one line, something like, TXD, P-Persist, Slot 
+time, Squelch Delay, and End Delay, and their values.  (It also shows 
+speed but you can't change that on the fly.)  The first parameter is par-
+ameter 0.  For example, to change TX delay on interface dr0a to 400 ms 
+(40) use the command, param dr0a 0 40.  To change P-Persistence from 64 to 
+128, use the command, param dr0a 1 128.  See KISS, in Chapter 8, for 
+meaning of P-Persistence.
+
+2.2.5.  Kantronics TNC's
+
+Kantronics includes KISS support in their products.  See below for special 
+features that may be compiled in your code to permit dual port operation 
+with the KPC-4 or KAM.
+
+First setup and operate your KAM, KPC-II, or KPC-4 for standard packet 
+operation.  This will ensure that the computer, TNC, cabling, and radio 
+are operating properly.  Use your terminal program to send the following 
+commands:
+
+ ABAUD 4800 -- baud rate to what you will be using when net is running 
+               (set by the attach command)
+ DWAIT 0 -- disable DWAIT
+ PERSIST 50 -- enable persistence and set it to about 20%
+ SLOTTIME 16 -- set the slot time to 160 ms
+ KISS ON -- Enable KISS mode at the next reset
+ PERM -- make above command permanent so that KISS will be entered 
+         whenever TNC is powered up
+ RESET -- start KISS
+
+If you wish to have the the TNC revert back to ordinary AX.25 mode of 
+operation you should omit the PERM command from the above sequence.  That 
+way the TNC will revert back to ordinary AX.25 mode when the power is 
+removed and restored to the TNC.  The TNC may be switched back to ordinary 
+AX.25 mode by issuing the command:
+
+     param ax0 255
+
+This command will work even if the PERM command has been used to make KISS 
+the default mode of operation.
+
+2.2.5.1.  Optional kpc4 driver
+
+If compiled with KPCPORT compiler directive defined, the "attach kpc4" 
+command is available to enable both Kantronics KPC-4 radio ports to be 
+independently used.  The Kantronics KAM should work the same as the KPC-4, 
+though all references here are to the KPC-4.  You can tell if the KPC-4 
+driver was compiled into the executable from the net startup screen, or 
+you can issue the command, "attach kpc4", to see how net responds.  If you 
+want to compile a version with this driver, define KPCPORT in options.h 
+(Or contact K5JB to get one compiled).
+
+Syntax of this command is:
+
+     attach kpc4 <I/O addr> <vector> <label> <bufsize> <mtu> <speed>
+
+Label is normally kp0, bufsize is the receiver buffer size, mtu is the 
+maximum packet size without fragmenting, and speed is the baud rate of the 
+asynchronous serial port.  The attach kpc4 command differs from the attach 
+command in one way.  Note that the mode argument is missing since only AX-
+25 mode is available.  An example of using it in MS-DOS, using com1, 2k 
+receive buffer, 256 byte max packet size, at 4800 bps on the serial port, 
+would be:
+
+     attach kpc4 0x3f8 4 kp0 2048 256 4800
+
+The Unix version of the command, using /dev/tty14 at 4800 bps would be:
+
+ attach kpc4 0 /dev/tty14 kp0 0 256 4800  (The "0"s are placeholders.)
+
+(As in the drsi driver, subsequent commands will need reference to the 
+first port as kp0a and the second as kp0b.  Additional kpc4 drivers may be 
+attached to other serial ports by using labels such as kp1, kp2, etc.
+
+2.2.5.2.  KPC-4 explanation
+
+This driver was developed by Steve, N5OWK, who provides the following 
+explanation of the Kantronics KISS used in the KPC-4 and KAM.
+
+The KPC-4 is a dual radio port TNC with the ports identified as port 1 and 
+port 2.  By using the attach kpc4 command you enable a special driver that 
+will later enable you to specify which port you want to use.  The ports 
+can be on two different frequencies or can be used at two different radio 
+baud rates (with equipment modification).  If the 2400 baud option board 
+is installed, and you have made suitable modifications, then kp0a would 
+refer to the 1200 bps port and kp0b to the 2400 bps port.
+
+Note: Use of the param command effects only the selected port, therefore 
+param command must be given for each port to give the desired result.
+
+.pa
+2.2.5.3.  KISS as applied by Kantronics
+
+The KPC-4 kiss interface command type byte is used to multiplex to both 
+ports.  There are only 4 normal commands, and one special command.  These 
+are:
+
+ TYPE    FUNCTION
+ 0       Data to be transmitted
+ 1       TXDELAY - second byte contains txdelay in 10ms increments
+ 2       PERSISTENCE - second byte contains persistence value
+ 3       SLOTTIME - second byte contains slot interval
+
+ 255     Causes KPC-4 to exit the kiss mode
+
+Since these commands can be represented in the lower nibble (first 4 bits) 
+of the command byte, the upper nibble is used to signify which port is to 
+receive the command.  If the upper nibble is 0 then port 1 is selected.  
+Otherwise port 2 is selected.  (Bit 4, 0x10, is the bit in the command 
+byte that contains the port signal.)  Receive data is similarly identified 
+by the presence or absence of bit 4 in the command byte.  If this bit is 
+set, the data is coming from port 2; if clear, it is from port 1.
+
+Using the KPC-4, or KAM, in KISS mode therefore enables two radio ports 
+while using only one serial port on the computer.  Use these two ports as 
+though they were separate and distinct ports (kp0a and kp0b) when setting 
+up the IP operation of your station.
+
+2.2.6.  PacComm PC-100 Card, EAGLE, HAPN, etc.
+
+The drivers for these cards are incomplete and are not included in this 
+release, it is unclear whether the available drivers work at all.  An 
+interested individual can obtain them from K5JB if he wants to complete 
+work on one of them.  The code for the DRSI driver could be used for 
+ideas.
+
+2.3.  IBM PC and Clones
+
+2.3.1.  Serial Data Cable
+
+To prevent hard to diagnose problems, make sure your RS-232C data cable 
+from the PC and the TNC has the correct configuration to run net.  Net and 
+the KISS equipped TNC should only have Transmit Data, Receive Data, and 
+Signal Ground (TXD, pin 2; RXD, pin 3; and SG, pin 7 in the DB-25 
+connector) connected.  At the PC end, tie Request To Send (RTS, pin 4) to 
+Clear To Send (CTS, pin 5).  Also tie Data Set Ready (DSR, pin 6), Data 
+Carrier Detect (DCD, pin 8), and Data Terminal Ready (DTR, pin 20) 
+together.
+
+If you are using a DE-9 connector on the TNC, check your manufacturer's 
+literature, but normally you should find that TXD is pin 3, RXD is pin 2, 
+and SG is pin 5.  On PC/AT DE-9 connectors, TXD is pin 3, RXD is pin 2, SG 
+is pin 5.  On the PC/AT end, Tie RTS, pin 7; to CTS, pin 8; and tie the 
+three lines, DSR, pin 6; DCD, pin 1; and DTR, pin 4 all together.
+
+.pa
+If you are using the Unix version, see Section 2.5. for data cable 
+requirements.
+
+2.3.2.  MS-DOS Quick Start -- File Structure
+
+For users of MS-DOS, see the archive "etcfiles.lzh" which contains sample 
+files normally used.  Follow the instructions and edit these files with 
+your favorite text editor (one that can save files as ASCII), and then 
+you're ready to "Play".  Typically, the following four files are 
+considered minimum, but you can start with less.  You need autoexec.net to 
+do the basic set-up commands for you.  You need hosts.net to translate 
+host names to numbers.  You need ftpusers to try out FTP, and to do any 
+mailing with bm, you will need bm.rc.
+
+Instructions on editing the files are embedded as comments in the files.  
+Brief summary on what these files do is included here.
+
+In case you didn't already know, there are two executable programs, 
+net.exe and bm.exe.  (Normally simply called "net" and "bm".)  Net is the 
+networking program (TCP/IP).  Bm is the mailer, Bdale's Mailer, which is 
+used to read and write messages.  You should use the versions supplied 
+with this documentation because they have both been house broken and both 
+use the same environmental variables to find their files (explained 
+below.)
+
+There are various net versions available, depending on what options were 
+turned on during compile.  The one included with this kit is likely the 
+bare-bones version with only a few options included, the most notable 
+being NET/ROM interface.  Two options that are seldom used but can be 
+compiled in are GRAPES Multiport code and DRSI Packet Adapter driver.  If 
+you have a C compiler you can modify the options.h file and make your own 
+or contact me and I'll compile whatever version you want.
+
+These versions of net and bm permit you to organize your files better than 
+earlier versions.  They use "environmental variables" to tell net and bm 
+where to find the required files.  Environmental variables are strings 
+tucked away in the operating system that let you pass information to run-
+ning programs.  The environmental variables we use are, NETHOME, NETSPOOL, 
+and (if you want to enable the mbox) PUBLIC.  (You should also use TZ to 
+establish time zone information on mail messages.)  You put lines in your 
+autoexec.bat file, like those that follow, and reboot the computer, or 
+make a batch file that sets these variables and then executes net.  (If 
+you get a message like, "Out of environment space", then I presume you are 
+already savvy of the environment and know where in your MS-DOS manual to 
+look to see how to expand the environment.  Hint:  Look under "Command".)
+
+The following examples assume you made directories, NET, SPOOL, and 
+PUBLIC, right off of root, like the diagram that follows.  (The forward 
+slashes are correct, In this case, MS-DOS doesn't care but Unix does, and 
+I run this thing on both.  These variable names must be in caps, but the 
+rest of the "set" command doesn't need to be.  When it is necessary to use 
+back slashes "\" in MS-DOS, these notes will point it out.)  In MS-DOS, 
+you can specify drive letter (e.g. d:/net) in these paths.  (If in bm.rc 
+you use the mqueue and smtp commands, those commands will prevail over the 
+environmental variable.)
+
+First, here is how you set the environmental variables:
+
+set NETHOME=/net
+set NETSPOOL=/spool
+set PUBLIC=/public
+set TZ=CST6CDT  (Use your time zone, e.g. EST5EDT, or UTC0UTC, the number 
+                is an offset from UTC)
+
+then, the directories and subdirectories (in caps) and files that go into 
+them, should be set up to look like the illustration here and on the next 
+page:
+
+        \NET__ . . . . . . . . . net.exe, bm.exe
+           |                     autoexec.net, ftpusers, hosts.net (1)
+           |                     bm.rc (if you are going to do mail)
+           |                     alias (optional)
+           |                     net.hlp (optional)
+           |                     helpbox.hlp (optional)
+           |                     *.hlp (optional)
+           |
+           |___FINGER. . . . . . optional finger files
+
+        \SPOOL__ . . . . . . . . * net.log (2)
+                     |
+                     |___MAIL. . * user.seq
+                     |           * user.txt
+                     |
+                     |___MQUEUE. * sequence.seq
+                     |           * #.txt
+                     |           * #.wrk
+                     |
+                     |___RQUEUE. only used if you're a mail
+                                 gateway...
+
+        \PUBLIC_. . . . . . . .  downloadable mbox files (optional)
+
+(1)  You can get by without ftpusers; no one will be able to do ftp, not 
+even yourself if it missing.  You will need to at least have yourself in 
+hosts.net or you won't be able to use your user name in commands.  You 
+would have to use the IP address number where host is called for.
+
+(2) The files marked "*" are created by net or bm when they run.  The name 
+for your logging file, and its placement is set in autoexec.net.  You can 
+leave out the optional files until you figure out what they are for.
+
+If you want to be consistent with time stamping of messages, set the en-
+vironmental variable TZ = CST6CDT or EST5EDT, or whatever, and it will 
+timestamp the messages with the proper time if your DOS clock is set to 
+local time.  (The number in the TZ string is the offset from UTC.)  The 
+copy of BM included in this kit handles this timezone thing correctly.  If 
+you don't do this, it will use UTC for time stamping and you will need to 
+set your computer clock accordingly.
+
+You can add your net home directory (\net in this example) to your path 
+command and you will be able to execute net or bm from any current direct-
+ory on the disk(s).  Alternatively, you can put net and bm wherever you 
+keep executables (e.g. \bin) and the environmental variables will seek out 
+the files they need.
+
+If you chose to follow the file placement instructions that come with 
+other versions of net and bm, (scattered all over the place) the supplied 
+versions of net and bm will find them if you don't use the environmental 
+variables.
+
+Examine the sample files I included, edit them to fit your situation, 
+following the file notes that follow.  In Chapter 6 all of the commands 
+are explained.  When you have your files edited, you will be ready to go.  
+You just start net and see if it upchucks some error messages.  At the 
+command prompt, type "host".  If it doesn't respond with your host name, 
+re-read the above.  If it looks good at this point, jump ahead to Chapter 
+3 and take it for a test drive.  If you are more cautious, read on before 
+launching the thing.
+
+Note:  Commands for net and bm are case sensitive.  "host" works.  "Host" 
+or "HOST" doesn't.  You only have to type enough of a command to make it 
+unambiguous to the list of commands.  In either program, command, "?" 
+shows the command list.  The program scans this list from the top and 
+executes the first command that matches the characters you typed, and it 
+only looks at the number of characters you typed.  "a" does arp, "ax" does 
+ax25.
+
+Another note:  This is explained in Chapter 6, but when you see a command 
+word or argument surrounded by angle brackets "<variable>" it means you 
+supply the variable, and not the word, "variable".  When you see a command 
+or argument surrounded by square brackets "[on]" it means this is an op-
+tional command.  In this case, since there are no "<>" it means to supply 
+the word "on".  If you see a pipe, "|" it means "or", and denotes options 
+you can choose.  In this text, strict syntax is now demonstrated.  In 
+Chapter 6, it is.
+
+2.3.2.1.  The AUTOEXEC.NET File
+
+The AUTOEXEC.NET file (called STARTUP.NET under Unix, and other things 
+elsewhere) works a lot like the AUTOEXEC.BAT file in DOS, hence the name.  
+When NET first starts up, it reads AUTOEXEC.NET and executes all of the 
+commands as if they had been typed in to the program from the keyboard.  
+This provides an easy mechanism for setting up the initial system config-
+uration, including setting the hostname, AX.25 parameters, interfaces 
+used, servers to start, and protocol variables.
+
+I recommend not messing with NET/ROM until you know how to do it properly, 
+and have decided to keep your computer on all the time.  You can mess up 
+the NET/ROM network with this program if it is misused.
+
+The ordering of some of the commands in autoexec.net is important.  Some 
+commands depend on information supplied by other commands.  The order of 
+the following (non-exclusive) list should be followed.  (In the 
+following list, not all the commands are necessary, nor is their order 
+important, but they are included to add some context to this list.  This 
+list doesn't contain all the possible autoexec.net commands.  See the 
+documentation, the sample files; and, most important, get help from 
+someone already on IP in your locale.)
+
+These first three have traditionally been near the top, along with the 
+ax25 mycall command, because it is often the only thing that you need to 
+change to share an autoexec.net with a neighbor.
+
+hostname (e.g. k5jb.ampr.org, necessary but order not important)
+ip address (e.g. [44.78.0.2], used by start commands, )
+smtp gate (e.g. 44.78.0.2, order umportant but here is convenient)
+
+Then use the ax25 commands:
+ax25 mycall (e.g. k5jb-10, used by attach and netrom commands)
+ax25 mboxcall (e.g. k5jb-9, necessary to enable mailbox but order 
+unimportant)
+
+(Now add the rest of the ax25 commands.  If you are using NET/ROM, and if 
+you want too make netrom reduce size of link layer packets put a reduced 
+ax25 paclen here, e.g. ax25 paclen 128, then restore normal value after 
+attach netrom, below.)  (Netrom mss is paclen - 20, max 236, min 44.)
+
+Add attach (asy and other) commands
+
+Add any param commands that are needed to change kiss timing, e.g.:
+
+# slottime
+param ax1 3 1
+# txtail
+param ax1 4 2
+
+If you enable Virtual Circuit (ROSE) interface, make this attachment 
+after all interface parameters set and before the virtual circuit is 
+referred to, e.g.
+
+vcircuit attach rosa kp0a
+
+Now you can add Netrom stuff that doesn't hurt anything, even if you 
+aren't using netrom, e.g.
+
+attach netrom
+
+If you used a shortened ax25 paclen in the ax25 commands above, you can 
+now restore normal paclen, e.g.
+
+ax25 paclen 256
+
+Here are examples of additional and typical "benign" netrom commands:
+
+netrom interface ax0 #IPJB 170
+netrom bcstifle ax0 1
+netrom interface rosa MWC 193
+netrom bcstifle rosa 1
+netrom interface rosb 4E0002 80
+
+netrom nodefilter mode accept
+netrom nodefilter add wb5fwe-1 rosb
+netrom obsotimer 3600
+netrom qlimit 100
+netrom verbose no
+netrom ttl 16
+
+Add Netrom commands that you enable if you are using the netrom transport 
+to other hosts, e.g.:
+route add wb5fwe netrom
+arp add wb5fwe netrom wb5fwe-6
+
+netrom nodetimer 1740
+netrom bcnodes rosb
+
+(For netrom off, set netrom nodetimer 0)
+
+Add your arp add and route add commands, e.g.
+
+route add default ax0
+
+arp add n5owk ax25 n5owk-2
+route add n5owk ax1
+
+If you are using VC, add stations reachable only by ROSE network, e.g.
+vc add w5gfe-10
+arp add w5gfe ax25 w5gfe-10 k5jb-5 405771 ada
+route add w5gfe rosa
+
+Add any desired IP commands, e.g.
+ip ttl 16
+
+Add any desired tcp commands, e.g.
+tcp mss 216
+tcp window 1080
+tcp irtt 30000
+tcp timer linear 5
+
+Add any desired smtp commands, e.g.
+smtp timer 1800
+smtp maxclients 10
+
+Possibly add miscellaneous commands:
+log \net\1net
+mbox y
+
+If you are using Grapes Mulport code (It uses the attached port names):
+mulport on
+
+Maybe toggle socket naming to the off state:
+sok
+
+Start commands (important to save these until almost last) e.g.
+start smtp
+start ftp
+start echo
+start discard
+start telnet
+start finger
+
+(I think I caught the necessary order.  Think of it in terms of the 
+protocol layers.  Set layer 1 things before you set layer 2, etc.)
+
+I suggest you start with the AUTOEXEC.NET file included in the sample 
+files (etcfiles.lzh), and go from there.  If you don't have the samples, 
+review the command summary in Chapter 6, and wing it...
+
+2.3.2.2.  The FTPUSERS File
+
+Since MS-DOS was designed as a single-user operating system, it provides 
+no access control; all files can be read, written or deleted by the local 
+user.  It is usually undesirable to give such open access to a system to 
+remote network users.  The FTP server therefore provides its own access 
+control mechanism.
+
+The file "ftpusers" is used to control remote FTP access.  The default is 
+NO access; if this file does not exist, the FTP server will be unusable.  
+A remote user must first "log in" to the system, giving a valid name and 
+password listed in ftpusers, before using FTP.
+
+Each entry in ftpusers consists of a single line of the form
+
+     username password path1 permissions1 path2 permissions2 ...
+
+There must be exactly one space between each field.  Comment lines are 
+begun with "#" in column one.  There can be eight path-permission pairs.  
+
+"username" is the user's login name.
+
+"password" is the required password.  Note that this is in plain-text; 
+therefore it is not a good idea to give general read/write/destroy 
+permission to the directory containing this file.  A password of "*" (a 
+single asterisk) means that any password is acceptable.
+
+(In the following instances of path names, under MS-DOS, use backslashes 
+("\"), NOT forward slashes ("/").  This field must always begin with a 
+"\", i.e., at the root directory.  This is one of the few instances where 
+\ is required in the MS-DOS version.  In Unix, use forward slashes ("/") 
+in the path names.
+
+"\pathN" is an allowable prefix on accessible files.  Before any file or 
+directory operation, the current directory and the user specified file 
+name are joined to form an absolute path name in "canonical" form (i.e., a 
+full path name starting at the root, with "./" and "../" references, as 
+well as redundant /'s, recognized and removed).  The result MUST begin 
+with an allowable path prefix; if not, the operation is denied.
+
+"permissionsN" is a decimal number granting permission for read, create 
+and write operations.  If the low order bit (0x1) is set, the user is 
+allowed to read a file subject to the path name prefix restriction.  If 
+the next bit (0x2) is set, the user is allowed to create a new file if it 
+does not overwrite an existing file.  If the third bit (0x4) is set, the 
+user is allowed to write a file even if it overwrites an existing file, 
+and in addition he may delete files.  Again, all operations are allowed 
+subject to the path name prefix restrictions.  Permissions may be combined 
+by adding bits, for example, 0x3 (= 0x2 + 0x1) means that the user is 
+given read and create permission, but not overwrite/delete permission.
+
+For example, suppose ftpusers on machine "pc.ka9q.ampr" contains the line
+
+ friendly test \testdir 7
+
+A session using this account would look like this:
+
+ net> ftp pc.ka9q.ampr
+ SYN Sent
+ Estab.
+ 220 pc.ka9q.ampr FTP version 871225.5 ready at Wed Jan 20 16:27:18 1988
+ Enter user name: friendly 
+ 331 Enter PASS command
+ Password: test  (doesn't echo to screen)
+ 331 Logged in
+
+(If you get user or pass wrong, your program will loop until you get it 
+right, or escape with a F-10 (or escape in Unix) and close the session.)
+
+The user now has read, write, overwrite and delete privileges for any file 
+under \testdir; he may not access files in any other directories.
+
+Here are some more sample entries in ftpusers:
+
+ steve n5owk \public 7
+ newby * \public 3
+ clyde k5lid \public 1
+
+Steve, with password n5owk, has read, write and delete permission in the 
+\public directory.  Newby can use anything for a password and can read and 
+write but not delete files in \public.  Clyde is untrustworthy so he can 
+only read files in \public.
+
+If more than one path-permission pair is used, the user will be placed in 
+the last listed path when he logs in.  When a file read, write, or delete 
+command is sent, the program will scan all path-permission pairs from left 
+to right and the first one that matches the first part of the user's 
+current path or command argument will govern the permission.  This leads 
+to some interesting puzzles:
+
+  joe secret \ 3 \usr\public 7
+
+Will not let joe delete a file in \usr\public, and conversely,
+
+  joe secret \ 7 \usr\public 1
+
+Gives joe the run of the place.  To allow full permissions to a user's 
+home directory, limited permission in \usr\public, and read only anywhere 
+else on the disk, try:
+
+  joe secret \usr\public 3 \usr\joe\ 7 \ 1 \usr\public 3
+
+This will let joe read write and delete files in \usr\joe, read and not 
+write or delete files in other directories except in \usr\public where he 
+can read and write but not delete.  He will begin in \usr\public when he 
+logs in because it is the last pair in the list.  \usr\public had to be 
+duplicated so it would be encountered before the pair, \ 1 when a command 
+is processed.
+
+2.3.2.3.  The HOSTS.NET File
+
+The file HOSTS.NET provides a mapping between internet addresses and 
+symbolic hostnames.  It is used by NET to look up a hostname to figure out 
+the correct IP address to use.  This version of NET does not include 
+nameserver support (see the discussion earlier in this document), and so 
+uses this static file for name lookups.  Tabs are recommended between the 
+host number and host name.  Here is an example of some HOSTS.NET entries:
+
+ 44.96.0.2   wb2sef wb2sef.ampr.org xt.wb2sef
+ 44.96.0.16  n8fjb  n8fjb.ampr.org
+ 44.96.0.17  ka3lyq ka3lyq.ampr.org
+
+You will probably have multiple host names for each IP address in your 
+network because you will want a short one for initiating sessions and you 
+will probably need alternatives to be able to use the "reply" function in 
+bm.  There are two ways to put alternatives in the hosts.net file.  The 
+first simply strings them along a line:
+
+ 44.78.0.2  k5jb k5jb.okla.ampr k5jb.ampr.org
+
+I can mail to k5jb by using the short form, and if I get mail from him 
+that has a longer form in its header, I can reply and net can find his 
+address in hosts.net.  Sometimes someone on the network will try a 
+different version of TCP/IP and inadvertently change his host name in 
+bm.rc.  You can add the variation in hosts.net to deal with it.
+
+Note that the domain name .ampr.org has been assigned for amateur radio.  
+By default, we assume that the hostname is the user's callsign in the case 
+where a user has one system online, and so <callsign>.ampr.org is the 
+implied official hostname.  If you have more than one machine on the air, 
+distinguish them by prefixing a familiar name followed by a period, as in 
+"winfree.n3eua" or "at.n0ccz".
+
+(If the code is compiled with SOKNAME defined in sokname.h, when a stat 
+command is issued, or at other times when net reports that someone is 
+playing with you, the IP address will be replaced with the information 
+from the third, or the last, field in the hosts.net line containing that 
+IP address.  For the above example, it would show "k5jb.okla.ampr" instead 
+of 44.78.0.2 in such reports.)
+
+.pa
+The second way to have alternates is:
+
+ 44.78.0.2  k5jb
+ 44.78.0.2  k5jb.okla.ampr
+ 44.78.0.2  k5jb.ampr.org
+
+(In this case, if SOKNAME was used, the name returned is the last field of 
+the first line that has the IP address, e.g. "k5jb" in this example.)  
+Note that the use of a callsign as a host name has nothing to do with the 
+"mycall" parameter.  It is convenient to use the callsign as a host name, 
+and required to use the callsign for "mycall" to properly identify a 
+station according to FCC rules.
+
+2.3.3.  Other files you can add later.
+
+2.3.3.1.  The alias and bm.rc files
+
+See Chapter 4 for a full explanation of alias and bm.rc (in Unix, .bmrc).  
+Net will run without alias and bm.rc but bm, the mailer, must have bm.rc.
+
+2.3.3.2.  The net.hlp file.
+
+This file (see samples in etcfiles.lzh) can contain anything you want.  At 
+the net command prompt, if you need a refresher on a command or a 
+procedure, you can type "help" ("h" for short) and net.hlp will be 
+displayed a screen at a time until it is finished, or you hit the F-10 (in 
+Unix, the defined escape) key.  If the file is missing, net will tell you 
+so when you hit "h".  Net.hlp is kept in the NETHOME directory (\net in 
+these examples).  You can create any help files you want by naming them 
+(subject).hlp and putting them in the net home directory.  Call them up by 
+following the help command with the name of the file.  For example, help 
+ftp, would display \net\ftp.hlp.
+
+2.3.3.3.  The helpbox.hlp file
+
+The AX.25 mail box has a similar help file you can prepare for users who 
+use the "h" command when connected to your mail box.  You will want to 
+keep it short and maybe include a pointer to a longer, more detailed file 
+that the user can download from the public directory if he is serious.  
+Helpbox.hlp is kept in the NETHOME directory.  See Chapter 5 for more on 
+the AX.25 mbox.
+
+2.3.3.4.  Finger files
+
+Chapter 5 contains information on the finger service.  Chapter 6 contains 
+the Finger commands.  Finger files are plain text files created for users 
+for whom you want to provide information.  For example, I include 
+necessary paths to reach the more obscure IP stations.  I keep one file, 
+all.txt handy that contains all the more or less active IPeros for whom I 
+have assigned addresses.  A finger file for k5jb is called k5jb.txt.  
+Files that do not have the .txt extension are invisible to the finger 
+server.  Finger files go in the "finger" directory, off of NETHOME.  In 
+these examples, finger files would be in \net\finger.  With other versions 
+of net, the finger directory is right off of root.
+
+2.3.3.5.  Mulport files - digilist and exlist
+
+If you are running code with the Grapes Multi-port option, you will need 
+to create digilist and exlist and put them in the NETHOME directory.  See 
+Chapter 5 for more on mulport.
+
+2.4.  DESQview Setup
+
+The MS-DOS version of net is a natural to run under DESQview and has been 
+specifically cleaned up to be a good neighbor under that environment.  
+When net starts, it grabs all the memory available so it doesn't have to 
+make a request from DOS when it later runs short.  All allocations are 
+made from that pool that is grabbed on startup.  If a minimum size version 
+of net is permitted to run unrestrained the memory status command ("m") 
+will show a little under 35k available if nothing has been loaded from 
+autoexec.net.  A DESQview window size of around 180k allows net to run 
+unrestrained.  It is not necessary to provide this much space for net to 
+run in typical applications.  If memory space is a problem, you can cut 
+the DESQview window size until the available memory reported by net, after 
+loading commands from autoexec.net, is around 15k and there will be space 
+to run several sessions concurrently without problem.  With a moderate 
+number of arp entries, and one neighbor NET/ROM feeding the program with 
+NET/ROM route information, DESQview window of 164k is adequate.  (It will 
+vary with program size but with the current version, this size of window 
+leaves over 14k in the memory pool on startup, after reading autoexec.net.  
+This is satisfactory with medium amount of user and NET/ROM activity.)
+
+If you are using the DRSI driver, memory requirements are about 8k 
+greater (maybe more if multiple connections are expected -- the DRSI 
+driver gobbles memory when it is handling packets).  If you are using the 
+Mulport code, allow 4k more.  If you are using the optional KPC-4 driver, 
+allow 2k more.
+
+The defaults presented by DESQview create a window option need only minor 
+changes to be acceptable.  Be certain that you specify "net.exe", and not 
+simply "net" as the program name, or it will cost you 4096 bytes for the 
+portion of command.com that will also be loaded.
+
+Net does not write directly to screen so you can answer that question, 
+"N".  It does use serial ports, so you can answer that question with a "Y" 
+or specify the port.  To permit net to run in the background, and not be 
+swapped out, answer the question in the advanced screen, "Runs in 
+background?" with "Y".  Note that answering either of these last two 
+questions will probably be all that is necessary to make sure net runs 
+when you wander off to run bm, or something else.
+
+Bm, the mailer, runs in a 50k DESQview window, perhaps less, but it will 
+fail ungracefully if you have a lot of messages and insufficient memory.  
+Be sure and specify the program name, "bm.exe" and not "bm" for the same 
+reason as above.  In this memory space, you will not be able to shell out 
+to run your favorite editor on a message.  If you want to do this, 
+increase window size to whatever it takes.
+
+Net and BM should also work fine under DoubleDOS, another multi-tasker 
+shell that permits two windows to run concurrently.
+
+2.5.  Unix
+
+To run NET under Unix, you'll need to compile the program from sources and 
+first you have to get the source.  If it is not included with this kit, 
+contact K5JB to get the one used for AT&T System V and Coherent.  Normally 
+the modules are kept in a set of Lharc archives for MS-DOS and Lharc, 
+cpio.Z or tar.Z files for Unix.
+
+Unpack the common source archives and the Unix archive into a directory, 
+edit the Makefile to pick your Unix variant, edit config.h and options.h 
+to enable the appropriate interface hardware (slip and kiss are probably 
+all that will work), then run 'make'.  (Extract the bm source files in a 
+separate directory because some of the files have the same name as net 
+files but are different.)
+
+If you have Internet access, you will find the Unix/Coherent source code 
+on ucsd.edu, in /hamradio/packet/tcpip/k5jb.  They will be in compressed 
+tar archives.  See the associated .txt files for information.
+
+It is important that the serial port on the Unix computer have the Data 
+Carrier Detect (DCD) asserted and that it not be connected to the DCD 
+signal from the TNC.  At the computer end, connect DCD to the Data 
+Terminal Ready (DTR) signal coming from the computer.
+
+The basic requirements are that the serial ports to be used by net must 
+have their permissions set so that they are read-write for the userid that 
+will run net.  For a two port example, you can define a user named 'net' 
+and make that user own /dev/tty11 and /dev/tty12.  The permissions for the 
+ttys should be at least crw------- (600).  (A more flexible, method if you 
+are the only one on the machine and you use the port for other things, is 
+to set the permission to crw-rw--- and let the group permission take care 
+of things.)  Logins must be turned off for those ports, i.e. there must 
+not be any other process, such as a getty or init, trying to access them.  
+The attach line is virtually the same as for the PC, except that the I/O 
+address and buffer size arguments are ignored and the I/O vector argument 
+is now the tty name.  For example:
+
+ attach asy 0 /dev/tty11 ax25 ax0 0 256 4800
+
+ attach asy 0 /dev/tty12 ax25 ax1 0 256 4800
+
+The zeroes are currently place holders in the attach asy command.  If the 
+optional KPC-4 driver is installed, omit the "ax25" argument in the attach 
+kpc4 command.  (See 2.2.5.1.)
+
+The Unix version of Net can use up to three environment variables, NETHOME 
+NETSPOOL, PUBLIC and TZ.  PUBLIC is optional with the use of the AX.25 
+mbox.  Unix normally uses TZ already.
+
+A possible configuration might be:
+
+ NETHOME=/usr/net
+ NETSPOOL=/usr/spool
+ PUBLIC=/usr/public
+
+In this example, the directories needed are /usr/net, /usr/net/finger, 
+/usr/spool/mail/, /usr/spool/mqueue, and /usr/public.  Place the required 
+and optional files in the same home directories as described for MS-DOS.
+
+The Unix version of NET currently supports only serial ports, with the 
+KISS and SLIP protocols.  You can run this version of net in the 
+background, redirecting it's output to a file so you can check on its 
+welfare from time to time.  It uses the quit signal to toggle its input 
+scanning so it won't block on input.
+
+2.5.1.  Telunix (remote login)
+
+Telunix provides remote login via telnet.  Telnet in amateur radio is 
+different from telnet on wire line TCP/IP networks.  (See Para. 6.3.44.)  
+If your computer has pseudo terminals (pty) on it, you can compile net 
+with the option, TELUNIX, set in unixopt.h and the telunix server will be 
+available for attachment.  (There is no failure mechanism built into the 
+telunix start procedure so if you don't have pty slaves prepared for 
+logins, the start telunix command will appear to work, but users who try 
+to login will just get their commands echoed back to them.)
+
+I don't have ptys on my Unix machine so I could only test this thing under 
+Coherent.  I added three pseudo (slave) terminals to /etc/ttys, like this:
+
+   1lPttyp0
+   1lPttyp1
+   1lpttyp2
+
+And issued a kill quit 1 command before starting net.
+
+To enable the login server, use the command (either from command prompt or 
+from startup.net) start telunix.  It has an optional argument.  Default 
+login socket number is 513.  (This is an assigned "well known socket 
+number", but you can use any unassigned number.)  If you don't use telnet, 
+or you aren't using NET on amateur radio, you can start telunix 23 and any 
+incoming telnet session started without argument will get the login.  
+Amateur radio users normally have to use a telnet <host> 513 to get the 
+login on your machine unless they have altered their telnet clients to 
+handle the login argument (doubtful).
+
+If a user simply closes the telnet session while logged in, it appears 
+that the login closes normally, but there is no mechanism for closing the 
+telnet session when a user logs out.  Also, there is no processing of 
+user's end of line sequence, so I suggest that you put in your public 
+login directories at least the following .profile, contents:
+
+stty -echo
+echo "Welcome Message ..."
+echo "To prevent double prompts, do \"eol unix\" before starting telnet." 
+echo "Use \"exit\" to log off, then \"close\" from your end to close 
+       session."
+cd /usr/public  # or whatever you want to do with him...
+
+What you do with this guy after he logs on to your machine is up to you.
+
+2.5.2.  NET and Unix Multi-tasking
+
+NET is designed as an MS-DOS application, so does not make full use of 
+Unix's multi-tasking ability but runs quite well in Unix.  You can use it 
+in a Unix windowing environment (or in shell layers) but you must prevent 
+blocking on input if you make the window session inactive.  See the 3.8. 
+on how to do use shell layer manager.  In Coherent 4.0, use the virtual 
+terminal capability.  You shouldn't shell out of NET for an extended 
+period of time, as NET suspends operation during shell escapes.  If you 
+operate a heavily used machine, use your system's background methods and 
+switch to another terminal session to do other things.
+
+2.6.  Macintosh
+
+This release does not include Macintosh code.  A separate group is working 
+on the Macintosh, using the same system independent protocol modules, but 
+with a user interface that is much more "Macintoshish".
+
+Installation documentation for the Mac is included with the Mac version of 
+the software.  Check with Compuserve's Hamnet for source of Mac versions 
+of the software.  Current TCP/IP work for the Mac is based on NOS, the 
+suite that replaced NET, the subject of this manual.
+
+2.7.  Atari ST
+
+Installation for the Atari version of NET is not yet available.  Your best 
+bet is to stare at the sources, in config.h and files.h, as well as st.c 
+and st.h.
+
+2.8.  NEC PC-9801
+
+Installation on the NEC PC-98 family is the same as for the IBM PC and 
+clones, except that you need to have the version of NET.EXE that includes 
+handling for the serial port(s) in the NEC machine.
+
+2.9.  Hewlett-Packard Portable Plus
+
+Installation on the Portable Plus is the same as for the IBM PC and 
+clones, except that you need to have the version of NET.EXE that is 
+designed for the Portable Plus.

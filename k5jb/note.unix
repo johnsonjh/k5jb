@@ -1,0 +1,272 @@
+                   k5jb.k31.txt (and preface in unix.note)
+
+Version k31 of the K5JB NET kit is a complete set of Unix and Coherent source 
+code files for the KA9Q NET (pre NOS TCP/IP).  It is NOT necessary to get 
+earlier source files to have a complete kit, but it IS necessary to get
+k5jb.bm.tar.Z to have a coordinated version of the mailer, BM.  Thus, a
+complete k31 kit consists of:
+
+k5jb.k31.txt   -- This file
+k5jb.k31.tar.Z -- Source code for Unix KA9Q NET
+k5jb.dock31.tar.Z -- Complete user documentation for same.
+k5jb.bm.tar.Z  -- Source code for BM, the mailer.  Unchanged.
+k5jb.samp.tar.Z -- Optional, Sample startup files for beginners.
+
+(These files on ucsd.edu are either in /hamradio/packet/tcpip/incoming, or in 
+/hamradio/packet/tcpip/k5jb.)
+
+                        Brief description of Unix NET
+
+NET is designed as an MS-DOS application, so does not make full use of Unix's 
+multi-tasking ability but runs quite well in Unix.  You can use it in a Unix 
+windowing environment (or in shell layers) but you must prevent blocking on 
+input if you make the window session inactive.  See the doc on how to do 
+this.  Also, a casual user shouldn't shell out of NET for an extended period 
+of time, as NET suspends operation during shell escapes.  If you operate a 
+heavily used machine, use your system's background methods and switch to 
+another terminal session to do other things.
+
+If you are unfamiliar with NET (the TCP/IP suite, written by Phil Karn, KA9Q, 
+and preceding his current project, NOS), you need to break out the files in 
+k5jb.dock31.tar.Z and browse them.  k5jb.k31.tar.Z contains a file,
+source.note, source.note, which has modification information.
+
+                          Brief description of kit
+
+More detail on files contained in this set:
+
+k5jb.k31.tar.Z
+Contains files needed to compile NET under various System V, Release 3 
+versions of Unix (I use AT&T), under Coherent, version 4.0.1 and under
+OS9-68K.  This file also contains source.note, a collection of revision notes,
+an os9osk.note, and unix.note for information specific to Unix, Coherent and
+OS9-68K that I not yet included in the main documentation.  (This .txt file is
+also the preface to unix.note.)  W5GFE compiled NET and BM under SCO Unix
+(80386) Sys V, release 3, both with the native compiler and with GNU.  Others
+report compiling it under various versions of Unix, but were not specific on
+versions used.
+
+k5jb.bm.tar.Z
+Contains source for Bdale's Mailer (BM).  Works with same environmental 
+variables as K5JB version of NET.  Has been sanitized to prevent memory 
+violations.
+
+k5jb.dock31.tar.Z
+Contains NET and BM user's documentation.  Targeted for MS-DOS users, but 
+contains essential Unix information.
+
+k5jb.samp.tar.Z
+Contains a rough set of sample configuration files for setup.  I didn't
+make any particular effort to cover all instances so you must look at
+chapter0 and decide if you want to go on from there.
+
+Coherent users have no need to user the Ctrl-\ (quit) switch on NET if
+they are using virtual terminals.  NET runs fine when its window is not
+active.  In fact, using the quit signal removes one of the two places
+where the CPU is released to do other tasks.  If you start NET with no
+serial ports attached (like if you have no startup.net file), and issue
+a quit signal to ignore keyboard input, NET will become a CPU hog,
+consuming an enormous amount of the machine's resources.
+
+(End of k5jb.k31.txt)
+
+                       File: unix.note, Revised 9/6/93
+
+     Unix Supplement to K5JB manual for kit of KA9Q NET (pre NOS TCP/IP)
+
+In k5jb.doc(ver).tar.Z, the files, chapter0 through chapter8, (referred to
+herein as "doc") contain the documentation for NET.  This supplement contains 
+information specific to Unix and Coherent which has not been incorporated 
+into those files.
+
+The doc files are adapted from the primary MS-DOS environment so you have to 
+wade through a lot of MS-DOS specific stuff, but the Unix information is 
+there, if somewhat terse.
+
+If you want the MS-DOS files, contact TAPR, which maintains current versions 
+in its library.
+
+There are three makefiles, Makefile.unix, Makefile.coh and Makefile.os9.
+Link the correct one for your operating system to Makefile.  Be sure the file
+depend.out (Unix) is relevant to the configuration you select in config.h
+and options.h.  The depend.out supplied in this kit relates to the version I
+last compiled, and reflected in the config.h, options.h and unixopt.h supplied
+in the kit.  
+Use "make depend" to use the shell script mkdep.  Note that the depend.out 
+supplied also relates to files in MY MACHINE.  It is unlikely you have the 
+same files do do a "make depend" before you compile.
+
+Coherent dependency is handled differently.  The shell script, mkdep, doesn't 
+work with Coherent so source code for mkdepcoh.c, a dependency maker, is 
+provided for that system and the dependency information is kept in Makefile 
+(Makefile.coh).  You shouldn't have to make a new dependency list unless you 
+make changes to the #includes.  If you make such changes you can edit the 
+dependency directly or use mkdepcoh for a wholesale update.  (Direct 
+mkdepcoh's output to a temporary file, and perhaps pipe through sort before 
+pasting into Makefile.)  See the note in Makefile regarding spurious files, 
+like "mac.h" that must be deleted.  If you miss them, your compiler will find 
+them for you.
+
+To compile bm with Coherent, you need to edit the file makefile.unx (in 
+k5jb.bm.tar.Z) to include the #define COH386.
+
+I haven't tested NET on Coherent very extensively.  One person reported
+that he was unable to log in from a serial port.  He is right and I
+don't know why that is.  Another person was having some trouble at the 
+console so I advised him that I was using virtual terminal drivers.  I don't 
+know if that helped him or not but he reported back that it was running fine.
+
+There are two (known) deficiencies in the Coherent version.  Times() doesn't 
+return a the long integer value of clock ticks like the Unix times() so I had 
+to use time() to get clock ticks.  Therefore, timing has one second granular- 
+ity instead of 10 ms.  (Tick(), referred to in the Coherent manual, is non-
+existent in my release of Coherent.)
+
+(Net times and controls events by maintaining a linked list of timers that is 
+synchronized with the CPU's internal clock.  In Coherent's /usr/include/sys/-
+timeout.h see the tim struct for a similar struct as the one used for this 
+linked list.  In Unix machines clock ticks are usually 60 or 100 Hz.  Having 
+to use Coherent's time() function which returns seconds since 1/1/1970 is 
+probably satisfactory except that short duration processes, like pinging 
+yourself, will not return realistic values.)
+
+There is no tmpfile() function in Coherent so temporary files I create with 
+tmpnam() are not deleted when you quit NET.  They are created in /tmp and are 
+deleted if you reboot.  To make them go away upon quitting I guess one would 
+have to build a list of them and delete them when exiting (or create our own 
+unique file names and delete them on exiting).
+
+Note that the termio structure members where the control characters are kept
+can be used for timeout values if canonical processing is disabled.  This
+didn't work in Coherent, so I used a poll trick to make a micro-sleep, which
+worked very well.  See sys5_io.c.  The value of the argument to sleep2() is a 
+manifest constant kept in unixopt.h.  You can dink with this number (milli-
+seconds) to tune performance.  (Note that sleep2 has a granularity of 10 ms.)
+
+                                   Telunix
+
+(Thanks to VE6BC for prompting me to fix telunix.)  Telunix provides remote 
+login via telnet.  If your computer has pseudo terminals (ptys) on it, you 
+can compile NET with the option, TELUNIX, set in unixopt.h and the telunix 
+server will be available for attachment.  The failure mechanism built into 
+the telunix start procedure can tell if you don't have ptys, but it can't 
+tell if you don't have pty slaves prepared for logins.  If you don't, the 
+start telunix command will appear to work, but users who try to log in will 
+just get their commands echoed back to them.
+
+I don't have ptys on my Unix machine so I could only test this thing under
+Coherent.  I added three pseudo (slave) terminals to /etc/ttys, like this:
+
+1lPttyp0
+1lPttyp1
+1lpttyp2
+
+And issued a kill quit 1 command before starting NET.
+
+To enable your login server, use the command (either from command prompt or 
+from startup.net) "start telunix".  It has an optional argument.  Default 
+login "well known" socket number is 513, but you can use any unassigned 
+number.  If you don't use telnet, (or even if you do) you can start telunix 
+23 and any incoming telnet session started without argument will get the 
+login.  Users normally have to use a telnet <host> 513 to get the login on 
+your machine unless they have altered their telnet clients to handle the 
+argument, "login" (doubtful).
+
+If a user simply closes the telnet session while logged in, it appears that
+the login closes normally, but there is no mechanism for closing the telnet
+session when a user logs out.  Also, there is no processing of user's end of
+line sequence, so I suggest that you prepare .profiles for your public login 
+directories (guest, anonymous, etc.) containing at least the following:
+
+stty -echo
+echo "Welcome Message ..."
+echo "To prevent double prompts, do \"eol unix\" before starting telnet."
+echo "Use \"exit\" to log off, then \"close\" from your end to close session."
+cd /usr/public  # or whatever you want to do with him...
+
+What you do from here on is up to you...
+
+(Incidentally, I would like to find a pointer to source for pty on my
+Sys V, Release 3.2, AT&T 3B2.  Only thing I found so far was jaked up
+for the 3B1.)
+
+Those of you who have OS9-68K have Bob Brose, N0QBJ, to thank for
+porting the code.  See his note, os9osk.note in the kit.
+
+                             Most recent changes
+
+The following is snipped from the tail end of my source.note:
+
+3/3/92 v k29 - Corrected a rare condition where packets, acked at TCP 
+layer by the other station, but not acked at the AX.25 or Netrom layers, 
+were freed, corrupted and sent again.  Used the NOS code for dupe 
+packets (mbuf.c).  Made the Netrom mtu dependent on current setting of 
+AX.25 paclen.  This enables autoexec.net to contain the command sequence:
+
+ ax25 paclen 128
+  ...
+ attach netrom
+  ...
+ ax25 paclen 256
+
+These two modifications only cost 96 bytes.
+
+Added to the ax25 mailbox code a "send" command.  Syntax of the mbox 
+command is, mbox [ y|n|?| s [<message>] ].  If you use mbox s, one or 
+two lines are sent to a mail box user prior to the next prompt string.  
+If the optional message, up to 79 characters is entered after mbox s, it 
+is sent first.  In any case, the line, "I'm at the console.  If you want 
+to chat, send a "c"." is sent and then the prompt.  This modification 
+is not aware that the mbox is multiuser, and if more than one are 
+connected, your string will be sent to the next user getting a prompt.  
+This mod is enabled by the directive #define BUTTIN in ax_mbox.c; and 
+costs 314 bytes.
+
+In smtpcli.c, added same eol handling as in fingserv.c and ftp.c to 
+prevent chronic tcp queue size of window - 1.  In all three files, made 
+the int savedch a static.  There is slight risk of two ftp, two finger, 
+or two smtp sessions using their respective savedchs simultaneously but 
+it is too slight to worry about it.  (Eol handling applies to Unix only 
+but the queue size fix applies to all.)  Made provisions for this scheme 
+to work correctly with OS9/OSK by defining OS9 where these three files 
+can see it.  (4/1/93)
+
+Corrected error in smtpcli.c that affected incoming unix mail, and revised
+EOL handling again for the OS9 setup.  Added optional argument, clear, to 
+the ip stat command to clear out bad receive and transmit conditions from
+the ip stat report.  (5/19/93)
+
+6/26/93 k30 - Corrected error in smtpcli.c where atoi() was used instead of
+atol() for smtp timer value.  Note that there are a lot of inconsistent usages
+of atoi() where casts are needed, particularly where the value is to be put
+into socket.port, which is int16 (short).  The effects appear to be benign,
+but in Unix, there is a large difference from an int and a short.  Note also
+that there are no bounds checking in ax25cmd.c.  Bizarre values can be entered
+for ax.25 variables.  (Later cleaned up the atoi() usages.)
+
+In main.c, log(), corrected longstanding omission where the AX.25 mailbox
+queues a message with a null tcb.  This makes spurious log entries, so simply
+changed this condition to put "AX25 Mailbox" in the log.
+
+7/12/93 still k30 - Swept through the code and replaced occurences of \r and
+\n where it was intended that a 0x0d and \0x0a be sent over radio.  (Used
+octal for portability.)  This should permit porting more easily to OS9/OSK.
+(Thanks to Bob, N0QBJ, for showing me the light.)  Did some work on the drsi
+driver to enable a maximum of 2 cards and incidentally cleaned up compiler
+warnings.  Added another switch, SHELL, to options.h to permit skipping the
+shell commands.  They aren't worth having in MS-DOS since NET stops while
+shelled out, and the interrupt reaction is unpredictable.
+
+9/6/93 k31 - Incorporated changes made by Bob, N0QBJ, so NET would compile as
+well under OS9-68K.  Added a receive overrun counter to the MS-DOS version.
+Revised the line editing in ttydriv.c, corrected reference to "FTP" in
+session,c (should have been "Finger").
+
+Joe Buswell, K5JB, 44.78.0.2
+3312 N Idylwild Dr
+Midwest City OK 73110-1643
+
+Internet (guaranteed): 70305.1341@compuserve.com
+Internet (temporary): jbus@sabea-oc.af.mil
+Amateur Packet: k5jb@k5jb.ok.usa.na
+Voice Phone: (405) 732-0676

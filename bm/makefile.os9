@@ -1,0 +1,38 @@
+#
+#       Makefile for Bdale's Mailer  (Works on os9-68000 v2.4 C compiler v 3.2)
+#       (ported by N0QBJ, St Paul, MN to OS9)
+#       For more info see the net documentation package.
+#       If you change the makefile, do a make clean before you do a make.
+#
+
+CFLAGS= -o=2 -DUNIX
+CC=cc
+
+OBJS=	main.r send.r osk.r bmutil.r version.r header.r files.r getopt.r \
+	 wildmat.r
+
+SRC=	main.c send.c osk.c bmutil.c version.c header.c files.c getopt.c \
+	wildmat.c
+
+bm:	$(OBJS)
+	$(CC) $(CFLAGS) $(OBJS) -f=bm
+
+clean:
+	rm *.r
+
+lint:
+	lint $(CFLAGS) $(SRC)
+
+#
+# dependencies - please keep up to date!
+#
+
+bmutil.r: bmutil.c bm.h header.h
+files.r: files.c
+getopt.r: getopt.c
+header.r: header.c bm.h header.h
+main.r: main.c bm.h
+send.r: send.c bm.h
+osk.r: osk.c bm.h ndir.h
+version.r: version.c
+wildmat.r: wildmat.c

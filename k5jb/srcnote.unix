@@ -1,0 +1,614 @@
+                        K5JB flavor of 890421 NET
+
+                          Updated Sept 6, 1993
+
+                            Source Code Notes
+
+The MS-DOS source code is located on the second of a two disk set.  The first 
+disk contains executables, documentation, and miscellaneous files for setting 
+up NET.  The documentation is probably the most useful thing on the first 
+disk if you are going to compile your own code.  The documentation consists 
+of the revised User Manual, which you will need for reference, unless you are 
+a veteran NET user.  If you are a veteran, you can probably get enough out of 
+this file to pick up things I added, but you will need to refer to Chapter 6 
+in the Manual for new command syntax.  A little further down are some version 
+notes.
+
+The source code disk contains files required to compile a stable and mature 
+Pre-NOS version of net.exe and bm.exe.  It includes a driver for the DRSI 
+PC*PA interface card.  To pack the files, I used LHA because I think it is 
+neato and it is free, as opposed to being a commercial program like PKZIP.  
+To extract files from LZH archives, use the command:
+
+   lha x archive_file
+
+For example, lha x netsrc1, to extract all files from netsrc1.lzh.
+
+(Unix files are archived with lharc, because I don't have lha for Unix.)
+
+                             Files on Disk 2
+
+Note: When you un-archive these files, keep BM separate from NET because 
+some file names are duplicated, though totally dissimilar.
+
+BM_SRC.LZH:  Source code for BM, the mailer.
+
+NETMSDOS.LZH:  Part of the source code for NET exclusive to MS-DOS.  
+Also contains *.asm, makefile and other support files for Turbo C.
+
+NETSRC1.LZH:  Approx. half of the .c and .h source code for NET that are 
+common to MS-DOS and Unix.
+
+NETSRC2.LZH:  Rest of the .c and .h source code for NET that are common to 
+MS-DOS and Unix.
+
+SRCDOC.LZH:  Archive containing this file.
+
+                         Why Bother With old NET?
+
+NOS is neat, but if you want to do TCP/IP and other things at the same time 
+with a multi-tasker like Desqview, on a modest computer, you need a lean, 
+well behaved, program.  I have been running this version of NET simultaneous-
+ly with CBBS since 1989 and I never have to mess with either one of them.  I 
+can run Wordstar and other things on the AT with the others running in the 
+background and never know they are there.  I generally run NET and CBBS on a 
+10 MHz AT, but have run this combination on an XT.  Except for being a little 
+jerky, even operation on the XT is acceptable.
+
+See the archive, netdoc.lzh, for completely revised user manual for NET.  
+It explains about all you need to know about NET.  I gathered a half dozen 
+files I have been shuffling about and included them in this manual.  With 
+these additions, the manual is pretty much up-to-date.  Thanks to KB0QJ for 
+giving me some proofreading help.  Neither one of us tried very hard to make 
+it perfect, but it should be readable and useful.
+
+Major corrections made to NET include proper end of line sequences, correct 
+trace and session logging, elimination of several null pointer assignments 
+and memory violations and fair amount of size reduction.  Added features 
+include flexible file locations on a hard disk, and modification to NET's 
+ax.25 mailbox that permit mail reading as well as posting, making this 
+version much more friendly to non-IP users.  My design philosophy is to stick 
+to the business of doing TCP/IP, but not be totally rude to the uninformed.
+
+Oh, yeah!  I made the DRSI PC*PA driver work for this thing in case you have 
+one of those.  I also made the PACKET driver work well enough to work with 
+the G8BPQ scheme.  It _should_ work with the Baycom type of modems.  (PACKET 
+is not normally included in the distribution executable.)  Most recently, 
+N5OWK worked out a scheme to use both ports of a Kantronics KPC-4 or KAM, 
+while using a single serial port on the computer.
+
+The only code modules that are missing from these archives are those that 
+are Unix, Apple or Amiga specific; drivers for PC100, Eagle, and HAPN,
+and the SLFP driver.  (They are incomplete, or of suspicious functionality.)
+
+My Unix version of NET is running on a AT&T 3B2 and I have run it on 
+Coherent 386.  Contact me if you want the 3B2 source code, or any of the 
+missing modules mentioned above.  The NET source archives are broken into 
+three files for ease of manipulation.  The disk also has source to BM.  This 
+version of BM shares the same environmental variables as NET.
+
+The makefile contains enough information for you to see how the compile is 
+conducted.  You will need to modify makefile to reflect where you keep your
+compiler files.  Config.h has most of the hardware dependent defines, 
+options.h has common software choices, sokname.h and trace.h have a couple 
+of cosmetic defines.
+
+In the makefile, I have the unused parameter warning turned off (-w-par).
+In most instances the unused parameters are there to attain parity with 
+companion modules.  I checked all (I think) of the unused parameter instances 
+out and all were benign.  If you enable the linker warning about dupe modules 
+you will see a number of dupes with those in the Turbo C library.  The dupes 
+are OK (and necessary).
+
+(Note that there are a lot of functions used without declaration.  I combed 
+through these and found none that would have caused an error from the 
+function returning its default (int).  I am adding declarations as I rework 
+modules, but not trying to re-do the whole thing to eliminate warnings.  See 
+makefile for the warnings that are disabled.)
+
+Version notes:
+
+(This is a synopsis, from my version notes, that covers general modifi-
+cations made to code which was originally received in Dayton 1989.  This 
+is pre-NOS code.)
+
+(Modifications prior to 5/90 were made over the first couple of weeks 
+after I got NET in 4/89.  I was not new to NET, having cleaned up and run 
+earlier versions, so it didn't take long to fix noticeable problems.  For 
+the first year that I ran this version it was almost trouble free, running 
+continuously.  It was later that I deliberately went looking for problems.  
+Reader's Digest version of my revision notes follows.)
+
+This version of NET is derived from the version distributed at Dayton in 
+1989, v 890421.0.  Initially I cleaned up some MS-DOS end of line sequences 
+in text files written by NET.  I also fixed some problems where tracing 
+sometimes went to screen and sometimes went to a trace file (if it was 
+enabled).  I think I probably fixed the things that were fixed to make the .1 
+(and .2?) versions of NET.  The included version of BM has its end of line 
+handling (and potential array over-writes) fixed also.
+
+Then, I added some features to mailbox (mbox) to permit AX25 users to read 
+their mail with the "r" command, see who has mail with the "m" command, 
+list the public directory with the "l" command, download a file from the 
+public directory with the "g" <filename> command, get help with the "h" 
+command, and see what version is running with the "v" command.  See 
+ax_mbx.c for these changes.  If an operator sends any characters to the 
+mbox during a download, it will abort as soon as the queue is empty.
+
+To recover some space for mbox, I combed through the code and #ifdefed as 
+DEAD code that did nothing.  I checked all the compiler warnings to see if 
+they were significant.  I made no changes to modules solely to correct 
+these warnings because I wanted to easily compare this code to work others 
+are doing.  File dates indicate which modules were changed and which ones 
+weren't.  Since I run the code also in Unix, portability is important so 
+declarations, etc., aren't compiler dependent.  Most changes are marked 
+with my call so they are easy to find with grep K5JB <fn>.
+
+I added file name initialization to permit looking for files in custom 
+areas.  Three environmental variables, if defined, are used by the program:
+
+NETHOME is the directory where NET will look for autoexec.net, ftpusers, 
+hosts.net, net.hlp, helpbox.hlp, and alias.  (syntax example, set 
+NETHOME=/net)  If it is not specified, NET uses root (\).  Logging is 
+normally done in NETHOME, if specified.  Session recording also defaults to 
+NETHOME.
+
+NETSPOOL is the directory where mail files are found and defaults to 
+/spool unless you specify differently.  (Syntax, set SPOOL=/spool)  It 
+will find /spool/mail, /spool/mailq, and other necessary directories below 
+the /spool directory level.  (Note that the "/" is OK in these path names 
+on MS-DOS.)
+
+PUBLIC is the directory where you keep files that are safe to download 
+over an ax.25 link.  If it is not specified it uses /public.  (Syntax, set 
+PUBLIC=/public)  By "safe to download over an ax.25 link", I mean not 
+monstrous, not binary executables.
+
+(Drive designation in these path names will permit you to use multiple 
+drives or partitions for different directories.  You can run NET from any 
+directory as long as the executable can be found from your PATH variable, 
+or your command line.  Also, it will accept an argument for a startup file 
+other than autoexec.net.  The startup file needs to be in the NETHOME 
+directory.)
+
+The environmental variable, TZ, is also recognized, by NET and BM, for 
+date and timestamping messages.  Syntax is, set TZ=CST6CDT.  Daylight 
+savings will be handled correctly.
+
+BM has been modified to work likewise and looks for bm.rc and alias in 
+NETHOME if it has been specified.  Otherwise it looks in root.  I also 
+fixed an array over-run if an operator with broken return key enters a 
+line of over 128 characters.  (Replaced gets() with fgets().)  (This 
+version of bm.exe is 3.3.1j.)
+
+5/28/90  v.890421.0.g/h  Fixed an error in DRSI.c which caused null 
+pointer assignment and added test to determine if drsi card was installed 
+if attach command was tried.  If not it reports the error instead of 
+proceeding to screw up.  I reorganized the files into Lharc files to get a 
+little more needed room.
+
+10/20/90 v.890421.0i  Only difference between this version (i) and the May 
+28, 1990 version (g/h) is corrected trace to file in udpdump.c.  (brought 
+to my attention by N5OWK.)  Notes that refer to suffix g or h are 
+unchanged.
+
+12/13/90:  I modified mulport.c to look at the NETHOME environmental 
+variable and find its required files there.  I also modified it to correct 
+an error that would overwrite things in digilist.  Fixed formatting error 
+in report when exlist loaded.  Asy port name can now have four characters 
+instead of three, e.g. dr0a, or kp0a.
+
+12/13/90:  Cleaned up defines in code modules to enable removing -D_FINGER 
+and -DMULPORT from the makefile and including it in config.h.
+
+6/3/91: Noticed while doing some testing that if there is a NET/ROM 
+circuit in effect when exiting and restarting the code, the next mbox 
+connection fails because the neighbor nr sends a NET/ROM frame and this 
+thing sends DM, as it should.  Disconnect ax25 NET/ROM connections before 
+exiting to prevent this from happening again. (If a user makes a NET/ROM 
+connect request under the above described state he gets nothing back from 
+his NET/ROM port.  If he sends the connect command a second time, the 
+circuit is established normally.
+
+(About this time, decided to forget about tracability to the 890421 code 
+and comb out the nits in the code.  Made a lot of style changes from here 
+on out.)
+
+6/6/91 v.i.1  Added 10 minute inactivity time out timer to both AX25 and 
+NET/ROM mail box connections.  Added mbox timer with 10 minute time out.
+
+6/9/91 v.i.2  ICMPCMD.C: corrected int 1000.0, which implied type float.  
+Reduced code size 13.5k! - should change rtt to an int32 but a lot of 
+other things need changing too.  In many other places in the code rtt and 
+irtt are int32.  NET/ROM code seems to be pretty consistent.
+
+Changed version.c and main.c to add a third sign-on line with more 
+complete version and option information.  Karn's version number moved to 
+main.c and version[] is selected by compiler directive, defined in 
+config.h.  Reason is to more easily identify options like DRSI, MULPORT, 
+or UNIX.  
+
+6/12/91, v.i.4  Added a time display in ms to the mbox status report.
+
+6/14/91 v.i.5 corrected an error in cd (pwd) that prevented NET from 
+telling what the current directory was.  v.i.6 added a real help function 
+that reads an optional help.net file in the NETHOME directory.  ? still 
+shows a list of commands. (help.net later renamed to net.hlp.)
+
+6/15/91 v.i.7 Found serious error in fingserv that caused memory violation 
+in the Unix version.  While meddling, fixed error in ftp cd command that 
+permitted changing to a regular file as a directory.  Did cosmetic work on 
+tcpcmd that caused line with "SYN Received" to run over 80 columns in a 
+stat report.  Removed memstat command from Unix version.  Increased size 
+of finger file prefix to 11 characters for Unix.  (It is 8 in MS-DOS).  
+(Change to fingserv that handles newlines is not portable to Apple, but 
+who cares.)
+
+6/16/91 v.i.8 Decided to eliminate sending cr/lf with fingerserv because 
+fingercli was changing cr/lf to cr/cr/lf.  Fixed both and am only sending 
+cr.  If there is an incompatibility with nos, I can add cr/lf back in.  
+(Be careful to respect array bounds when 0x0a added.)
+
+6/24/91 v.j  Added ability to selectively read messages in mbox.  Added 
+(l)ist as distinguished from (ls), (r)ead <n>, and (k)ill <n> to the 
+commands.  Made some wide swoops through other modules to #ifdef things 
+out that were not defined by NETROM, NRS, APPLETALK and PACKET.  (May want 
+to put ROSE in as an optional substitute for NETROM later.)  Interesting 
+observation can now be made that NET/ROM service adds over 22k to the 
+
+7/5-11/91  v.j1-j5  Fixed chronic error caused by atol() not being 
+declared long in ax25cmd.c, nrcmd.c and tcpcmd.c.  Mostly caused no 
+problems except to react with weird numbers when attempts to set numbers 
+greater than 32000 (0x7fff) were tried.  AX_MBX.C, revised file sending to 
+use transmit upcall, added prompting to the timer chain because this 
+module gets no signal that file sending is completed.  Re-arranged struct 
+mbx to match struct session so t_upcall could be used.  Made the message 
+list function also a t_upcall.
+
+7/17/91 v.j6 Felt guilty about growing code size so did some cleanup and 
+squeezed 692 bytes out of her.  Replaced the pretty send command parser, 
+mbx_to(), in ax_mbx.c, which saved 608 of those bytes.
+
+Comparative code sizes.  Basic NET with NET/ROM, 154,656; with DRSI, 
+162,150; with Multiport, 158,138; with DRSI and Multiport, 165,628.  If 
+no NET/ROM, code size is 132,290.  Thus, NET/ROM takes 22,366; DRSI 
+takes 7494; Multiport takes 3482.  (These numbers changed slightly with 
+later versions.)
+
+Initial memory pool when unrestricted, and no configuration commands 
+executed from autoexec.net:  Basic NET with NET/ROM, 34,940; with DRSI, 
+33,660; with Multiport, 34,144; with DRSI and Multiport, 32,864.  With 
+no NET/ROM, memory pool is 38,260.
+
+7/20/91  v.j61  Changed Telnet to add include global.h in attempt to fix 
+ttyflow which didn't work.  Changed ax25cmd.c to include ttyflow check to 
+stop interruptions from incoming packets while we are typing.  Made 
+several changes to mulport.c to fix some incorrect string references and 
+trim it's size, particularly in the line buffer.
+
+7/29/91  v.j62  Removed some debugging code and re-kitted the files.
+
+8/13/91  v.j63  Fixed broken ax_mbx "get" command that was broken earlier 
+by feeding pointer to temp buffer to another function that also used it.  
+At Steve, N5OWK's suggestion, made some cleanups in function declarations 
+in lapbtime.c and dirutil.c so they would compile in his C++.  Also made 
+changes to BM so that mail and mail queue directories defined in bm.rc 
+(smtp and mqueue commands) would over-ride default, or environmental 
+strings.
+
+8/19/91  v.j64  More suggestions from N5OWK.  Changed 7 digis max to 8 in 
+ax25.h to prevent occasional bad header from appearing in trace, added 
+ROSE PID to header trace, increased array for log path name to 40 (in MS-
+DOS version).  In order to reduce archive sizes, removed code related to 
+eagle, hapn, pc100, and slfp, none of which worked, from the source code 
+package and put in the dregs archive.  Also removed references to these 
+files from response files, makefile and depend out.  When mkdep is used 
+slfp.h is another reference (like unix.h) that will have to be manually 
+removed from depend.out.  (See makefile for the complete list.)
+
+9/2/91  v.j64-j67  While looking for a memory violation, fixed many 
+things.  Did some TZ work in NET and BM to prevent possible array over-
+writes from ill formed environmental variable.  Re-arranged argument 
+handling to permit autoexec.net to be read from NETHOME, wherever it is 
+(disk and path).  Cut LINELEN in netuser.c from 256 down to 80.  In alloc, 
+added some voids to functions.  In BM, fixed an embarrassment.  NETSPOOL 
+was called MAILSPOOL there which prevented it from working from a desired 
+path unless it was put in the bm.rc file.
+
+In ftpcli, found an unterminated string being sent to printf(), while I 
+was in the module, did complete cleanup of undefined functions, of 
+"automated" login process and added a little help.  Login from ftp now 
+loops until you get logged in or break out and close the session.  In 
+ttydriv, added a couple of voids to function declarations.
+
+9/17/91  v.j68 - j70  In looking for a checksum error report on the Unix 
+box, I found several files that needed better function definition layout, 
+and general cleanup. Noticed error in one place which would leave an RR 
+frame without a newline, and noticed extra \r in the hex dump.  Fixed 
+both.  Checksum error was caused by my Unix non blocking I/O working 
+incorrectly.  Apparently, the DCD toggling during incoming data is causing 
+a character to be lost.  Position of the lost character would just about 
+correspond with the the point where DCD is dropped.  Tested an MS-DOS 
+version with DCD connected and noted no such problem.  Fixed tcpdump.c so 
+show checksum instead of i, an index used earlier to ripple through flags.
+
+Added the new code devised by N5OWK that steers data on the basis of the 
+0x10 bit in the KISS command byte.  This code works really neat!  I even 
+went out and bought a Kantronics KPC-4 to wring it out and replaced two 
+TNCs on two ports with the single box on a single serial port.
+
+Changed config.h and added options.h and sokname.h to make compiling 
+various versions a little quicker.  Options.h now selects Kantronics KPC-4 
+code, Mulport code, and DRSI code only.  TIMEMARK is now in trace.h since 
+it only affects trace.c (and I never use it myself).
+
+Found, I think, and corrected the problem in the ftpscs() function 
+(ftpserv.c) where during a CLOSED state change a non-existent FTP session 
+can be reset freeing garbage.  It happens if we happen to be in the SYN 
+received state.  An ftp_create() is not called (allocating memory) until 
+the state is established.  Noted an ineffective test for ftp->control and 
+remarked it out while adding test for state != SYN_RECEIVED.  No 
+undesirable side effects found so far.
+
+In Unix version, add a quit command (Ctrl-\) handler that toggles a flag 
+that determines whether NET looks for input.  When it is ignoring input it 
+will run fine in background (shell layer), enabling one terminal to handle 
+other tasks while NET is running.  (Shell command suspends NET.)
+
+Added socket and port name functions as suggested by N5OWK.  Added a 
+command, "sokname" to toggle plain English name presentation.  It uses the 
+last, or the third, field of hosts.net for its information.  This feature 
+is enabled with the compiler directive, #define SOKNAME, in sokname.h.
+
+9/21/91 Modified version to k 0 when I sent the latest to TAPR.
+
+11/19/91 version k01 - Corrected error in icmpcmd.c that caused ping
+intervals of over 32k to be wrong.  Also made cosmetic change to reported
+intervals by re-arranging when MSPTICK was used as divisor.
+
+12/22/91 version k02 - Corrected error I caused 9/2/91 in smtpserv.c that 
+caused the TZ environmental variable to be messed up.
+
+In BM, completed the addition of wordwrap in mail entering.  Wordwrap is 
+active always in the MS-DOS version, but defaults to inactive in the Unix 
+version unless the command "wordwrap" is added to .bmrc.  Reason for making 
+it switchable in Unix is the show response from a busy box as compared to 
+letting the port work in cooked mode and echo typing directly -- besides in 
+Unix it is much more practical to just use the system editor.
+
+In BM, also experimented with a function snprintf() which limited number of
+characters printed to a string.  Then cut array sizes to minimums.  Net 
+result was that the code was bigger so abandoned the idea, though it would 
+have made the code more robust.
+
+2/28/92 versions k02-06 - Added ROSE transport capability by creating 
+check_rose() and calling it from procdata() in lapb.c.  This part catches 
+the received frames.  Also to enable transmitting VC on ROSE without
+dedicating the port to VC, created a synthetic, or pseudo, interface that 
+has all attributes of a physical async interface except that the VC mode 
+flag is set and stop points to rose_stop(), which does nothing, on exit.  
+Cleaned up some inconsistencies in arp dealings.  While at it, I eliminated 
+some dupe code in ax_mbx.c to save 128 bytes,
+
+In the Unix version, I revised the quit signal handler which is used for 
+background operation.  Rather than have the handler print a message, it sets 
+a flag and the message is printed during the main loop.  (A signal handler 
+is not safely re-entrant).
+
+(Also modified a version of NOS so it could play ROSE with me.  I just 
+tacked modifications to lapb.c.)
+
+3/15/92 version k08 - Completed implementation of SID2 code which enables
+a second call sign to be used for incoming connects to the mailbox.  When
+this call is used on an ax25 connection, mbox responds without requiring
+an info frame first.  Also, added ability for a user to list files in a
+sub-directory off of the mbox public directory.  Reworked mulport.c to 
+eliminate scanf().  Doing so cut code size 1800 bytes which more than made 
+up for weight it gained with these recent additions.
+3/16/92 version k09 - Split out "lineparse()" from cmdparse() to make it 
+available to mulport.  While at it, #ifndefed parts that weren't used.
+3/19/92 version k10 - Added previous line recall and editing to ttydriv.c.  
+#ifdefed out the "forward" command because I couldn't think of any use for 
+it in amateur radio.  It can be restored by defining in iface.h.
+3/28/92 version k11 - In ax_mbx.c added a stat() to readany() to prevent the
+Unix version from sending a directory file in response to a "g" command.
+Reformatted the ax25 stat response slightly for cosmetics.
+4/29/92 version k12 - Added some #ifdef AX25s to places so I could make a 
+version for non-radio use.  (It is 92114 bytes long, 48885 compressed.)  
+While at it, added some function declarations to reduce compiler 
+warnings.
+
+The AX25 executable is unchanged from k11 except for the version number.
+
+6/9/92 version k13 - No new functionality, just changes to make it compile 
+under Borland C.  Added another configuration file, config.inc for the .asm 
+files to prevent assembly and confusion of Borland C.
+
+7/92 version k14 - Found error I made in ax25.c when I added SID2.  It 
+prevented arp from adding an un-coordinated pop-up to the arp table.  
+(Brought to my attention by Mick, VK2XOC).
+
+8/29/92 version k15 - Fixed shell (!) command error that damaged MS-DOS 
+environment if ! or shell was followed by an argument.  I guess that never 
+did work but I didn't notice it.  Brought to my attention by W6SWE.  The 
+repair reduced exe size by over 2k!
+
+9/20/92 version k16 - While porting to Coherent, I corrected inconsistent 
+use of manifest constant NULL.  It is changed from (void *)0 to simply 0.  
+This is consistent with Turbo C and Unix.  Coherent uses (char *)0 so I 
+redefine NULL for Coherent and use NULLCHAR where (char *)0 is what we want.  
+Added a timer, T4, to AX.25 LAPB to disconnect a stale circuit that was not 
+being used.  This applys mostly to ROSE and Netrom circuits.  Default value 
+is approx 900 seconds (15 Minutes).  Time is entered and reported in 
+seconds, instead of ms used for T1, T2, and T3.  Command is AX25 T4 nnn, 
+where nnn is in seconds.  This function was copied from NOS and added about 
+600 bytes to exec.
+
+9/26/92 version k17 - Added command, tcp timertype [linear | exponential].  
+Also set a maximum limit of 5 minutes on tcp backoff time.  I used a 
+combination of backoff schemes from NOS and NET.  In the Unix version, 
+included modification by W5GFE that makes incoming telnet text show inverse 
+on screen.  (option selected in unixopt.h)
+
+10/3/92 versions k18 & k19 - added a second argument to tcp timertype.  It 
+enables setting maximum backoff time value in minutes.  Default is 30 
+minutes.  Also added a mail command that pages through the users mail file.  
+It defaults to <host>.txt.  If the user wants to read a file, say k5jb1.txt
+he uses the command, mail k5jb1.  Files are kept in \spool\mail (MS-DOS) or 
+in /usr/spool/mail (Unix).
+
+10/15/92 version k20 - Added a linefeed filter to ax_mbx.c, also added 
+optional second arg to "mail" that, if numeric, skips display of that quantity 
+of screens while scanning <arg 2>.txt.  Also, rewrote parts of pktdrvr.c 
+and pktdrvr.h to make them work with G8BPQ scheme.
+
+10/18/92 version k21 - Revised lapb.c to simplify part added to trap selected
+virtual circuit frames and enabled netrom frames carried by ROSE to be handled
+correctly.  Also added command netrom bcstifle <iface> 0|1 which if 1 prevents
+Netrom broadcasts from <iface>.  Default is 0 which allows broadcasts.
+
+10/25/92 version k22, k23 - Added optional arg to help command.  It defaults 
+to "net" and reads net.hlp in NETHOME directory.  Additional files can be 
+written such as ftp.hlp, and "help ftp" would display it.  Changed name of 
+helpbox.net to helpbox.hlp to be consistent.  This change requires these two 
+usual help files be renamed to the .hlp extension.  Simplified version.c and
+removed versionc.c from the Coherent version.
+
+11/10/92 version k24 - Modified Unix and Coherent versions to give up some 
+(a lot of) CPU time.
+
+11/17/92 version k25 - Added ax25 heard command, and similar, "j" command, 
+for the mailbox.  (Compile with AX25_HEARD defined in options.h.)  Added "w" 
+(what) to the ax25 mbox as an alias to the ls command without args.  
+Increased nr of digis permitted in netrom route add command so try and make 
+use of a poor ROSE circuit.  (It is still a poor ROSE circuit.)
+
+12/20/92 version k26 - Made several changes to make the code compile with
+Borland C, versions 2.0 and 3.1.  Seems that brk() is still broke with
+Borland.  Added an instrumentation switch in options.h, CPUSTAT, which I used
+for some developmental tuning.  Discovered that code compiled for smallest
+size was almost as fast as that compiled for max speed.  Henceforth will be
+using the -G- switch for smaller size (about 6k diff in operating heap when
+constrained by Desqview -- no difference when running unconstrained).  Changed
+logging method to open and close log file when used rather than leave it open.
+It is now safe to alter a log file while net is running.  Also changed method
+of setting log file name.  Can be explicit full path, or relative to NETHOME.
+
+12/22/92 version k27 - Added preliminary support for combios/mbbios/xxbios
+interface commonly used with BBSs.  This enabled me to use ports on a card
+that uses shared interrupt.  Only applies to MS-DOS.  Attach command takes
+the form: attach combios <com#> <mode> <label> <buffer> <mtu> <speed>, where
+com# is integer corresponding to com port number, mode must be "AX.25", 
+label is e.g. "ax0", buffer is unused but field must be filled, mtu is 216
+or whatever is sane, speed is in bps.  Max speed is 9600 unless you know
+how to toggle the bios to high speed.  Moved #define PACKET from config.h
+to options.h  In Unix version, created unixopt.h to clean up Makefile.
+
+2/6/92 v k28 - Discovered error in my ways and replaced linefeed stuffing
+I had removed earlier from fingserv.c.  Seems NOS cares about those line-
+feeds!  Fixed function docd() in sys5unix.c so cd and pwd could be enabled
+in Unix.  Worked on ftp.c to stop tcp from having a queue of window size - 1 
+bytes.  Made EOL handling in FTP text mode and finger the same.  Modified 
+icmpcmd "ping clear" command to clear ALL stats, not just echo.
+
+MS_DOS: Reworked alloc.c debugging code to enable memory analysis in medium 
+model and get better reports.  Also experimented with allocating in 8 byte 
+units instead of 4 to reduce number of unusable free fragments.  (Alloc.c is 
+only used in MS-DOS version)  Added bits to mbuf.c to also tell which 
+function called alloc_mbuf (See ALLOCDEBUG & MBUFDEBUG).  Provided for 
+clearing the alloc table for extended operation.  This debugging enabled me 
+to discover a rare memory drain that could happen if a connected AX.25 
+station suddenly got diarrhea.  (A local ROSE switch sent me well over 75 
+packets in one transmission!)  Consequently, added a trap in smtp.c to limit 
+the outbound slip queue.  Ip stat shows slipbalks if the queue ever exceeds 8 
+(an arbitrary number).  (Did some cosmetic work on ip stat and tcp stat 
+displays.)  (Unix version has the added ip stat info.)
+
+Revised ftpserv.c so an ftp CWD command won't try to use an ordinary file as 
+a directory.  Modified tnserv.c to cause an incoming telnet session to enable 
+itself so characters sent from an uninformed station don't just go to the bit 
+bucket (side effects?).  (Also modified ax25cmd.c and nrcmd.c so ax.25 and 
+Netrom chat sessions worked likewise.  Behavior can be changed with the 
+define AUTOSESSION.)  Fixed a minor error in sys5_io.c which mixed up the 
+saved console characteristics with the saved tty port characteristics when 
+setting port mode (Unix only).  For Unix, added a pclose() command to the 
+transmit upcalls in nrcmd.c and ax25cmd.c to avoid defunct processes after 
+directory reads from the mailbox.  Fixed the "remote start/stop" and "remote 
+reset" in Unix, and re-arranged program exits to provide better "remote" 
+handling.  Did preliminary work on Unix's telunix to get it integrated into 
+NET and working.  (Selected 513 for the login socket number.)
+
+3/3/92 v k29 - Corrected a rare condition where packets, acked at TCP 
+layer by the other station, but not acked at the AX.25 or Netrom layers, 
+were freed, corrupted and sent again.  Used the NOS code for dupe 
+packets (mbuf.c).  Made the Netrom mtu dependent on current setting of 
+AX.25 paclen.  This enables autoexec.net to contain the command sequence:
+
+ ax25 paclen 128
+  ...
+ attach netrom
+  ...
+ ax25 paclen 256
+
+These two modifications only cost 96 bytes.
+
+Added to the ax25 mailbox code a "send" command.  Syntax of the mbox 
+command is, mbox [ y|n|?| s [<message>] ].  If you use mbox s, one or 
+two lines are sent to a mail box user prior to the next prompt string.  
+If the optional message, up to 79 characters is entered after mbox s, it 
+is sent first.  In any case, the line, "I'm at the console.  If you want 
+to chat, send a "c"." is sent and then the prompt.  This modification 
+is not aware that the mbox is multiuser, and if more than one are 
+connected, your string will be sent to the next user getting a prompt.  
+This mod is enabled by the directive #define BUTTIN in ax_mbox.c; and 
+costs 314 bytes.
+
+In smtpcli.c, added same eol handling as in fingserv.c and ftp.c to 
+prevent chronic tcp queue size of window - 1.  In all three files, made 
+the int savedch a static.  There is slight risk of two ftp, two finger, 
+or two smtp sessions using their respective savedchs simultaneously but 
+it is too slight to worry about it.  (Eol handling applies to Unix only 
+but the queue size fix applies to all.)  Made provisions for this scheme 
+to work correctly with OS9/OSK by defining OS9 where these three files 
+can see it.  (4/1/93)
+
+Corrected error in smtpcli.c that affected incoming unix mail, and revised
+EOL handling again for the OS9 setup.  Added optional argument, clear, to 
+the ip stat command to clear out bad receive and transmit conditions from
+the ip stat report.  (5/19/93)
+
+6/26/93 k30 - Corrected error in smtpcli.c where atoi() was used instead of
+atol() for smtp timer value.  Note that there are a lot of inconsistent usages
+of atoi() where casts are needed, particularly where the value is to be put
+into socket.port, which is int16 (short).  The effects appear to be benign,
+but in Unix, there is a large difference from an int and a short.  Note also
+that there are no bounds checking in ax25cmd.c.  Bizarre values can be entered
+for ax.25 variables.  (Later cleaned up the atoi() usages.)
+
+In main.c, log(), corrected longstanding omission where the AX.25 mailbox
+queues a message with a null tcb.  This makes spurious log entries, so simply
+changed this condition to put "AX25 Mailbox" in the log.
+
+7/12/93 still k30 - Swept through the code and replaced occurences of \r and
+\n where it was intended that a 0x0d and \0x0a be sent over radio.  (Used
+octal for portability.)  This should permit porting more easily to OS9/OSK.
+(Thanks to Bob, N0QBJ, for showing me the light.)  Did some work on the drsi
+driver to enable a maximum of 2 cards and incidentally cleaned up compiler
+warnings.  Added another switch, SHELL, to options.h to permit skipping the
+shell commands.  They aren't worth having in MS-DOS since NET stops while
+shelled out, and the interrupt reaction is unpredictable.
+
+9/6/93 k31 - Incorporated changes made by Bob, N0QBJ, so NET would compile as
+well under OS9-68K.  Added a receive overrun counter to the MS-DOS version.
+If an overrun occurs on the 8250 the frame being sent from the TNC is marked
+as corrupt and tossed.  (I get some overruns on a 10 MHz 286 running four
+ports simultaneously.) Revised the line editing in ttydriv.c, corrected ref-
+erence to "FTP" in session.c (should have been "Finger").  Cleaned up compiler
+warnings in nrs.c but code is untested as far as I know.
+
+73 es Enjoy!
+
+Joe Buswell, K5JB@K5JB.OK
+[44.78.0.2]
+3312 N. Idylwild Dr,
+Midwest City OK 73110

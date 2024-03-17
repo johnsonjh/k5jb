@@ -1,0 +1,18 @@
+See send.c and unix.c for temporary fixes for Coherent related to missing
+function tmpfile().  Need to return and make provisions to remove temporary
+files when bm exits.
+
+(These are repackaged as a tape archive for Internet upload.  Ignore
+MS-DOS references, though this is a complete set of files for either
+MS-DOS or Unix.)
+
+See send.c and unix.c for temporary fixes for Coherent related to missing
+function tmpfile().  Need to return and make provisions to remove temporary
+files when bm exits.
+
+Never did return and make the above fixes.
+Incorporated changes to increase number of characters the word wrap looks back
+to find a space at end of line, and loosened test for correct date format
+in incoming mail.  Some systems don't strictly comply with RFC-822.
+Merged my changes with those made by Bob, N0QBJ, to make this code compile
+and run under OS9-OSK.  Bumped version up to 3.1.1l (ell)  Joe, K5JB

@@ -1,0 +1,943 @@
+5.  Other Things: NET/ROM, Finger, Mulport, Mbox, Datagrams and V Circuit
+
+5.1.  NET/ROM Services
+
+This NET/ROM information was provided by Dan Frank W9NK, author of the 
+NET/ROM support for NET.EXE.
+
+The NET/ROM support for the KA9Q package serves three purposes:
+
+   1) Existing NET/ROM networks may be used to send IP traffic.
+   2) NET may be used as a NET/ROM packet switch.
+   3) NET may be used to communicate with NET/ROM nodes, and its
+      mailbox facility can accept connects over the NET/ROM network.
+
+5.1.1  Setting up NET/ROM
+
+5.1.1.1  The NET/ROM Interface
+
+No physical interface is completely dedicated to NET/ROM, which is as it 
+should be.  You attach all your AX.25 interfaces, of whatever sort.  Then 
+you attach the NET/ROM pseudo-interface ("attach netrom").  Then you 
+identify to the NET/ROM software those interfaces you want to allow it to 
+use, with the "netrom interface" command.  The format of this command is:
+
+     netrom interface ax0 #ipnode 192
+
+The first argument is the name of the previously attached interface you 
+want to use.  The second argument is the alias of your node, to be used in 
+your routing broadcasts.  The alias is never used for anything else (as 
+you will see!).  The last number is the NET/ROM quality figure.  This is 
+used in computing the route qualities; it represents the contribution of 
+this interface to the overall computation.  For a 1200 baud half-duplex 
+connection, 192 is the right number.  
+
+You need a netrom interface command for every interface you're going to 
+use with NET/ROM.
+
+5.1.1.2.  Tracing on the NET/ROM Interface
+
+If you want to trace your NET/ROM datagrams, don't try turning on trace 
+mode for the "netrom" interface.  Nothing will break, but nothing will 
+happen.  You should trace the individual AX.25 interfaces instead.
+
+5.1.1.3.  Routing Broadcasts
+
+Once you have set up your interfaces, you need to set some timers.  There 
+are two:  the nodes broadcast interval timer, and the obsolescence timer.  
+These are set in seconds, like the smtp timer.  You should usually set 
+them to an hour.  You can set them to something different, if you want.  
+If your local NET/ROM nodes broadcast every hour, but you want to do so 
+every ten minutes, you can say:
+
+     netrom nodetimer 600
+     netrom obsotimer 3600
+
+Every time the obsotimer kicks, the obsolescence counts for all non-
+permanent entries are decremented by one.  When the count for an entry 
+falls below five, it is no longer broadcast.  When it falls to 0, it is 
+removed.  The count is initialized at 6.  These will eventually be 
+settable parameters; you can adjust them now by changing the initializers 
+for the variables in the source file.
+
+When you first come on the air, you can send out nodes broadcasts to tell 
+the local nodes that you are available.  Use the command:
+
+     netrom bcnodes ax0
+
+where ax0 is the interface on which you want to send the broadcast.  Do 
+this for every interface on which you want to do this.
+
+By default, the NET/ROM code does not broadcast the contents of your 
+routing table.  This is as it should be, since usually we just want to be 
+the endpoints of communications rather than relaying NET/ROM traffic.  If 
+you want to be a switch station, include in your autoexec the command:
+
+     netrom verbose yes
+
+Sometimes you can hear broadcasts from nodes that can't hear you.  If your 
+routing table gets filled with these unusable routes, your node will grind 
+to a halt.  The solution to this is node broadcast filtering, via the 
+netrom nodefilter command.  There is a filter list, which contains a list 
+of callsigns and interfaces.  Then there is a filter mode, which indicates 
+what to do with the list.
+
+If the filter mode is "none", no filtering is done.  If it is "accept", 
+then only broadcasts from the indicated stations on the indicated 
+interfaces are accepted.  If it is "reject", then all broadcasts except 
+those from the listed stations on the listed interfaces are accepted.
+
+Because the NET/ROM code cannot at this time recognize unusable routes and 
+try alternates, I strongly recommend use of the filter command to restrict 
+broadcast acceptance to those nodes which you know you can reach.
+
+5.1.1.4.  The NET/ROM Routing Table
+
+The next NET/ROM commands are those used for maintaining the routing 
+table.  They fall under the "netrom route" subcommand.  "netrom add" adds 
+a permanent entry to the routing table.  Its format is:
+
+     netrom route add #foo w9foo ax0 192 w9rly
+
+This command adds an entry for w9foo, whose alias is #foo, route quality 
+192, via w9rly on interface ax0.  Let's talk about what this means.  w9foo 
+is the *destination* node, the one to whom you want the packets routed by 
+the NET/ROM network.  w9rly is your *neighbor*, the NET/ROM node to which 
+you pass the packet to be forwarded.  Since w9rly may appear on more than 
+one interface (the callsign may be used by more than one NET/ROM node on 
+different bands), we specify that we are to use ax0 to send the packet.
+
+With NET/ROM, like IP, we don't know exactly what route a packet will take 
+to its destination.  We only know the name of a neighbor which has 
+indicated a willingness to forward that packet (of course, the neighbor 
+may be the destination itself, but that's unlikely in our application).  
+NET/ROM sends the packet to the neighbor, with a network header specifying 
+our callsign and that of the ultimate destination (in this case w9foo).
+
+We can use the netrom route add command to establish a digipeater path to 
+the neighbor.  For example:
+
+     netrom route add #foo w9foo ax0 192 w9rly wd9igi
+
+This will cause us to use wd9igi as a digipeater in establishing our 
+connection to the NET/ROM node w9rly.
+
+To drop the route to w9foo, you would type
+
+     netrom route drop w9foo w9rly ax0
+
+To see the contents of your routing table, you may type
+
+     netrom route
+
+and to see the routing entries for an individual station you can type
+
+     netrom route info <callsign>
+
+You may not use an alias as an argument to the netrom route info command.
+
+I can not stress enough that "route add" and "netrom route add" are two 
+different commands, with different purposes.  In general, you only need a 
+"netrom route add" if you need to add a route to a NET/ROM node via a 
+digipeater path.  If you find yourself using this command, ask yourself, 
+"Why am I doing this?"  Many people do not understand that NET/ROM does 
+automatic routing (well, sort of :-)).
+
+5.1.1.5.  The Importance of the Routing Table
+
+The NET/ROM routing table is analogous to the IP routing table:  if there 
+is nothing in it, your NET/ROM traffic will not go out.  You must either 
+manually enter a list of routes (perhaps via your autoexec.net) or wait to 
+receive routing broadcasts from your neighbors before your NET/ROM traffic 
+will leave your station.
+
+If you go to send packets via NET/ROM and nothing happens, even if you 
+have trace mode on, make sure that the destination node is in your NET/ROM 
+routing table.  If sending IP traffic, double check the ARP table for an 
+appropriate NET/ROM ARP entry for the destination node (see below for more 
+information on the use of the ARP table).  The ARP table is not used for 
+NET/ROM transport routing.
+
+5.1.1.6.  Interfacing with NET/ROMs Using Your Serial Port
+
+What if you have a NET/ROM node or nodes, and you'd like to attach them to 
+your computer via their serial interfaces, and use net as a packet switch?  
+It's very easy:  you have to attach those interfaces, using the "attach 
+asy" command, but specifying type "nrs" instead of "slip" or "kiss".  
+"nrs" is the NET/ROM serial framing protocol, which is like KISS, but uses 
+different framing characters and has an 8-bit checksum.
+
+When you attach an nrs interface, it can be used for passing IP datagrams 
+or AX.25 frames over serial lines or modems.  To use it for NET/ROM, you 
+have to identify it to the netrom code just like any other interface, with 
+the "netrom interface" command.
+
+5.1.1.7.  The Time to Live Initializer
+
+The "netrom ttl" command allows setting of the time-to-live initializer 
+for NET/ROM datagrams.  I recommend a value of 16 for most networks.  Use 
+more if you expect to go more than 16 hops.  The default is 64.
+
+The purpose of the ttl initializer is to prevent a packet from getting 
+caught forever in routing loops.  Every router who handles the packet 
+decrements the ttl field of the network datagram before sending it on, and 
+when it reaches 0 it is discarded.
+
+5.1.1.8.  Using NET/ROM Support for IP
+
+Now you know all the commands, but how do we actually use NET/ROM for IP 
+communications?  This takes two steps:
+
+Step one:  update the routing table.  In all likelihood, you will use 
+NET/ROM to gateway two IP subnets.  So, you'll probably want to identify a 
+station on each end as a gateway.  Let's say we're on the Milwaukee 
+subnet, and we want to talk to someone in Madison.  If we're not the 
+gateway, we just have a routing table entry like this:
+
+     route add [44.92.0.0]/24 ax0 wg9ate-pc.ampr
+
+This specifies that wg9ate should get all packets for the 44.92.0.x subnet 
+via interface ax0.
+
+Wg9ate has this routing table entry:
+
+     route add [44.92.0.0]/24 netrom w9mad-pc.ampr
+
+(presuming that w9mad is the Madison gateway).  Now, when the IP layer at 
+wg9ate gets datagrams for Madison, it knows that they have to go via 
+NET/ROM to w9mad.  Notice that we don't specify a "real" interface, like 
+ax1 or nr0, in the route entry.  The NET/ROM network layer will pick the 
+right interface based on its NET/ROM routing tables.
+
+We're not done yet, though.  w9mad-pc.ampr is not an ax.25 callsign.  The 
+NET/ROM send routine called by the IP layer needs to map from the IP 
+address to an ax.25 address.  It does this via a manually added arp entry:
+
+     arp add w9mad-pc.ampr netrom w9mad
+
+[We kind of fudged by using the arp table for this purpose, since there is 
+no way to do automatic address resolution for NET/ROM, and arp messages 
+are never sent or received for NET/ROM nodes.  However, the arp table does 
+contain precisely what we have here: mappings from IP addresses to 
+callsigns, and it saved a lot of code to do it this way.]
+
+Notice also that no digipeaters are ever specified in the arp entry for a 
+NET/ROM node.  Also, the callsign to which we are mapping is the final 
+destination of the packet, not the non-destination neighbor.  That 
+neighbor will be picked based on the NET/ROM routing tables.
+
+So, as a summary, let's look at what happens to a packet that reaches the 
+IP layer on wg9ate, destined for Madison.  The IP routing code looks the 
+destination IP address up in the table, and discovers that it should go 
+via NET/ROM to w9mad-pc.ampr.  So, it passes the packet to the NET/ROM 
+send routine.  That routine uses the arp table to translate w9mad-pc's IP 
+address to the callsign "w9mad".  Then it passes the packet to the NET/ROM 
+routing code.  That code checks to see if the destination callsign (w9mad) 
+is the same as that of any of its assigned NET/ROM interfaces.  Since it 
+isn't, it puts a network layer header (a.k.a. NET/ROM level 3 header) on 
+it, and looks for w9mad in its routing tables.  Presumably, it finds an 
+appropriate neighbor for the packet, and sends in out via ax.25.  The 
+NET/ROM network actually gets the packet to its destination.
+
+At w9mad, the packet's protocol ID causes it to be sent to the same 
+NET/ROM routing code that handled the outgoing packet from wg9ate (running 
+on a different computer, of course).  Now the destination callsign 
+matches, so the NET/ROM network layer header is stripped off, and packet 
+is passed up to the IP layer.  (NET/ROM network headers don't have a 
+protocol ID byte, so we just hope for the best.  If a NET/ROM node 
+addresses a NET/ROM transport layer packet to us, it is likely to be 
+dropped by IP for any of a number of reasons.)
+
+5.1.2.  The NET/ROM Transport Layer
+
+NET/ROM transport is the protocol used by NET/ROM node to communicate end-
+to-end.  When a user attaches to a NET/ROM via AX.25, and asks for a con-
+nect to a node in the NODES list, his local NET/ROM tries to open a trans-
+port connection to the destination node over the NET/ROM network.  NET/ROM 
+transport packets are carried in NET/ROM network datagrams, just like IP 
+datagrams.
+
+You shouldn't use NET/ROM transport when connecting to other TCP/IP 
+stations.  TCP is a much better protocol than NET/ROM transport, and makes 
+better use of available bandwidth.  Also, BM and SMTP are more convenient 
+to use than a TCP/IP station's mailbox facility.  However, for communi-
+cating with AX.25 users via the NET/ROM network, the transport facilities 
+in NET will work better (and more easily) than the traditional method of 
+connecting to your local node via AX.25.
+
+5.1.2.1.  Connecting via NET/ROM Transport
+
+To connect to the node whose alias is FOO and whose callsign is W9FOO, you 
+can issue either of the following two commands:
+
+     netrom connect foo
+
+     netrom connect w9foo
+
+If foo:w9foo is in your NET/ROM routing table, your station will transmit 
+a connect request to the appropriate neighbor used to reach w9foo.
+
+NET/ROM transport sessions are very much like those for AX.25.  You can 
+use the disconnect, reset, kick, upload, and record commands, and the 
+session command to switch sessions.
+
+5.1.2.2.  Displaying the Status of NET/ROM Connections
+
+The command
+
+     netrom status
+
+is used to display the status of all NET/ROM connections, which will 
+include those used in keyboard sessions as well as ones attached to the 
+mailbox.  For more detailed information on a session, you can use the 
+address of the NET/ROM control block:
+
+     netrom status <&nrcb>
+
+where <&nrcb> is the hex address given in the short form of the command or 
+in the "session" display.
+
+5.1.2.3.  NET/ROM Transport Parameters
+
+The NET/ROM transport parameters may be set with the various NET/ROM 
+subcommands.  Their meanings are listed below:
+
+   acktime: This is the ack delay timer, similarly to ax25 t2.
+            The default is 3000 ms.
+
+   choketime: The time to wait before breaking a send choke condition.
+              Choke is the term for NET/ROM flow control.
+
+   irtt: The initial round trip time guess, used for timer setting.
+
+   qlimit: The maximum length of the receive queue for chat sessions.
+           This is similar to ax25 window.
+
+   retries: Maximum retries on connect, disconnect, and data frames.
+
+   window: Maximum sliding window size, negotiated down at connect
+           time.
+
+5.1.3.  Where to go for More Information
+
+The paper "Transmission of IP Datagrams over NET/ROM Networks" appeared in 
+the Seventh ARRL Networking Conference papers, available from the ARRL.  
+In it, I describe the more technical details of how the NET/ROM network 
+support works.
+
+If you want to learn about NET/ROM, talk your local NET/ROM operator out 
+of his or her manual.  If you want to learn more, read the source code.  
+That's about it for sources, since the NET/ROM protocols originated in a 
+commercial product.
+
+5.1.4.  About the Code
+
+There has been a great deal of controversy about TheNET, a NET/ROM clone 
+for TNCs.  This is not the place to discuss the truth of the charges 
+leveled by Software 2000 against its authors, but that situation requires 
+me to make the following statement:
+
+The NET/ROM transport support in NET.EXE was not taken in any way, shape 
+or form from NET/ROM (whose source I have never seen) or from TheNET.  The 
+protocol code is based on protocol 6 from Tanenbaum's excellent book, 
+Computer Networks, as a moderately careful reading of both should show.  
+The source code is freely distributed, so the curious reader should have 
+the opportunity to check this assertion if he or she so desires.
+
+The smoothed round trip time calculation, which is not done in "real" 
+NET/ROMs (and should be, by the way -- they'd work a whole lot better) is 
+adapted from that used by KA9Q in the TCP protocol in NET.  The dicey 
+business of adapting it to a sliding windows protocol with selective 
+retransmission was done by me, all alone, after my cries for help on the 
+tcp-group mailing list went unanswered :-).
+
+I have taken the precaution of copyrighting the NET/ROM code in NET.  It 
+may be freely distributed for non-commercial purposes, in whole or in 
+part, and may be used in other software packages such as BBS systems if so 
+desired, so long as the copyright notice is not removed from the source 
+files, and the program in which it is used displays "NET/ROM code 
+copyright 1989 by Dan Frank, W9NK" when it starts up.
+
+Any person who wishes to distribute the code, or anything based on the 
+code, for commercial purposes will find me very reasonable, but rather 
+insistent about being compensated for the hours I've spent working on it.
+
+Dan Frank, W9NK
+
+5.2.  The Finger Server (to put it on someone)
+
+Mike, KA7AXD, added the finger server to net, and he credits Gerhard, 
+PA0GRI, with giving him some help.  For more information on this 
+implementation of Finger, see the 7th Annual ARRL Networking Conference 
+Proceedings.  Mike can be reached at mhorne@honda.fdi.tek.com.
+
+In a subdirectory, called, finger, off of the NETHOME directory (e.g. 
+\net\finger, following these examples for the PC), put files with 
+identifying names followed by the extension "txt", for example, k5jb.txt, 
+sam.txt, all.txt, etc.  If someone sends "finger @k5jb" (my station), his 
+program responds with something to the effect:
+
+  Known users at k5jb:
+      k5jb
+      sam
+      all
+
+Then, if he sends, "finger all@k5jb", my program sends the contents of 
+all.txt to him.  You can see the results of the finger command on your own 
+computer by doing one of the three variations of the command: finger, 
+finger @your_hostname, finger someone@your_hostname.  This will show what 
+your files look like to someone else.  I use the all.txt to hold all the 
+current IP addresses I have assigned in the local area.  (Users use FTP to 
+get it from me as their first exercise of FTP.)
+
+5.3.  Mulport -- Run your own router!
+
+The multi-port code that is optionally compiled into net is called GRAPES 
+Multiport, and sometimes "Mulport", from the compiler switch by that name.  
+(Grapes is an acronym for "Georgia Radio Amateur Packet Experimenters 
+Society".)  It permits your station to handle certain packets received on 
+one port, and retransmit them out a second port.  (NET has to be compiled 
+with the compiler directive MULPORT defined in config.h.  Mulport code 
+adds about 3.3k bytes to the .exe file.)
+
+5.3.1.  Mulport planning and setup
+
+To use mulport, you must build are two tables (files).  These 
+files are named DIGILIST and EXLIST (Digipeater list and exception list).  
+Calls in these files are used in the rules that follow.  These files are 
+simple ASCII text files containing the callsign of each station involved 
+and the interface name of the port needed to reach it.  The port name is 
+the same name you used in the attach statement for that port.  There is a 
+special callsign "lan" that tells mulport which port feeds your LAN or 
+default port.
+
+5.3.2.  Digilist file
+
+The asynchronous port names in the following examples came off of my 
+setup.  They are ax0, ax1, vc0a, vc0b, etc.  An example of a digilist file 
+is:
+
+   lan vc0a
+   k5jb-5 vc0a
+   n0els5 vc0a
+
+5.3.3.  Exlist file
+
+An example of an exlist file is:
+
+   k5jb vc0b
+   k5jb-11 ax0
+   kb0qj-10 ax0
+   n5owk-2 ax1
+   n5owk-1 ax1
+
+The files digilist and exlist must be carefully constructed because the 
+mulport.c routine that reads them is not very robust; a badly formed file 
+can crash the program, or make it run erratically.  The program only reads 
+the first two fields of each line, and it doesn't do much error checking.
+
+.pa
+The following exlist and digilist file rules are important:
+
+     1. Don't put comments in the file unless you put them on the same 
+        line with an entry, e.g. w1aw-10 ax0 115kb link to the moon
+
+     2. Don't make the call sign total length over 11 characters (highly 
+        unlikely error)
+
+     3. Don't make the interface name over four characters.  ("dr0a" is 
+        max.)
+
+     4. Make sure the lines are well under 80 characters long if you add 
+        comments.  In fact, make sure they are less than 77 characters to 
+        be safe.  Us an ASCII text editor just like you use on other net 
+        files.
+
+Regarding comments.  The program reads the first two fields on each line 
+and throws the rest away.  There can be a maximum of 10 call - port pairs 
+in each file.  The bigger these lists, the more work you put on the ax25 
+parts of NET.
+
+Place these files in the NETHOME directory.  (In the examples for MS-DOS 
+this is in \net.  As usual, if environmental variable NETHOME is not used, 
+NET will find the files if they are in root.)
+
+5.3.4.  Mulport Rules
+
+Here are the rules that mulport follows (in pseudo C notation):
+
+If(our call is in the received packet header digipeater list)
+   if(it is not the last one on the list)
+      if(the call following ours is contained in digilist)
+         send the packet out the port specified in digilist
+      else
+         send the packet out the port from whence it came.
+   else /* our call is last one in digipeater list */
+      if(destination call is in exlist)
+         send the packet out the specified port
+      else
+         if(there is a lan entry in digilist))
+            send the packet out the lan port
+          else
+             send if out the port from whence it came
+
+Rules functionally restated:  If packets digipeated through our switch are 
+to be digipeated by another station put that other station's call in 
+digilist if it is not on the same port from which those packets are 
+received.  (For return packets to be handled correctly, you may have to 
+also apply the next rule.)
+
+If packets digipeated through our switch are intended for a directly 
+reachable station, put that station's call in exlist if it is not on the 
+"lan" port.
+
+.pa
+5.4.  AX.25 and NET/ROM Mailbox
+
+5.4.1.  A two way communication
+
+If you have enabled mbox (mbox on) non-TCP/IP users can connect to your 
+station and get something besides a blinking cursor.  Previous to the 
+inclusion of the mailbox (mbox) users were connected to a dormant ax25 
+terminal session.  You had to enable the session on your end, to receive 
+their typing.  (With version K28, such sessions are automatically made 
+active.
+
+Dan Frank, W9NK, incorporated the interception of NET/ROM and AX.25 
+connections when he did his NET/ROM code.  The initial mbox enabled a user 
+to do three things, send a message, initiate a telnet (chat) or 
+disconnect.  I added the ability for a user to read mail addressed to him 
+and download files that were put in a special place so their content and 
+size could be controlled so as to not flood the AX.25 network.
+
+An incoming AX.25 connection to your ax25 call requires the user to enter 
+a carriage return (or any information frame) to bring up the mailbox 
+banner and prompt.  This is because there is no protocol information in 
+the AX.25 link layer connect request (SABM).  If you use the ax25 mboxcall 
+and the user connects to that call the mailbox prompt will be sent 
+immediately after connect.  The NET/ROM mailbox also is activated as soon 
+as the incoming connection is completed over a NET/ROM circuit.
+
+With version, 890421.0g (K5JB.g or later), the user is able to read mail, 
+kill his mail, see who has mail, get a help message, get directory lists 
+and download text files.  See below for an explanation of files and 
+directories that support this mbox version.
+
+Mail handled by mbox is normal mail handled the same as SMTP so non IP 
+users can participate in the TCP/IP mail network.
+
+Operating note:  If your neighbor NET/ROM has parameters set a certain 
+way, the incoming AX.25 link creating a NET/ROM circuit may stay estab-
+lished after the initiator is gone.  Your neighbor NET/ROM will begin the 
+next connection with a NET/ROM protocol packet instead of an AX.25 SABM.  
+If you have stopped and restarted your program, it will send a DM to the 
+NET/ROM.  The effect is that the user never gets the prompt from your 
+station (unless he sends the connect command a second time to his terminal 
+NET/ROM).  If you observe that you have "permanent connections" with your 
+neighbor NET/ROM, it is good practice to make an AX.25 connection with it 
+and disconnect, either before exiting the program, or after restarting it.
+
+A new command ax25 t4 deals with stale ax25 connections.  Normally after 
+NET/ROM transactions your station will disconnect the circuit after 15 
+minutes of inactivity.
+
+Incidentally, it is not a good idea to set T3 to other than 0 when dealing 
+with NET/ROM because it only causes unnecessary polling.
+
+5.4.2.  Mbox File placement.
+
+In the following examples, the MS-DOS backslash is used in path names.  In 
+Unix, substitute forward slashes, of course.
+
+If you have defined them, mbox will use environmental variables NETHOME, 
+NETSPOOL and PUBLIC to find its files.  Mbox searches the directory, 
+specified by NETHOME for the file helpbox.hlp, used by the help command.  
+It searches $(NETSPOOL)\mail, (e.g. if NETSPOOL = \spool, it searches the 
+file \spool\mail) for a *.txt files containing the users' call signs.  (In 
+MS-DOS you can specify drive letter in paths.)  It uses the directory 
+defined in PUBLIC as its file area.  If PUBLIC is \public\mbox, it will 
+use that directory.  The PUBLIC file area should only contain files that 
+are suitable for downloading over AX.25 links.  (In other words, no 
+binaries, and no monsters).
+
+If you didn't define these environmental variables, mbox searches the 
+default directories, \net, \spool\mail, and \public, respectively for the 
+above functions.  Note that in most instances internal MS-DOS file 
+operations don't really care if you use "\" or "/" in these path 
+separators.  Unix does, so to be consistent the compiled code uses "/".
+
+In the Unix version, the default directories are placed differently.  If 
+no environmental variables are specified, spool will be  /usr/spool.  
+Public will be /usr/public
+
+There are provisions to put a short help file in the NETHOME directory 
+(\net in our example) that is sent to a user in response to "h".
+
+Here is an example of helpbox.hlp that I use.  It contains information on 
+commands that are not compiled into the mbox prompt:
+
+This is a mail box part of a TCP/IP program.  You can read mail addressed 
+to you or send mail to someone else in the local area, or someone else on 
+the TCP/IP network.  Briefly, here are some of the commands:
+
+b    Is for bye, like in bye-bye.  I'll disconnect.
+c    Enters chat, a telnet session.  You have to disconnect to quit.
+k N  Kills your message N.  If you change your mind, disconnect.
+l    Lists all messages for you
+ll N Lists last N messages for you.
+ls   (or w) Lists downloadable file names that are in a public directory.
+m    Lists calls of those who have mail here.
+g (filename) gets a files from your directory.  Use, g morehelp, to get a
+     more complete help file.
+r N  Reads your number N message.
+u    Shows current users on the mailbox.
+v    Shows what NET version this is.
+
+If you want to get in on this TCP/IP thing, leave me a message.
+
+Enjoy!  Joe, K5JB
+(end of helpbox.hlp)
+
+Helpbox.hlp is short because people are prone to type "h" when they can't 
+think of anything else to do.  A short file makes the results ofer a poor 
+path merciful.  "Morehelp" in the \public directory is much more inform-
+ative.  A sample morehelp file is in the samples provided with this kit.
+
+Note: If the user came in with AX.25, you can butt in by initiating a 
+connect with the connect command but it is not a good idea.  The session 
+you create will take the control block used by the mailbox leaving the 
+mbox as an orphan.  Only disadvantage of this is that a small amount of 
+memory will not be freed until you stop and restart net.  Frequency of 
+this occurrence was considered so small that no code was written to free 
+up this memory.  You can't butt in on a NET/ROM mbox session, though you 
+can issue a netrom connect to the destination node and then issue a 
+connect to the station who is using your mailbox.  This will be a separate 
+session from the mbox session.  See the "mbox s" command for a graceful 
+way to butt in.
+
+5.4.3.  Mbox user commands
+
+Once a session is started, the mbox tells the user whether or not he has 
+mail, and tells him how many messages there are, before the initial 
+prompt.  The prompt, which is compiled in, doesn't show all the possible 
+commands.  It shows,
+
+  "Read #, Kill #, List, LLast #, Send, Chat, What, Help, Bye >".
+
+
+"Read" works without an argument if there is only one message.  If there 
+are more than one, the message number must be used as an argument.  (e.g. 
+r 3 reads message number 3.  At least one space is required.)
+
+"Kill" deletes a message if there is only one.  If there are more, "Kill" 
+must be followed by the message number.  Kill takes effect after "Bye".
+
+"List", or "l" lists the entire list of messages for the user.  When the 
+user connects, the user is advised of the number of messages he has, but 
+only lists unread messages.  If the user wants to see the whole list he 
+can use this command, or for a partial list, the one that follows.
+
+"Llast n" or 'll n" lists the last n messages.  If n is missing, it lists 
+all the messages.
+
+"Send" has the same syntax as the standard WA7MBL/W0RLI/CBBS send command.  
+It has provisions to handle incoming BBS traffic correctly.  (Recognizes 
+the BBS "SID", such as [CBBS-v6.4-$H]; SP, SB, ST, as well as S; the @ BBS 
+field; the < fromcall field; and the $BID field.  It does nothing special 
+with the SP, SB, and ST fields except add the recognition to the message 
+header.)  Non-BBS users can also use the from redirection, e.g. 
+   s k5jb@k5jb <w1aw
+sends a message to k5jb at host k5jb and marks it as from w1aw, even 
+though it may have been sent by wb5fwe.
+
+"Chat" closes the mbox session and passes the user off to a telnet 
+session, never to return without disconnecting and reconnecting.  He is 
+advised of this fact before it happens.
+
+"What" is an alias for the LS command without arguments.  It lists 
+contents of the public directory.
+
+"Help" sends the user the contents of a file, helpbox.hlp.  See the 
+example above.
+
+"Bye" logs the user off, cleans up his files, and disconnects.
+
+Additional commands not shown at the prompt are:
+
+"Get" causes a file located in the public directory to be sent to the 
+user.  It is intended for text files, but will download a binary file to 
+the hapless user, so don't put any within his reach.  Location of the 
+public directory is discussed in 5.4.2.  The filename is case sensitive in 
+Unix.  ("d", for "download" is an alias for the "get" command.)
+
+"Ls" is a directory listing function.  It lists contents of the public 
+directory.  It uses the wildcard pattern of the host machine for 
+selectively listing file names.  Ls <directory> lists contents of a 
+subdirectory.  ("What" is an alias for "ls" with no argument.)
+
+"Mail" sends a list of users who have mail (files in $(SPOOL)/mail that 
+have the extension, .txt).
+
+"Users" shows the same information as the mbox command shows at the 
+console.  (See 6.2.24.)
+
+If you compiled your code with AX25_HEARD defined, there will be a "j" 
+command (jheard) that will cause the mailbox to show the most recent info 
+frames heard, with their associated interfaces and protocols.  (Display is 
+same as the one you get with the ax25 heard command.)  This function takes 
+a lot of space so it is not normally included.
+
+Note: Downloading (receiving) of files (resulting from: read mail, list 
+directory, get file) can be aborted by the recipient if he sends a char-
+acter to the mbox while the downloading is taking place.  (Empty line 
+alone won't do it.)  A disconnect will stop the downloading.  After queued 
+transmit packets are sent, the message, "Interrupted at your request", 
+will be sent before the prompt.
+
+When a user reads a message, mbox reads that message out of the call.txt 
+file.  A temporary file, call.$$$ is created for a message that is sent 
+and that file is not deleted.  You can brouse this file if you are curious 
+about the last message read.  When a user reads or kills a file, the old 
+call.txt file is renamed to call.bak, and a new call.txt file is created.  
+All these mail related files are are in the \spool\mail directory.  
+(MAILSPOOL environmental variable with "\mail" tacked on.)
+
+Addition of the AX.25 mbox is probably the most significant thing that has 
+been done to convert the net suite from a networker's toy to an interest-
+ing and useful addition to routine packet radio environment.  At least, it 
+provides a window for those who are learning about packet to peer through 
+to the possibilities of TCP/IP.  It is difficult to stifle adding goodies 
+in this area of net.
+
+To witness facination amateur radio operators have with BBSs, notice the 
+transformation of NOS from a TCP/IP program to a full blown BBS.
+
+5.5.  Virtual Circuits and Datagrams
+
+The "mode" command sets the manner in which packets are transmitted over 
+AX.25.  The mode command is given for each interface and can be either 
+"vc" or "datagram".  Default is "datagram".
+
+In "vc" (virtual circuit) mode, IP packets are encapsulated in AX.25 I 
+frames and are acknowledged at the link layer according to the AX.25 
+protocol.  Link layer connections are opened if necessary.  With the 
+proper setting of the AX.25 T2 (acknowledgment delay) timer, AX.25 
+acknowledgments can be piggybacked on I frames carrying other IP datagrams 
+(e.g., TCP level acknowledgments), thereby eliminating the extra overhead 
+ordinarily incurred by link layer acknowledgments.
+
+In both modes, ARP is used to map IP to AX.25 addresses.  The defaults can 
+be overridden with the type-of-service (TOS) bits in the IP header.  
+Turning on the "reliability" bit causes I frames to be used, while turning 
+on the "low delay" bit uses UI frames.  (The effect of turning on both 
+bits is undefined and subject to change).
+
+In both modes, IP-level fragmentation is done if the datagram is larger 
+than the interface MTU.  In virtual circuit mode, however, the resulting 
+datagram (or fragments) is further fragmented at the AX.25 layer if it (or 
+they) are still larger than the AX.25 "paclen" parameter.  In AX.25 
+fragmentation, datagrams are broken into several I frames and reassembled 
+at the receiving end before being passed to IP.  This is preferable to IP 
+fragmentation whenever possible because of decreased overhead (the IP 
+header isn't repeated in each fragment) and increased robustness (a lost 
+fragment is immediately retransmitted by the link layer).
+
+5.6. ROSE Transport
+
+If included at compilation, NET has two commands that permit conducting 
+sessions over ROSE circuits.  ROSE networking software prior to version 
+3.0 replaced the protocol identifier (PID) in user AX.25 information 
+frames with F0, the "no layer 3" PID, when it delivered them to their 
+destinations.  Version 3.0 and later ROSE switches preserve the user's 
+PID.  Depending on the types of ROSE switches (or other virtual circuit 
+networking schemes) you encounter, you and the other IP stations you work 
+with, will have to take steps in NET (or NOS) to deal with these 
+networking schemes.  (With NET version k15, and later, "Vcircuit" and 
+"rosebash" commands replace the "rose" commands that were in earlier 
+versions of net.)
+
+There are two conditions that have to be satisfied BY BOTH IP stations in 
+order to use ROSE transport circuits.  1. Stations using ROSE must be 
+prepared to work in virtual circuit (VC, or "Connected" mode), and 2. If 
+the ROSE circuit sends packets with F0 PID, both stations must be able to 
+discard them.
+
+In its native datagram mode NET communicates with other NET or NOS 
+stations using un-numbered information frames (UI) but can be made to run 
+in VC mode by using the "mode" command.  Since VC mode is lower perform- 
+ance than datagram, it should be avoided.  NET version k15, and later, 
+have the command, vcircuit, that permits adding a synthetic interface to 
+an existing asy interface.  Outgoing packets that are routed over that 
+synthetic interface use virtual circuit, even if the associated real 
+interface is in the default datagram mode.
+
+Incoming packets from TCP/IP stations, if carried by ROSE virtual circuits,
+must be handled specially.  If they contain IP or Netrom PIDs they can be
+handled normally but if they contain F0 PID they have to be trapped or they
+will be routed to the AX.25 mailbox.  ROSE switches send unexpected alias
+frames that are trapped by using the vcircuit command (explained shortly.)
+
+A second command, rosebash, can be used to replace the missing IP PID in 
+incoming VC packets that are unfaithful reproductions transported by 
+ROSE versions earlier than 3.0  Don't use rosebash unless necessary.
+
+Stations on each end of a ROSE circuit must coordinate their activities if 
+they are to use ROSE.  Both TCP/IP stations on a ROSE circuit must be 
+running a version of NET (or NOS) capable of specially handling the ROSE 
+transport mechanism.  NOS must be modified to use earlier ROSE versions, or
+can be used on later ROSE versions if the "reliable mode" is used.  (Use
+your neighbor ROSE switch's digipeater call instead of its regular call in
+setting up your AX.25 route command.  This is _Supposed_ to work, but I 
+haven't seen a knowledgable NOS user make it work yet.  I have a patch for 
+NOS if we need it.  Even in the "reliable mode" ROSE persists in sending an I 
+frame to the connecting station (it is zero length) and the F0 protocol ID 
+spawns an AX.25 user service from an unsuspecting NET or NOS.)
+
+For outgoing frames, to avoid dedicating the async port to the VC mode, 
+you can use the "vcircuit attach" command to attach a pseudo interface 
+which has most of the attributes of an already attached asynchronous 
+interface.  (This command can be abbreviated to "v at".)  You then use 
+that pseudo interface to specify that you want to use virtual circuit.  
+This way, not all transactions that start from that async port need to be 
+VC.  The vcircuit attach command syntax is:
+
+   vcircuit attach <virtual circuit iface name> <async iface name>
+
+If you only have one async interface attached, called ax0, I suggest you 
+simply use the command:
+
+   vcircuit attach vc0 ax0
+
+If you are using more than one interface, you might use "vc0", "vc1", etc.  
+Put this command in autoexec.net after AX25 parameters are defined and 
+before it is referenced.
+
+If you are using the Kantronics KPC-4 or KAM interface, there is a strict 
+naming convention you must follow.  The KPC interface name must be four 
+characters long, start with a 'k' and end with an 'a'.  If the interface 
+to be used is kp0a, use the vc interface name vc0a, kpva, or whatever.  
+(Another vc interface will also be automatically attached to the second 
+KPC interface.  Simultaneous dual port attachment is necessary because of 
+the way the KPC-4 code handles incoming traffic.)
+
+You can add a maximum of 4 pseudo interfaces to 4 corresponding async 
+interfaces.  This maximum can be changed by defines in vcircuit.c.  If you 
+use the pseudo VC interface you don't use the mode command.  Instead you 
+use the VC interface name in place of the real interface name in the route 
+add command.
+
+If you want to trace incoming data on a port that has an associated VC
+interface attached, trace it by its VC (pseudo) interface name because the
+vast majority of incoming packets will be handled by that interface because
+of its position on the interface chain.  If you are transmitting on the
+real interface, put the trace on both the real and VC interfaces.
+
+Use the vcircuit add command to create a table of distant IP stations that 
+will be feeding packets to you over a ROSE circuit.  This table is used to 
+catch incoming F0 information frames from those stations, divert them from 
+triggering the AX.25 mailbox, and, if (remotely) necessary, put the IP PID 
+back so NET will handle them internally.  Syntax for this command is:
+
+   vcircuit add <remote station's call>
+
+The distant IP station's call is the AX.25 call, not his host name.
+
+For an example of calls used, I will describe a test circuit I used. 
+K5JB-10 is my IP station #1 (host is k5jb), with N0ELS-5 as a neighbor 
+ROSE (address 405771).  It will be using async port kp0a which is 
+connected to a Kantronics KPC-4 using logical port a.  K5JB-11 is my IP 
+station #2 (k5jbspook) on another frequency with K5JB-5 as a neighbor ROSE 
+(address 405732).  It will use a conventional port named ax0.
+
+First, on IP station Number 1 (k5jb), I would use, vcircuit attach vc0a 
+kp0a.  (Second port would automatically be called vc0b and be attached 
+to kp0b.)
+
+Then I would add the remote station to the vcircuit table with a command 
+like:
+
+   vcircuit add k5jb-11
+
+Where the -11 call is my #2 IP station's call.  (SSIDs are significant.)
+
+If you want to drop a call from the table, the command would be:
+
+   vcircuit drop <destination station's call>
+
+You can have a maximum of 10 IP station calls in the VC table.
+
+This takes care of incoming packets on IP station #1; now to route 
+outgoing packets.  Use two standard NET commands, arp add, and route add.  
+For our purpose, we use a simple form of the arp add command with the 
+syntax:
+
+   arp add <hostname> ax25 <AX.25 call path>
+
+Using the calls in the example above, the arp add command would be:
+
+   arp add k5jbspook ax25 k5jb-11 n0els-5 405732
+
+The call sign string is the same as one you would use to make an ax25 
+connection manually over that ROSE circuit (destination call, neighbor 
+ROSE call, destination ROSE address).
+
+For our purpose we use a simple version of the route add command with the 
+syntax:
+
+   route add <hostname> <iface name>
+
+And using the example calls, and assuming that we are using kp0a as our 
+asynchronous port for this circuit, our route add command would be:
+
+   route add k5jbspook vc0a
+
+In summary, it takes three command entries for each circuit: vcircuit add, 
+arp add, and route add.  You can add all the sophistication you want to 
+them.  See Chapter 6.
+
+(If you don't use the vcircuit attach command we must tell NET to use 
+virtual circuit mode on your async port (kp0a in this example) by using 
+the mode command, mode kp0a v.)
+
+To complete our example, we move to the second IP station (k5jbspook) and 
+use the following to reach k5jb on ROSE:
+
+   vcircuit attach vc0 ax0
+   vcircuit add k5jb-10
+   arp add k5jb ax25 k5jb-10 k5jb-5 405771
+   route add k5jb vc0
+
+NET feeds outgoing packets to the ROSE network by looking up the host in 
+the arp table, getting the route from the route table, and since the 
+pseudo interface was installed as a VC, initiating an AX.25 connect to the 
+ROSE switch.  After some spurious packets from the ROSE switch are read 
+and discarded, you are in business!
+
+If one of the ROSE switches in a ROSE circuit loses the IP PID and it is 
+necessary to replace it, use the command, rosebash, on both IP stations 
+involved.  (The spurious setup and disconnect packets from the neighbor 
+ROSE switches are discarded by the IP handler because they fail the 
+checksum test.  These failures are duly recorded in the statistics 
+displayed by the ip stat command.)
+
+In summary:
+
+ 1. Decide what you want to do
+ 2. Get someone else to agree (use the AX.25 mailbox to pass messages)
+ 6. Either use the mode command or the vcircuit attach command, or if 
+    using NOS, use the ax25 route add and ax25 route mode commands.
+ 3. Use the vcircuit add command
+ 4. Use the arp add command
+ 5. Use the route add command
+ 7. Get the other person to set his/her station to correspond.
+ 8. Ping the other station.  Watch for the return.
+ 9. Do it again, it won't take so long for a return this time.
+
+If you want to use ROSE to reach a Netrom station, use the netrom route add
+command to specify the ROSE path.  The command prompter doesn't indicate so
+but you can add digipeater calls after the <neighbor> argument.  Add the
+neighbor ROSE's call there, followed by the destination ROSE's address.  For
+IP, put the other IP station's AX.25 call in the <destination> field.  If you
+just want to be able to make Netrom connects (unlikely), put the Netrom's
+call in the <destination> field.  In either case, put the Netrom's call in
+your VC table to discard ROSE's spurious frames.  Joe, K5JB

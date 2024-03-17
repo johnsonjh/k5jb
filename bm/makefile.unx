@@ -1,0 +1,40 @@
+#
+#       Makefile for Bdale's Mailer  (Works on AT&T System V - K5JB)
+#       
+#       For more info see the net documentation package.
+#       If you change the makefile, do a make clean before you do a make.
+#
+
+CFLAGS= -O -DUNIX
+#use the following for Coherent 386:
+#CFLAGS= -O -DUNIX -DCOH386
+
+OBJS=	main.o send.o unix.o bmutil.o version.o header.o files.o getopt.o \
+	ndir.o wildmat.o
+
+SRC=	main.c send.c unix.c bmutil.c version.c header.c files.c getopt.c \
+	ndir.c wildmat.c
+
+bm:	$(OBJS)
+	$(CC) $(CFLAGS) $(OBJS) -s -o bm $(LDFLAGS)
+
+clean:
+	rm *.o
+
+lint:
+	lint $(CFLAGS) $(SRC)
+
+#
+# dependencies - please keep up to date!
+#
+
+bmutil.o: bmutil.c bm.h header.h
+files.o: files.c
+getopt.o: getopt.c
+header.o: header.c bm.h header.h
+main.o: main.c bm.h
+ndir.o: ndir.c ndir.h
+send.o: send.c bm.h
+unix.o: unix.c bm.h ndir.h
+version.o: version.c
+wildmat.o: wildmat.c

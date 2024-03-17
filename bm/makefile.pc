@@ -1,0 +1,39 @@
+#
+#	Makefile for Bdale's Mailer
+#	
+#	For more info see the net documentation package.
+#	If you change the makefile, do a make clean before you do a make.
+#	This makefile for Turboc C's make.  (Supposed to also work with
+#	ndmake.  K5JB
+#
+
+CFLAGS= -ms -v- -y- -w-nod -w-rvl -O -Z -d -DMSDOS
+LDFLAGS= -ms -v-
+HDRS=	bm.h header.h
+OBJS=	main.obj send.obj pc.obj bmutil.obj version.obj header.obj \
+	files.obj getopt.obj
+
+all:	bm.exe 
+	
+bm.exe:  $(OBJS)
+	tcc $(LDFLAGS) -ebm $(OBJS)
+
+clean:
+	del *.obj
+
+clobber: clean
+	del *.exe
+#
+# dependencies - please keep up to date!
+#
+bmutil.obj:	bmutil.c bm.h header.h
+pc.obj:	pc.c
+main.obj: 	main.c bm.h
+send.obj:	send.c bm.h
+header.obj:	header.c bm.h header.h
+files.obj:	files.c
+getopt.obj:	getopt.c
+version.obj:	version.c
+
+.c.obj:
+	tcc -c $(CFLAGS) $<

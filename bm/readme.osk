@@ -1,0 +1,4 @@
+Altered write message to file to put it to the default folder if no
+path is specified (instead of the current directory). This makes
+the path for write message the same as for save message. N0QBJ 1-31-93
+
