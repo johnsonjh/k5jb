@@ -20,18 +20,18 @@
  * Contact me for source code if you have same problem.
  */
 
-#undef TELUNIX
+#define TELUNIX
 
 /* On k5jb3b2 only, has to do with brain damaged pty on my machine.
  * Don't define this unless you have the file that I call telunix.c3
  * linked to telunix.c in your set.
  */
-#undef PTY_PIPE
+#define PTY_PIPE
 
 /* a client stub with PORT 87.  Uses IPC to transact with a server.
  * Contact me for a sample server if you want to try this.
  */
-#undef TELSERV
+#define TELSERV
 #define SERVNAME "telserv"	/* suggest 7 max for screen formatting */
 
 #ifdef _OSK
@@ -52,10 +52,10 @@
 */
 
 #define STARTOPT \
-	"start: discard, echo, finger, ftp, remote, smtp, telnet"
+	"start: discard, echo, finger, ftp, remote, smtp, telnet, telserv, telunix"
 #undef STOPOPT
 #define STOPOPT \
-	"stop: discard, echo, finger, ftp, remote, smtp, telnet"
+	"stop: discard, echo, finger, ftp, remote, smtp, telnet, telserv, telunix"
 
 
 /* We can either USE_QUIT and the shell layer manager (shl) or USE_QUIT

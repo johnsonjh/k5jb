@@ -1,4 +1,5 @@
 #include "config.h"
+#include "options.h"
 #ifdef TRACE
 #include <stdio.h>
 #include "global.h"
@@ -23,11 +24,20 @@ int check;
 	int16 offset;
 	int16 length;
 	int16 csum,cksum();
+#ifndef NO_INFO_CMD
+	extern int info_only;
+	extern char axtrhdr[];
+#endif
 
 	if(bpp == NULLBUFP || *bpp == NULLBUF)
 		return;
 
+#ifndef NO_INFO_CMD	/* missed this one for quite a while */
+	if(axtrhdr[0] != 0xff)
+		fprintf(trfp,"%sIP: ",axtrhdr);
+#else
 	fprintf(trfp,"IP:");
+#endif
 	/* Sneak peek at IP header and find length */
 	ip_len = ((*bpp)->data[0] & 0xf) << 2;
 	if(ip_len < IPLEN){

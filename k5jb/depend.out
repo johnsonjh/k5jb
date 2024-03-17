@@ -104,12 +104,12 @@ icmpdump.o:	./config.h	/usr/include/stdio.h	./global.h\
 
 icmpmsg.o:	./global.h
 
-iface.o:	./global.h	./iface.h
+iface.o:	./options.h	./global.h	./iface.h
 
 ip.o:	./global.h	./mbuf.h	./timer.h	./internet.h	./iface.h\
 	./ip.h	./icmp.h
 
-ipcmd.o:	/usr/include/stdio.h	./options.h	./config.h\
+ipcmd.o:	/usr/include/stdio.h	./options.h\
 	./global.h	./mbuf.h	./internet.h	./timer.h	./netuser.h\
 	./iface.h	./ip.h	./cmdparse.h
 

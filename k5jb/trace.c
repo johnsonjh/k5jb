@@ -140,9 +140,11 @@ char *argv[];
 		case 'a':	/* allmode */
 			notraceall = 0;
 			break;
+#ifndef NO_INFO_CMD
 		case 'i':
 			info_only = !info_only;
 			break;
+#endif
 		case 't':	/* to */
 			if(argc < 3)
 				printf("trace to %s\n",trfp == stdout? "console" : trname);
@@ -254,10 +256,12 @@ struct mbuf *bp;
 	}
 	if(func != NULLVFP)
 		(*func)(&tbp,1);
+#ifndef NO_INFO_CMD
 	if(info_only && !*axtrhdr){  /* ax25_dump puts null if supv frame */
 		free_p(tbp);
 		goto trdone;
 	}
+#endif
 	if(interface->trace & IF_TRACE_ASCII)
 		/* Dump only data portion of packet in ascii */
 		ascii_dump(&tbp);

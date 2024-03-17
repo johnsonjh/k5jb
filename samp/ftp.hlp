@@ -1,0 +1,23 @@
+Example help file, ftp.hlp.  Call from net with, help ftp.
+
+Here are the FTP commands (ones marked with * are the only ones you 
+can use before you complete the logon process on someone's computer):
+
+ abort     /* only used during file transfer */
+ cd <directory>
+ cwd [<directory>]  /* without arg, acts like pwd */
+ dele <remotefile>
+ dir <remote directory/file> [<local filename>]  /* long directory */
+ get <remotefile> [<localfile>]  /* "con" for localfile will send to screen */
+ list - same as dir                    /* can be saved in local file */
+ ls <remote directory/file> [<local filename>] /* abbreviated directory */
+ mkd(ir) <directory>
+ nlst same as ls
+*pass <password>
+ put <localfile> [<remotefile>]
+ pwd [<new dir>]
+*quit
+ rmdir <directory>
+ type <image|ascii>  /* binary = image.  If you use l, it will switch to
+                     /* image and report an error */
+*user <username>

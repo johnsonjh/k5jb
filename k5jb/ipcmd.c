@@ -1,7 +1,6 @@
 /* IP-related user commands */
 #include <stdio.h>
 #include "options.h"	/* added for SERIALTEST */
-#include "config.h"	/* for VCIP_SSID */
 #include "global.h"
 #include "mbuf.h"
 #include "internet.h"
@@ -86,11 +85,7 @@ char *argv[];			/* should have been unsigned char - K5JB */
 int doadd(),dodrop();
 static struct cmds rtcmds[] = {
 	"add", doadd, 3,
-#ifdef VCIP_SSID
 	"route add <dest addr>[/<bits>] <if name> [gateway|*] [metric]",
-#else
-	"route add <dest addr>[/<bits>] <if name> [gateway] [metric]",
-#endif
 	"Add failed",
 
 	"drop", dodrop, 2,

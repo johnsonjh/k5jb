@@ -1,0 +1,111 @@
+Occasionally someone has unexpected results with net because of the 
+order that commands were given in autoexec.net (startup.net in Unix).  
+Nowhere in the documentation does it mention that the order is 
+important.
+
+The ordering of some of the commands in autoexec.net is important.  Some 
+commands depend on information supplied by other commands.  The order of 
+the following (non-exclusive) list should be followed.  (In the 
+following list, not all the commands are necessary, nor is their order 
+important, but they are included to add some context to this list.  This 
+list doesn't contain all the possible autoexec.net commands.  See the 
+documentation, the sample files, and get help from someone already on IP 
+in your locale.)
+
+These first three have traditionally been near the top, along with the 
+ax25 mycall command, because it often is about the only thing that you 
+need to change to share an autoexec.net with a neighbor.
+
+hostname (e.g. k5jb.ampr.org, necessary but order not important)
+ip address (e.g. [44.78.0.2], used by start commands, )
+smtp gate (e.g. 44.78.0.2, order umportant but here is convenient)
+
+ax25 mycall (e.g. k5jb-10, used by attach and netrom commands)
+ax25 mboxcall (e.g. k5jb-9, necessary to enable mailbox but order
+unimportant)
+ax25 vcipcall (e.g. k5jb-8, optional for virtual circuit use - order
+unimportant)
+
+(The rest of the ax25 commands.  If you are using NET/ROM, and if you 
+want too make netrom reduce size of link layer packets put a reduced 
+ax25 paclen here, e.g. ax25 paclen 128, then restore normal value after 
+attach netrom, below.)  (Netrom mss is paclen - 20, max 236, min 44.)
+
+attach (asy and other) commands
+
+Any param commands that are needed to change kiss timing, e.g.:
+
+# slottime
+param ax1 3 1
+# txtail
+param ax1 4 2
+
+Netrom stuff that doesn't hurt anything, even if you aren't using 
+netrom, e.g.
+
+attach netrom
+
+If you used a shortened ax25 paclen in the ax25 commands above, you can 
+now restore normal paclen, e.g.
+
+ax25 paclen 256
+
+Here are additional and typical benign netrom commands:
+
+netrom interface ax0 #IPJB 170
+netrom bcstifle ax0 1
+
+netrom nodefilter mode accept
+netrom nodefilter add wb5fwe-1 ax1
+netrom obsotimer 3600
+
+Netrom commands that you enable if you are using the netrom transport to 
+other hosts, e.g.:
+route add wb5fwe netrom
+arp add wb5fwe netrom wb5fwe-6
+
+netrom nodetimer 1740
+netrom bcnodes ax1
+
+(For netrom off, set netrom nodetimer 0)
+
+Arp add and route add commands, e.g.
+
+route add default ax0
+
+arp add n5owk ax25 n5owk-2
+route add n5owk ax1
+
+Stations reachable only by a virtual circuit network, e.g.
+arp add w5gfe vax25 w5gfe-10 k5jb-5 405771 ada
+route add w5gfe ax0
+
+Any desired IP commands, e.g.
+
+Any desired tcp commands, e.g.
+tcp irtt 60000
+tcp timer linear 5
+
+Possibly miscellaneous commands:
+log \net\1net
+mbox on
+If you are using Grapes Mulport code (uses the attached port names):
+mulport on
+Maybe toggle socket naming to the off state:
+sok
+
+Start commands (important to save until almost last) e.g.
+start smtp
+start ftp
+start echo
+start discard
+start telnet
+start finger
+
+If you aren't going to do mailing, stop smtp timer:
+smtp timer 0
+
+(I think I caught the necessary order.  Think of it in terms of the 
+protocol layers.  Set layer 1 things before you set layer 2, etc.)
+
+Joe, K5JB

@@ -1,0 +1,9 @@
+This is an example of digilist, one of two files used with Grapes Multi-port
+code.  It can't have comments like this in it so if you edit this file,
+delete these first six lines.  The other required file is exlist.  Each
+line of up to 10 lines has two entries in it: call sign, and port name.  See
+Chapter 5 for explanation of Mulport.  Mulport has to be compiled into the
+net code.  (Comments after the first two fields are OK)
+lan ax0       Lan is required entry -- this is a default case of ax0
+wd5hjl-1 ax1  Digipeater on frequency associated with ax1
+kb0qj ax1

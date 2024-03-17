@@ -1,0 +1,18 @@
+( sample file - this password stuff is academic since it is transmitted 
+in the clear, but what the hay!  I encourage unique user names though so 
+the log will then reveal who did what.  
+  Format is, user_name password home_directory and permission.
+  Splat (*) is a wildcard password.  See user manual for details.  Delete
+down to here after you fix this file up for your own use.)
+
+joseph k5jb \ 3
+david wbfwe \usr\public 3
+dave * \usr\public 3
+.joe k5jb \usr 7
+monte * \usr\public 3
+paul n5pt \usr\public 3
+j * \usr\public 3
+terry * \usr\public 3
+wanda * \usr\public 3
+mike * \usr\public 3
+anonymous * \usr\\public\anon 3

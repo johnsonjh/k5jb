@@ -40,7 +40,7 @@ extern int exitval;
 
 struct tcb *tserv_tcb = NULLTCB;
 struct tcb *tservtcb[TSMAXSCAN];	/* savebuf for tcb ptrs for scan routines */
-int inqid;	/* global until I add another structure member fd */
+int inqid = -1;	/* global until I add another structure member fd */
 
 struct inmsgbuf {
 	long mtype;
@@ -79,7 +79,7 @@ openmsgs()
 	int i,rtn;
 	struct msgbuf *msgp;
 
-	if(inqid > 0)	/* already opened */
+	if(inqid >= 0)	/* already opened */
 		return -1;
 
 	inqid = msgget(INKEY,0600);	/* rw by owner only */
@@ -96,7 +96,7 @@ openmsgs()
 	printf("Server Output Queue ID is %d\n",outqid);
 #endif
 
-	return (inqid > 0) ? outqid : -1;
+	return (inqid >= 0) ? outqid : -1;
 }
 
 static void
@@ -104,7 +104,7 @@ closemsgs(ts)	/* won't actually close, just ignore */
 struct telnet *ts;
 {
 	ts->fd = 0;
-	inqid = 0;
+	inqid = -1;
 }
 
 static int

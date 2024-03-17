@@ -1,5 +1,3 @@
-#undef FORWARD	/* define it if you want to use the receive only iface */
-
 /* Interface control structure */
 struct interface {
 	struct interface *next;	/* Linked list pointer */
@@ -22,9 +20,8 @@ struct interface {
 #define	IF_TRACE_HEX	0x200	/* Dump packets in hex/ascii */
 	char *hwaddr;		/* Device hardware address, if any */
 	int kissport;		/* for multidropped kiss */
-#ifdef FORWARD
+/* we leave forw defined even it is not always used - K5JB */
 	struct interface *forw;	/* Forwarding interface for output, if rx only */
-#endif
 };
 #define	NULLIF	(struct interface *)0
 extern struct interface *ifaces;	/* Head of interface list */

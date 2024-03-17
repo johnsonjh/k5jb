@@ -77,10 +77,8 @@ struct mbuf *bp;	/* IP datagram to be queued if unresolved */
 	/* Create an entry and put the datagram on the
 	 * queue pending an answer
 	 */
-#ifdef VCIP_SSID
 	if(hardware == ARP_VAX25)	/* avoid enqueueing a bogon. All VAX25 are VC */
 		return NULLCHAR;
-#endif
 	arp = arp_add(target,hardware,NULLCHAR,0,0);
 	enqueue(&arp->pending,bp);
 	arp_output(interface,hardware,target);
@@ -155,11 +153,7 @@ struct mbuf *bp;
 			/* Mark the end of the sender's AX.25 address
 			 * in case he didn't
 			 */
-#ifdef VCIP_SSID
 			if(arp.hardware == ARP_AX25 || arp.hardware == ARP_VAX25)
-#else
-			if(arp.hardware == ARP_AX25)
-#endif
 				arp.thwaddr[uchar(arp.hwalen)-1] |= E;
 
 			memcpy(arp.shwaddr,interface->hwaddr,at->hwalen);
@@ -168,7 +162,7 @@ struct mbuf *bp;
 			arp.opcode = ARP_REPLY;
 			if((bp = htonarp(&arp)) == NULLBUF)
 				return;
-#ifdef FORWARD
+#ifdef OLD_FORWARD
 			if(interface->forw != NULLIF)
 				(*interface->forw->output)(interface->forw,
 				 arp.thwaddr,interface->forw->hwaddr,at->arptype,bp);
@@ -190,11 +184,7 @@ struct mbuf *bp;
 		/* Mark the end of the sender's AX.25 address
 		 * in case he didn't
 		 */
-#ifdef VCIP_SSID
 		if(arp.hardware == ARP_AX25 || arp.hardware == ARP_VAX25)
-#else
-		if(arp.hardware == ARP_AX25)
-#endif
 			arp.thwaddr[uchar(arp.hwalen)-1] |= E;
 		memcpy(arp.shwaddr,ap->hw_addr,at->hwalen);
 		arp.tprotaddr = arp.sprotaddr;
@@ -203,7 +193,7 @@ struct mbuf *bp;
 		if((bp = htonarp(&arp)) == NULLBUF)
 			return;
 
-#ifdef FORWARD
+#ifdef OLD_FORWARD
 		if(interface->forw != NULLIF)
 			(*interface->forw->output)(interface->forw,
 			 arp.thwaddr,interface->forw->hwaddr,at->arptype,bp);
@@ -265,11 +255,7 @@ int pub;		/* Publish this entry? */
 		/* This kludge marks the end of an AX.25 address to allow
 		 * for optional digipeaters (insert Joan Rivers salute here)
 		 */
-#ifdef VCIP_SSID
 		if(hardware == ARP_AX25 || hardware == ARP_VAX25)
-#else
-		if(hardware == ARP_AX25)
-#endif
 			ap->hw_addr[hw_alen-1] |= E;
 		ap->pub = pub;
 		while((bp = dequeue(&ap->pending)) != NULLBUF)

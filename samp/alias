@@ -1,0 +1,12 @@
+joe k5jb@k5jb
+spook k5jb@k5jbspook
+dave wb5fwe@wb5fwe
+steve n5owk@n5owk
+jay kb0qj@kb0qj
+monte wb5rzx%wb5rzx@wb5fwe
+doug wb5tki@wb5tki
+allip wb5fwe@wb5fwe n5owk@n5owk kb0qj@kb0qj wb5tki@wb5tki wb5rzx%wb5rzx@wb5fwe
+
+(note, don't do an alias for "all" or some fool mailbox may forward a 
+file to "all@your_ip and yours would forward it to all you had set up in 
+your alias file.  After you edit this file to suit, delete this paragraph.)

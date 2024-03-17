@@ -67,6 +67,7 @@ int unused;
 		}
 
 	fprintf(trfp,"%sAX25: ",axtrhdr);
+	axtrhdr[0] = 0xff;	/* flag for IP not to print header again */
 #else
 	if(pullup(bpp,&control,1) != 1){
 		fprintf(trfp,"\n");

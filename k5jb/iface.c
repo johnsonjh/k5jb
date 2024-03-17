@@ -1,5 +1,6 @@
 #include "global.h"
 #include "iface.h"
+#include "options.h"
 
 struct interface *
 if_lookup(name)
@@ -12,10 +13,10 @@ char *name;
 			break;
 	return iface;
 }
-#ifdef FORWARD	/* we don't use any receive only ifaces */
+#ifdef FORWARD	/* Used if we want to echo AX.25 received frames to a pipe */
 
-/* Divert output packets from one interface to another. Useful for ARP
- * and digipeat frames coming in from receive-only interfaces
+/* Divert output packets from one interface to another. Only used for AX.25
+ * monitoring with a pipe
  */
 doforward(argc,argv)
 int argc;

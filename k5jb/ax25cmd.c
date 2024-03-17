@@ -57,6 +57,7 @@ int doheard();
 #ifdef SID2
 int dombxcall();
 extern struct ax25_addr bbscall;
+int bbscall_set;	/* k36 */
 #endif
 #ifdef VCIP_SSID
 extern struct ax25_addr ip_call;
@@ -249,6 +250,7 @@ char *argv[];
 	if(setcall(&mycall,argv[1]) == -1)
 		return -1;
 	mycall.ssid |= E;
+	bbscall_set = 0;	/* k36 */
 	return 0;
 }
 
@@ -269,6 +271,7 @@ char *argv[];
 	if(setcall(&bbscall,argv[1]) == -1)
 		return -1;
 	bbscall.ssid |= E;
+	bbscall_set = 1;	/* k36 */
 	return 0;
 }
 #endif

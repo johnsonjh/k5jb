@@ -19,7 +19,8 @@
 
 extern char nospace[];
 extern char badhost[];
-int refuse_echo = 0;
+int refuse_echo = 0;	/* we had to modify to deal with JNOS crap - K5JB */
+static int saved_refuse_echo;	/* twiddled in k35d */
 int unix_line_mode = 0;    /* if true turn <cr> to <nl> when in line mode */
 
 int atoi(),go(),cmdmode();
@@ -504,6 +505,7 @@ int argc;
 char *argv[];
 {
 	extern int refuse_echo;
+	extern int saved_refuse_echo;	/* twiddled with unix eol mode */
 
 	if(argc < 2){
 		if(refuse_echo)
@@ -512,9 +514,9 @@ char *argv[];
 			printf("Accept\n");
 	} else {
 		if(argv[1][0] == 'r')
-			refuse_echo = 1;
+			saved_refuse_echo = refuse_echo = 1;
 		else if(argv[1][0] == 'a')
-			refuse_echo = 0;
+			saved_refuse_echo = refuse_echo = 0;
 		else
 			return -1;
 	}
@@ -535,6 +537,13 @@ char *argv[];
 			return -1;
 		else
 			unix_line_mode = argv[1][0] == 'u' ? 1 : 0;
+	/* added in k35d */
+	if(unix_line_mode){
+		saved_refuse_echo = refuse_echo;
+		refuse_echo = 0;
+	}else
+		refuse_echo = saved_refuse_echo;
+
 	return 0;
 }
 #endif /* _TELNET */

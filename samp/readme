@@ -1,0 +1,17 @@
+You will have to edit these sample files to suit your station.
+
+All of these files but one go in the NETHOME directory (e.g. \usr\net).
+If you followed my example, you will have a directory called \usr\public,
+where you can permit FTP users to brouse.  In it you will have another 
+directory, mbox, (\usr\public\mbox) where you can put files suitable for 
+mailbox people to download.  Here is where you put "morehelp" after you edit
+it to suit yourself. You probably won't be using "digilist" and "exlist" so 
+you can delete them.  (They are only used if your code was compiled with 
+Grapes Multi-port function included.  They are included here for 
+completeness.)
+
+You will want to write some *.txt files for your \usr\net\finger directory so
+users can "put the finger on" you.  Make them plain ASCII files and include
+what information you want in them.
+
+Enjoy!  Joe, K5JB

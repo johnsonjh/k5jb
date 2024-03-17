@@ -35,8 +35,12 @@ tar:
 	$(ZIPPER) -f bm.tar
 
 # make a new archive with lharc -- This one makes an MS-DOS format
+lharc:
+	lharc atg bm.lzh *.unx *.pc *.os9 bmnote *.[hc]
+
+# make a new archive with lha -- This one makes a Unix format
 lha:
-	lha atg bm.lzh *.unx *.pc *.os9 bmnote *.[hc]
+	lha a bmunix.lzh *.unx *.pc *.os9 bmnote *.[hc]
 
 #
 # dependencies - please keep up to date!

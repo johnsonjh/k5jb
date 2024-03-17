@@ -1,0 +1,25 @@
+(In this file you have to reconcile all the people who may connect to you.
+There are two ways to make multiple host names for a given IP address, 1. Make
+multiple lines per number -- see 44.78.0.8, or 2. put multiple host names on
+the line with the IP address -- see 44.78.0.2.  Reason for name variations
+is because users sometimes change their host names in BM messages and yours
+won't be able to reply.  Delete this paragraph after you have modified this
+file to suit.  Note to 44.78 users -- not kept up to date.  FTP all.txt from
+me to get the current list.)
+
+44.78.0.2       k5jb k5jb.okla.ampr k5jb.okla.ampr.org
+44.78.0.3       wd5g  wd5g.ampr wd5g.okla.ampr
+44.78.0.4       k5jb3b2
+44.78.0.5       n5loa n5loa.ampr.org n5loa.okla.ampr
+44.78.0.6       k5jbspook k5jbspook.okla.ampr
+44.78.0.7       k5jbslip
+44.78.0.8       wb5fwe wb5fwe.okla.ampr
+44.78.0.8       wb5fwe.norman.okla.ampr
+44.78.0.10      n5pt
+44.78.0.11      wb5rzx
+44.78.0.17      n5dub
+44.78.0.20      kb0qj kb0qj.okla.ampr
+44.78.0.21      qjspook
+44.78.0.22      kj5c
+44.78.0.28      k5hp  k5hp.okla.ampr
+44.78.0.40      wb5rrr

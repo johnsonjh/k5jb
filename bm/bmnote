@@ -1,3 +1,6 @@
+Rough modification notes for BM used by K5JB.  This BM is usable on MS-DOS,
+Unix, Coherent, and OS9/68K.
+
 See send.c and unix.c for temporary fixes for Coherent related to missing
 function tmpfile().  Need to return and make provisions to remove temporary
 files when bm exits.
@@ -30,4 +33,19 @@ DV window size that would work with Qedit.
 permit specifying alternate file names with starting command line.  BM
 looks for these files in the same directory where it would find the original
 defaults.
+
+6/18/94 Added bfgets() to bmutil.c so mail files with ^Z wouldn't get trun-
+cated.  Also cleaned up some misuse of feof().
+
+7/13/94 Added switch, OPTALIAS to conditionally add the -a alias arg.
+It is not normally desirable because NET and NOS use the hardcoded name,
+alias.
+
+8/22/94 Added filter to prevent user @ host errors and cleaned up for COH4
+Did some playing with BC.  Redid makefile to handle either. (vers n1)
+
+3/3/95 Corrected "size" which was lopping off trailing characters if there
+were some characters pushed back on stream; added skip over leading command
+spaces, fixed where screen banner scrolled away if BM started with a long
+message list.  made version n2
 

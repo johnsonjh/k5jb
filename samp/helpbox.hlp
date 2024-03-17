@@ -1,0 +1,21 @@
+
+This is a mail box part of a TCP/IP program.  You can read mail addressed to
+you or send mail to someone else in the local area, or someone else on the
+TCP/IP network.  Briefly, here are some of the commands:
+
+b    Is for bye, like in bye-bye.  I'll disconnect.
+c    Enters chat, a telnet session.  You have to disconnect to quit.
+k N  Kills your message N.  If you change your mind, disconnect.
+l    Lists all messages for you
+ll N Lists last N messages for you.
+ls   Lists downloadable file names that are in a public directory.
+m    Lists calls of those who have mail here.
+g (filename) gets a files from your directory.  Use, g morehelp, to get a
+     more complete help file.
+r N  Reads your number N message.
+u    Shows current users on the mailbox.
+v    Shows what NET version this is.
+
+If you want to get in on this TCP/IP thing, leave me a message.
+
+Enjoy!  Joe, K5JB

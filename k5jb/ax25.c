@@ -115,22 +115,18 @@ char reliability;
 #endif
 	int atohax25();
 	void send_ax25();
-#ifdef VCIP_SSID			/* For ARP_VAX25, we have boogered res_arp to not */
-	int use_vc = 0;	/* enqueue UI frames and call arp_output */
+	/* For ARP_VAX25, we have boogered res_arp to not enqueue UI frames and */
+	int use_vc = 0;		/* call arp_output */
 	if((hw_addr = res_arp(interface,ARP_VAX25,gateway,bp)) != NULLCHAR)
 		use_vc = 1;
-	else
-#endif
-	if((hw_addr = res_arp(interface,ARP_AX25,gateway,bp)) == NULLCHAR)
-			return 0; /* Wait for address resolution */
+	else if((hw_addr = res_arp(interface,ARP_AX25,gateway,bp)) == NULLCHAR)
+		return 0; /* Wait for address resolution */
 
-#ifdef VCIP_SSID
 	if(!use_vc)
-#endif
-	if(delay || (!reliability && (interface->flags == DATAGRAM_MODE)))
-		/* Use UI frame */
-		return (*interface->output)(interface,hw_addr,
-			interface->hwaddr,PID_IP,bp);
+		if(delay || (!reliability && (interface->flags == DATAGRAM_MODE)))
+			/* Use UI frame */
+			return (*interface->output)(interface,hw_addr,
+				interface->hwaddr,PID_IP,bp);
 
 	/* Reliability is needed; use I-frames in AX.25 connection */
 	memcpy(destaddr.call,hw_addr,ALEN);
@@ -209,7 +205,7 @@ struct mbuf *data;	/* Data field (follows PID) */
 		free_p(cbp);   /* Also frees data */
 		return -1;
 	}
-#ifdef FORWARD
+#ifdef OLD_FORWARD
 	/* This shouldn't be necessary because redirection has already been
 	 * done at the IP router layer, but just to be safe...
 	 */
@@ -265,13 +261,22 @@ struct mbuf *bp;
 	memcpy(ifcall.call,interface->hwaddr,ALEN);
 	ifcall.ssid = interface->hwaddr[ALEN];
 
+#ifdef FORWARD
+	if(interface->forw != NULLIF){
+		struct mbuf *tbp;
+
+		dup_p(&tbp,bp,0,len_mbuf(bp));
+		if(tbp == NULLBUF)
+			return;
+		(*interface->forw->raw)(interface->forw,tbp);
+	}
+#endif
 	/* Pull header off packet and convert to host structure */
 	if(ntohax25(&hdr,&bp) < 0){
 		/* Something wrong with the header */
 		free_p(bp);
 		return;
 	}
-
 #ifdef AX25_HEARD
 	/* heard stuff - note that the heard structure is 1602 bytes */
 	if (heard.enabled) {
@@ -365,7 +370,7 @@ struct mbuf *bp;
 #endif
 			ap->ssid |= REPEATED;
 			if((hbp = htonax25(&hdr,bp)) != NULLBUF){
-#ifdef FORWARD
+#ifdef OLD_FORWARD
 				if(interface->forw != NULLIF)
 					(*interface->forw->raw)(interface->forw,hbp);
 				else
@@ -382,30 +387,30 @@ struct mbuf *bp;
 		multicast = 1; /* Broadcast packet */
 	else
 #ifdef SID2
-			if(ax25mbox && addreq(&hdr.dest,&bbscall))
-				isbbscall = 1;
-			else
+		if(ax25mbox && addreq(&hdr.dest,&bbscall))
+			isbbscall = 1;
+		else
 #endif
-			if(addreq(&hdr.dest,&ifcall))
-				; /* Packet directed at us */
-			else
+		if(addreq(&hdr.dest,&ifcall))
+			; /* Packet directed at us */
+		else
 #ifdef NETROM
-			if(addreq(&hdr.dest,&nr_nodebc))
-				nrnodes = 1 ;
-			else
+		if(addreq(&hdr.dest,&nr_nodebc))
+			nrnodes = 1 ;
+		else
 #endif
 #ifdef VCIP_SSID
-			if(addreq(&hdr.dest,&ip_call))  /* our IP only call */
+		if(addreq(&hdr.dest,&ip_call))  /* our IP only call */
 			;       /* keep it -- probably coming from ROSE. lapb will discard
 						* it if it has F0 PID
 						*/
-			else
+		else
 #endif
-				{
+		{
 		/* Flunked all the if-else tests, No interest to us */
-					free_p(bp);
-					return;
-				}
+			free_p(bp);
+			return;
+		}
 
 	if(bp == NULLBUF)
 		/* Nothing left */
@@ -547,7 +552,7 @@ struct mbuf *data;
 		return -1;
 	}
 	/* The packet is all ready, now send it */
-#ifdef FORWARD	/* nobody would want to use this */
+#ifdef OLD_FORWARD	/* nobody would want to use this */
 	if(axp->interface->forw != NULLIF)
 		i = (*axp->interface->forw->raw)(axp->interface->forw,hbp);
 	else

@@ -1,0 +1,26 @@
+Starter help.net file - put in here the commands you find you need help
+remembering.  When running net, the "h" command will present this file
+a page at a time.  Here is only an example of what it could contain.  Put
+commands you most often need help with at the top of the file so they come
+up first.
+
+Another suggestion:  Put a copy of your alias file here so you can check it
+before you go to the mailer if you forgot what you used for someone's alias.
+Call this copy of your alias file alias.hlp and call it up with, help alias.
+
+Well known ports:
+7  Echo
+9  Discard
+20 FTP Data
+21 FTP Control
+23 Telnet
+25 SMTP
+79 Finger
+87 Ttylink in NOS
+513 Login if telunix is available
+1234 is the UDP port used by remote.
+
+Other help files:
+
+FTP      HLP       927 10-25-92   2:14p
+HELPBOX  HLP       899 07-21-91  10:05a

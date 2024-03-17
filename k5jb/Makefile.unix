@@ -149,8 +149,11 @@ tar:
 	$(TAR) cvf net.tar *.unix *.coh *.os9 mkdep depend.out *.[hca]
 	$(ZIPPER) -f net.tar
 
-lharc:
-	lharc f netunix
+lha:
+	lha a netunix *.unix *.coh *.os9 mkdep depend.out *.[hca]
+
+lhafresh:
+	lha f netunix *.unix *.coh *.os9 mkdep depend.out *.[hca]
 
 uptar:
 	$(TAR) uvf net.tar *.unix *.coh *.os9 mkdep depend.out *.[hca]

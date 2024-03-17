@@ -646,7 +646,11 @@ struct cmds attab[] = {
 #ifdef  PACKET
 	/* FTP Software's packet driver spec */
 	"packet", pk_attach, 4,
+#ifdef PACKET_POLL
+	"attach packet <int#> <label> <buffers> <mtu> [-p]",
+#else
 	"attach packet <int#> <label> <buffers> <mtu>",
+#endif
 	"Could not attach packet driver",
 #endif
 	NULLCHAR, NULLFP, 0,  "Unknown device",  NULLCHAR
@@ -1008,7 +1012,7 @@ char *argv[];
 #ifndef NOCOOKIE
 	extern char CMARK[];
 	char *vp = CMARK;
-	static char *cookie = "!_ (DY_	";
+	static char *cookie = "!_ (DY\\";
 	while(*cookie){
 		if(!*vp)
 			exit(1);

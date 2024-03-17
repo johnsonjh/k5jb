@@ -1,0 +1,233 @@
+# sample startup.net file with some explanation.  See the  user manual
+# Chapter 6 for explanation of commands.  (For Unix, startup.net is 
+# similar to MS-DOS's autoexec.net except for the attach command and
+# commands that deal with 8086 hardware interfaces.)
+#
+# Note that most of the values in this example file are the same as NET's
+# defaults, but are put here for reference, and to indicate best placement
+# if they are to be used.  In fact, NET only needs four configuration 
+# commands and the six startup commands to become fully functional.
+#
+# For testing, I have route add and arp add entries in this that depend on
+# these people being in my hosts.net file.  Remark out these lines before
+# trying this startup.net sample.
+#
+# NET, beginning with version k34, will run with 10 commands. ax25 mycall,
+# ip address, hostname, attach, and 6 start commands.  It is highly desir-
+# able that you also include the route add default command after you do the 
+# port attachment.
+#
+#  S T A R T U P . N E T  (A sample startup.net file for Unix)
+#
+# for primary station
+hostname k5jb.okla.ampr
+ax25 mycall k5jb-10
+# optional, but highly desirable, mail box call
+ax25 mboxcall k5jb-9
+# optional IP only virtual circuit call
+ax25 vcipcall k5jb-8
+ip address [44.78.0.2]
+#
+# this causes anything mis-addressed to go to me so I can handle it:
+# (Set automatically with ip address command)
+#smtp gate 44.78.0.2
+#
+# Now do some ax25 commands -- some ax25 values are used by later commands
+# These are the defaults
+#ax25 digipeat on
+#ax25 maxframe 1
+#ax25 paclen 256
+#ax25 retry 10
+#ax25 window 2048
+#ax25 t1 10000
+# ax25 t1 winds up being 9955 because of some integer arithmetic that is
+# done. t2 is default of 990 ms. t3 is default 0. Normally leave t3, the check
+# timer at 0.  Following would poll in 5 min intervals:
+#ax25 t3 300000
+# Default t4, the stale circuit timer, is 900 sec (15 min)
+#
+# attach commands
+#
+attach asy 0 /dev/tty13 ax25 ax0 0 256 4800
+#
+# If you have the KPC-4/KAM, you attach it as follows, (This is Multidrop
+# KISS, or MDKISS, that showed up on your startup screen.)  The only
+# difference between this and a standard attach asy command is the number
+# on the end (2, for example).
+#
+# Using /dev/tty13, and using two ports, as an example:
+#
+#attach asy 0 /dev/tty13 ax0 0 256 4800 2
+# and make further reference to its two ports as ax00 and ax01 (instead of
+# ax0) in the examples that follow.
+#
+# For a slip link to another computer using /dev/tty14: set up with 9600 baud 
+# and fairly high mtu:
+#attach asy 0 /dev/tty14 slip sl0 0 4096 9600
+#
+# At this point you have done all the required configuraion commands for
+# NET to work properly if you aren't going to use netrom.  You can now go
+# to the start commands below.
+#
+# Add any param commands that are needed to change kiss timing, e.g.:
+#
+# slottime
+#param ax0 3 1
+# txtail
+#param ax0 4 2
+#
+# 'route add' entry for that other computer:
+#route add k5jbslip sl0
+#
+# netrom stuff that doesn't hurt anything (if you aren't using Net/ROM)
+# You need both of these two:
+attach netrom
+netrom interface ax0 #IPJB 170
+# If for some reason you don't want to send ANY node broadcasts on ax0, do:
+#netrom bcstifle ax0 on
+# following depends on whether routing tables are wanted or not
+# "none" disables filter and lets tables build.
+# "accept" permits tables to build only from listed Net/ROM station.
+# I recommend only using the best neighbor Net/ROM here.
+# DON'T SEND ROUTING TABLES UNLESS YOU HAVE COORDINATED WITH THE OTHERS!
+netrom nodefilter mode accept
+netrom nodefilter add wd5hjl-2 ax0
+# same as above, but abbreviated:
+#n n a wd5hjl-2 ax0
+# You need this, otherwise it is 0
+netrom obsotimer 3600
+# This is default:
+#netrom qlimit 2400
+# Set netrom time-to-live to something reasonable; this is default:
+#netrom ttl 16
+#
+# If you are actually going to use Netrom transport to other IP hosts,
+# add commands like the following:
+#
+# Note:
+# "netrom route adds" are explicit routes and are undesirable.  It is better
+# to use net nodefilter and let pgrm build tables.  If destinations are prone
+# to go away, this method prevents pounding the n/r network trying to send 
+# mail to a station that has disappeared.
+# In these examples, none of the netrom route adds are explicit which means 
+# I have to wait for receipt of a route broadcast before I can initiate a 
+# netrom connection.  Mine will respond correctly, however, if an incoming 
+# netrom session is initiated before I hear a route broadcast.  (It will have
+# a quality of 10, which is usable.)
+#
+# Note that there are 2, and optionally 3, entries associated with each 
+# netrom entry (Again, I don't recommend using the first line of each of the 
+# following sets).
+#
+##netrom route add #ipfwe wb5fwe-10 ax0 194 wd5hjl-2
+route add [44.78.0.8] netrom wb5fwe
+arp add wb5fwe netrom wb5fwe-10
+#
+##netrom route add #IPRZX wb5rzx-10 ax0 194 wd5hjl-2
+route add [44.78.0.11] netrom wb5rzx
+arp add wb5rzx netrom wb5rzx-10
+#
+# if we are not using Net/ROM, or we don't want to announce ourselves:
+# This is the default
+#netrom nodetimer 0
+# else, if we are doing netrom:
+#netrom nodetimer 1740
+#
+# If we are using netrom, enable this to launch a node broadcast when we start:
+#netrom bcnodes ax0
+#
+# Here we add the arp add and route add commands for stations that are 
+# not using netrom:
+#arp add kb0qj ax25 kb0qj-10 kb0qj-5
+#arp add wb5fwe ax25 wb5fwe-10 wd5hjl-2 n5ang-2 n5ang-1 (alternative route)
+#arp add wb5fwe ax25 wb5fwe-10 wd5hjl-2 wb5fwe-3
+# etc.
+#
+# These guys don't use Net/ROM and they are not direct, so they need arp
+# entries with digis.  Use route add commands here also if you have 
+# multiple interfaces attached:
+#arp add n5loa ax25 n5loa-10 #okc2 okc
+#arp add k5jbspook ax25 k5jb-11 #okc2 okc
+#arp add wd5g ax25 wd5g #okc2 okc
+#
+# Here are some that require digipeaters to get to
+arp add wb5rrr ax25 wb5rrr #okc2 okc osu
+arp add kj5c ax25 kj5c #okc2 okc
+#
+# When no specific route is given, ax0 is taken.  This is not a required, 
+# but a highly desirable entry, used any place after your attach command.
+route add default ax0
+#
+# If your IP address coordinator is on the ball, you can probably route 
+# everything that is not explicit with gateway commands to gateway hosts.
+# In this example, 44.78.8.xx goes to Tulsa, everything else goes, including
+# out of state, to Oklahoma City:
+#route add 44.78.8/24 ax0 wa5txx
+#route add 44/8 ax0 k5jb
+#
+# Incidentally, if you are dealing with a NOS operator using virtual 
+# circuit and he insists on the BBS quickstart, use the same stunt we use
+# to deal with ROSE below, i.e. use vax25 in the arp add, and use our 
+# vciponly call sign.  Thus we can ignore the spurious frames from his BBS.
+#
+# Here we deal with stations reachable only by ROSE network, assuming that
+# we have set our ax25 vcipcall, above 
+#route add wb5cqu ax00
+#arp add wb5cqu vax25 wb5cqu-8 k5jb-6 817104
+#
+# If we were doing ax25 segmentation with him we might use
+# route add wb5cqu * 507
+# (507 is an mtu that corresponds to a tcp mss 467 to create two segments
+# per IP frame in 256 byte packets.  (Don't exceed that with ROSE 
+# circuits.  You will blow them up.)  You would use:
+# tcp mss 467
+# If we are using ROSE which can be terribly slow, we should also do:
+#tcp irtt 60000
+#
+# add any desired ip commands (this is default):
+#ip ttl 16
+# add any desired tcp commands:
+# these are default tcp mss and tcp window.  If doing ax25 segmentation,
+# see wb5cqu example above
+#tcp mss 216
+#tcp window 2048
+# If we aren't using ROSE, see above, we could use the default:
+#tcp irtt 10000
+# If you have pathological circuits you can change the tcp timer type and
+# max backoff value, default is exponential, 30 minutes
+#tcp timer linear 10
+#
+# Add the smtp commands, if other than these defaults.
+# Optional smtp timer command follows the start smtp command.
+# Default maxclients
+#smtp maxclients 10
+#
+# Some miscellanous commands:
+# you can put the log anywhere you want.
+log /usr/k5jb/net/netlog
+# enable the AX.25 mailbox (default)
+#mbox on
+#
+# If you want to use Grapes Mulport code (default for this is off):
+#mulport on
+# and prepare exlist and digilist files.
+#
+# If you want telnet users to have a message of the day, do:
+motd Hello, I may not be here but your typing may be saved on the screen.
+#
+# If you want the Netrom and AX.25 chat users to have a message of the
+# day different from the default, do:
+axmo I would have answered sooner, but I was asleep!
+#
+# Finally, and this is important to be near the last, start the servers:
+start smtp
+# smtp timer will be initialized to 1800 seconds (30 minutes).  If you
+# want something different, do it here, e.g. you don't want do do mail, do:
+#smtp timer 0
+start ftp
+start echo
+start discard
+start telnet
+start finger
+#
+# End of startup.net sample

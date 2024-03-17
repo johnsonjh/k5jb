@@ -1,0 +1,16 @@
+;            BDALES MAILER.RUNTIME CONFIGURATION  (.bmrc)
+;   Sample file from Unix
+;
+host k5jb.okla.ampr
+;
+user k5jb
+;
+fullname K5JB_3B2
+;
+maxlet 300
+;
+; Put your editor here if you want to be able to call it on a message you
+; are writing.
+;
+editor vi
+;

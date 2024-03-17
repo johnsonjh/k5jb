@@ -1,0 +1,73 @@
+This is a mail box function that is part of the TCP/IP system.  You can read 
+mail addressed to you or send mail to someone else in the local area, or 
+someone else on the TCP/IP network.  You can download certain selected files.
+Here is a command summary:
+
+s  to_call@host  To_call is destination station call without any dash number.
+   Host is call sign of the station it is to go to.  Note lack of spaces on
+   either side of the '@'.  If you want to leave it posted here, you can leave
+   the @host off.  Automatic forwarding is only done to the stations that are
+   active on TCP/IP.
+
+r  Reads mail addressed to you.  If there is but one message, r will get it.
+   If there are more than one, follow r with a space and the number.  r 1 
+   reads message number 1.  There is a delay from the time mail is posted and
+   it appears here.  The machine shuffles mail in and out on about a 30 minute
+   cycle.
+
+k  kills mail addressed to you.  If there is but one message, k will kill it.
+   If there are more, you have to follow k with the message number.  k 1 kills
+   message numbe 1.
+
+l  lists messages, if any, for you.  It will show which messages have been
+   read, and which ones are marked to be killed.
+
+ll followed by a space and a number, lists the last (number) of messages for
+   you.
+
+ls Lists downloadable file names that are in a public directory.  There may
+   not be anything there.  If you want to upload a file, use s to me and I'll
+   put it in the download area.  Some of the files here may be do nothing
+   files that are just there for test.
+
+m  Lists calls of those who have mail here.
+
+g  (filename) Gets a file from the downloadable area.  I will only have small
+   text files in that area because I don't want this thing clogging the
+   network.  It can send a binary file, but I don't think you would want that.
+
+c  Initiates a chat session which is only effective if I am sitting by the
+   computer.  Actually a chat session terminates the mail box process so to
+   return to it you have to disconnect and reconnect.
+
+u  Lists users currently connected to the mbox.  It shows some computer
+   internal information and the state of each of the connections.
+
+v  Shows the current version of net that I am running.  It is used mostly as
+   a diagnostic tool
+
+If you connect using NET/ROM, the mbox issues a prompt upon connect.  If you
+are not using NET/ROM, you have to send a carriage return to get the prompt.
+This is necessary so it will know you are not one of the network stations
+connecting.
+
+Sometimes there may be long delays for a complete response to arrive because of
+the _very_ shy nature of the TCP/IP when other stations are using a frequency.
+You don't have to wait for responses.  You can issue all your commands at
+once and, if the link can manage the queue, the mbox will respond normally.
+
+For example to send a message and leave,
+
+send: s to_call@host
+send: subject
+send: message (end each line with a carriage return)
+send: Ctrl-Z  (on a line by itself)
+send: b
+
+As in normal packet practice, it stores exactly what you send, so end the lines
+with carriage returns or it will chop up and reformat your text.
+
+If you want to set up your own TCP/IP station to enjoy the features it has,
+send me a message and I'll help you get set up.
+
+73 es Enjoy!  K5JB

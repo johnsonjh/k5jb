@@ -56,9 +56,7 @@ char rxbroadcast;	/* True if packet had link broadcast address */
 	struct mbuf *tbp;
 	int ntohip(),icmp_output();
 	int16 cksum();
-#ifdef VCIP_SSID
 	int16 mtu;
-#endif
 	ip_stats.total++;
 	if(len_mbuf(bp) < IPLEN){
 		/* The packet is shorter than a legal IP header */
@@ -205,7 +203,7 @@ no_opt:
 	}
 	/* Check for output forwarding and divert if necessary */
 	iface = rp->interface;
-#ifdef FORWARD
+#ifdef OLD_FORWARD
 	if(iface->forw != NULLIF)
 		iface = iface->forw;
 #endif
@@ -226,13 +224,9 @@ no_opt:
 	throughput = ip.tos & THRUPUT;
 	reliability = ip.tos & RELIABILITY;
 
-#ifdef VCIP_SSID	/* let's use metric for something at last */
+	/* let's use metric for something at last */
 	mtu = rp->metric ? rp->metric : iface->mtu;
-	if(ip.length <= mtu)
-#else
-	if(ip.length <= iface->mtu)
-#endif
-	{
+	if(ip.length <= mtu){
 		/* Datagram smaller than interface MTU; put header
 		 * back on and send normally
 		 */
@@ -261,22 +255,13 @@ no_opt:
 		 * options that aren't supposed to be copied on fragmentation
 		 */
 		ip.fl_offs = offset >> 3;
-#ifdef VCIP_SSID
-		if(length + ip_len <= mtu)
-#else
-		if(length + ip_len <= iface->mtu)
-#endif
-		{
+		if(length + ip_len <= mtu){
 			/* Last fragment; send all that remains */
 			fragsize = length;
 			ip.fl_offs |= mf_flag;	/* Pass original MF flag */
 		} else {
 			/* More to come, so send multiple of 8 bytes */
-#ifdef VCIP_SSID
 			fragsize = (mtu - ip_len) & 0xfff8;
-#else
-			fragsize = (iface->mtu - ip_len) & 0xfff8;
-#endif
 			ip.fl_offs |= MF;
 		}
 		ip.length = fragsize + ip_len;
@@ -447,15 +432,14 @@ int32 addr;
 		return 0;
 
 	iface = rp->interface;
-#ifdef FORWARD	/* probably never use this */
+#ifdef OLD_FORWARD	/* probably never use this */
 	if(iface->forw != NULLIF)
 		return iface->forw->mtu;
 	else
 #endif
 		/* let's use metric for something at last */
-#if defined(VCIP_SSID) || !defined(AX25)	
 		return rp->metric ? rp->metric : iface->mtu;
-#else
+#ifdef notdef
 		if(iface->flags == CONNECT_MODE)	/* revised to deal with ax25 segmentation */
 			return iface->mtu;		/* in datagram mode we don't want mtu - K5JB */
 		else

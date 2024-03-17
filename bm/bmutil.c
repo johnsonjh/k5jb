@@ -293,6 +293,7 @@ listnotes()
 	int	i;
 	int	lines;
 	long	size;
+	static int timesrun;
 
 	if (mfile == NULLFILE)
 		return;
@@ -301,7 +302,11 @@ listnotes()
 	screen_clear();		/* K5JB */
 #endif
 	printf("Mailbox %s - %d messages %d new\n\n",mfilename,nmsgs,newmsgs);
-	lines = 2;
+#if defined(MSDOS) && defined(DVREPORT)
+	lines = timesrun++ ? 2 : 7;	/* Forgot initial banner v.1n2 */
+#else
+	lines = timesrun++ ? 2 : 5;
+#endif
 	for (cmsg = &mbox[1],i = 1; i <= nmsgs; i++, cmsg++) {
 		*smtp_date = '\0';
 		*smtp_from = '\0';
@@ -839,6 +844,7 @@ int msg;
 						buf[col++] = c; /* max is col[78], 79 chars */
 					else{
 						ungetc(c,mfile);	/* ...nothing else if at pos 80 */
+						size++;	/* fixed in version 1n2 */
 						break;
 					}
 		}

@@ -724,7 +724,7 @@ getcommand()
 	char	command[LINELEN];	/* command line */
 	char	*args[MAXARGS];
 	int	nargs;
-	char	*cp;
+	char	*cp,*mcp;	/* mcp is moved command pointer v 1n2 */
 	register int	msgnum;
 	register int	i;
 
@@ -740,14 +740,21 @@ getcommand()
 				perror("system");
 			continue;
 		}
-		if (*command) {
-			cp = command;
+
+		/* Fix leading spaces entered accidentally - version 1n2 */
+		cp = command;
+		while(*cp == ' ')
+			cp++;
+
+		mcp = cp;
+
+		if (*cp) {
 			while (*cp && *cp != ' ')
 				cp++;
 			nargs = parse(cp,args,MAXARGS);
 		}
 
-		switch (*command) {
+		switch (*mcp) {
 		case 'm':		/* send msg */
 			if (nargs == 0) {
 				printf("To: ");
@@ -866,7 +873,7 @@ getcommand()
 			if (nargs == 0)
 				printf("No job id specified\n");
 			else
-				for (i = 0; i < nargs; i++) 
+				for (i = 0; i < nargs; i++)
 					killjob(args[i]);
 			break;
 
@@ -919,10 +926,10 @@ getcommand()
 			displaymsg(current);
 			break;
 		default:
-			if (!isdigit(*command))
+			if (!isdigit(*mcp))
 				printf("Invalid command - ? for help\n");
 			else {
-				msgnum = atoi(command);
+				msgnum = atoi(mcp);
 				if (msgnum < 0 || msgnum > nmsgs)
 					printf(badmsg,msgnum);
 				else {

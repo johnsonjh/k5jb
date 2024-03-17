@@ -18,6 +18,7 @@
  * with the G8BPQ scheme, and to some extent with Ethernet packet driver.
  * Should work with Baycom.  Adds 2552 bytes */
 #undef	PACKET
+#undef	PACKET_POLL /* Use polled receive on pipe packet driver */
 #define SERIALTEST /* SERIALTEST only applies to MS-DOS; counts rx overruns */
 			/* on serial port.  Costs 178 bytes */
 
@@ -61,7 +62,6 @@
 #define	REWRITE	/* rewrite.net file for smtp server */
 #define	REWRITECMD	/* rewrite command for testing rewrite.net */
 
-
 #if defined(DRSI) || defined(MDKISSPORT) || defined(COMBIOS) || defined(PACKET)
 #define AX25
 #endif
@@ -70,17 +70,17 @@
  * less files are affected by changing options.h.  Main.c and ax25cmd.c were
  * getting to be a mess so I made some macros to eliminate the deeply nested
  * ifdefs.  Edit this and the ATTACHOPTs to suit your configuration. Note
- * that there is a tab on second line.
+ * that there is a tab on second line.  Put vcipcall here if you use it.
  */
 
 #ifdef AX25_HEARD
 #define AXCMDDISP \
 "ax25 subcommands: digipeat heard maxframe mboxcall mycall paclen pthresh reset\n\
-	retry segment status t1 t2 t3 t4 vcipcall vers window"
+	retry segment status t1 t2 t3 t4 vers window"
 #else
 #define AXCMDDISP \
 "ax25 subcommands: digipeat maxframe mboxcall mycall paclen pthresh reset retry\n\
-	segment status t1 t2 t3 t4 vcipcall vers window"
+	segment status t1 t2 t3 t4 vers window"
 #endif
 
 /* Edit this attach display to suit the hardware you have chosen.  Note that

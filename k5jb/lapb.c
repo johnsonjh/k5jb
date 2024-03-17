@@ -27,6 +27,10 @@ extern struct ax25_addr ip_call;
 int addreq();
 #endif
 
+#ifdef SID2
+extern int bbscall_set;
+#endif
+
 #if defined(SEGMENT) && defined(SEG_CMD)
 int rx_segment = 1;	/* also used in ax25cmd.c */
 #endif
@@ -545,6 +549,23 @@ struct mbuf *bp;
 		if(addreq(&axp->addr.source,&ip_call)){
 			free_p(bp);
 			break;
+		}
+#endif
+#endif
+#ifdef SID2
+		/* new style of eliminating spurious I frames k36 */
+		if(bbscall_set && addreq(&axp->addr.source,&mycall) && !axp->user){
+			free_p(bp);
+			break;
+		}
+#ifdef REFERENCE
+		/* See if a session already exists */
+		for(s = sessions; s < &sessions[nsessions]; s++){
+			if(s->type == AX25TNC
+				&& addreq(&s->cb.ax25_cb->addr.dest,&dest)){
+				printf("Session %u to %s already exists\n",s - sessions,argv[2]);
+				return 1;
+			}
 		}
 #endif
 #endif

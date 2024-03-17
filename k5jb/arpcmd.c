@@ -24,7 +24,6 @@ extern char nospace[];
 int doarpadd(),doarpdrop();
 struct cmds arpcmds[] = {
 	"add", doarpadd, 4,
-#ifdef VCIP_SSID
 #ifdef NETROM
 #ifdef ETHER
 	"arp add <hostid> ether|ax25|vax25|netrom <ether addr|callsign>",
@@ -34,22 +33,10 @@ struct cmds arpcmds[] = {
 #else	/* NETROM */
 	"arp add <hostid> ax25|vax25 <callsign>",
 #endif	/* NETROM */
-#else /* VCIP_SSID */
-#ifdef NETROM
-#ifdef ETHER
-	"arp add <hostid> ether|ax25|netrom <ether addr|callsign>",
-#else
-	"arp add <hostid> ax25|netrom <callsign>",
-#endif	/* ETHER */
-#else	/* NETROM */
-	"arp add <hostid> ax25 <callsign>",
-#endif	/* NETROM */
-#endif /* VCIP_SSID */
 
 	"arp add failed",
 
 	"drop", doarpdrop, 3,
-#ifdef VCIP_SSID
 #ifdef NETROM
 #ifdef ETHER
 	"arp drop <hostid> ether|ax25|netrom|vax25",
@@ -59,22 +46,10 @@ struct cmds arpcmds[] = {
 #else	/* NETROM */
 	"arp drop <hostid> ax25|vax25",
 #endif	/* NETROM */
-#else /* VCIP_SSID */
-#ifdef NETROM
-#ifdef ETHER
-	"arp drop <hostid> ether|ax25|netrom",
-#else
-	"arp drop <hostid> ax25|netrom",
-#endif	/* ETHER */
-#else	/* NETROM */
-	"arp drop <hostid> ax25",
-#endif	/* NETROM */
-#endif /* VCIP_SSID */
 
 	"not in table",
 
 	"publish", doarpadd, 4,
-#ifdef VCIP_SSID
 #ifdef NETROM
 #ifdef ETHER
 	"arp publish <hostid> ether|ax25|netrom|vax25 <ether addr|callsign>",
@@ -84,17 +59,6 @@ struct cmds arpcmds[] = {
 #else	/* NETROM */
 	"arp publish <hostid> ax25|vax25 <callsign>",
 #endif	/* NETROM */
-#else /* VCIP_SSID */
-#ifdef NETROM
-#ifdef ETHER
-	"arp publish <hostid> ether|ax25|netrom <ether addr|callsign>",
-#else
-	"arp publish <hostid> ax25|netrom <callsign>",
-#endif /* ETHER */
-#else	/* NETROM */
-	"arp publish <hostid> ax25 <callsign>",
-#endif	/* NETROM */
-#endif /* VCIP_SSID */
 	"arp publish failed",
 
 	NULLCHAR, NULLFP, 0,
@@ -173,16 +137,16 @@ char *argv[];
 		hardware = ARP_AX25;
 		naddr = argc - 3;
 		break;
-#ifdef VCIP_SSID
 	case 'v':	/* VC AX.25 */
+#ifdef VCIP_SSID
 		if(ip_call.call[0] == '\0'){
 			printf("Set vcipcall first\n");
 			return -1;
 		}
+#endif
 		hardware = ARP_VAX25;
 		naddr = argc - 3;
 		break;
-#endif
 	default:
 		printf("unknown hardware type \"%s\"\n",argv[2]);
 		return -1;
@@ -190,12 +154,10 @@ char *argv[];
 	/* If an entry already exists, clear it */
 	if((ap = arp_lookup(hardware,addr)) != NULLARP)
 		arp_drop(ap);
-#ifdef VCIP_SSID
 	if(hardware == ARP_VAX25)
 		at = &arp_type[ARP_AX25];
 	else
-#endif
-	at = &arp_type[hardware];
+		at = &arp_type[hardware];
 	if(at->scan == NULLFP){
 		printf("Attach device first\n");
 		return 1;
@@ -245,11 +207,9 @@ char *argv[];
 	case 'a':	/* "ax25" */
 		hardware = ARP_AX25;
 		break;
-#ifdef VCIP_SSID
 	case 'v':	/* VC AX.25 */
 		hardware = ARP_VAX25;
 		break;
-#endif
 #ifdef APPLETALK
 	case 'm':	/* "mac appletalk" */
 		hardware = ARP_APPLETALK;
@@ -289,13 +249,10 @@ dumparp()
 			else
 				printf("  ");
 			if(ap->state == ARP_VALID){
-#ifdef VCIP_SSID
 				if(ap->hardware == ARP_VAX25){
 					if(arp_type[ARP_AX25].format != NULLFP)
 						(*arp_type[ARP_AX25].format)(e,ap->hw_addr);
-				}else
-#endif
-				if(arp_type[ap->hardware].format != NULLFP){
+				}else	if(arp_type[ap->hardware].format != NULLFP){
 					(*arp_type[ap->hardware].format)(e,ap->hw_addr);
 				} else {
 					e[0] = '\0';
