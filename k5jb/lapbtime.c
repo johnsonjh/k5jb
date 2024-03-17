@@ -17,17 +17,11 @@
 #include "finger.h"
 #include "lapb.h"
 
-/* miscellaneous function definitions - K5JB */
+/* miscellaneous function declarations - K5JB */
 
-void free_q();
-int sendctl();
-void start_timer();
-void tx_enq();
-void disc_stale();
-int frmr();
-void del_ax25();
-int sendframe();
-void stop_timer();
+void free_q(),start_timer(),tx_enq(),disc_stale(),del_ax25(),frmr(),
+	stop_timer();
+int sendctl(),sendframe();
 
 /* Called whenever timer T1 expires */
 void
@@ -46,7 +40,7 @@ int *n;
 			lapbstate(axp,DISCONNECTED);
 		} else {
 			axp->retries++;
-			sendctl(axp,COMMAND,SABM|PF);
+			sendctl(axp,COMMAND,SABM);
 			start_timer(&axp->t1);
 		}
 		break;
@@ -55,7 +49,7 @@ int *n;
 			lapbstate(axp,DISCONNECTED);
 		} else {
 			axp->retries++;
-			sendctl(axp,COMMAND,DISC|PF);
+			sendctl(axp,COMMAND,DISC);
 			start_timer(&axp->t1);
 		}
 		break;
@@ -64,7 +58,7 @@ int *n;
 	case RECOVERY:	/* note fall-thru */
 		if(axp->n2 != 0 && axp->retries == axp->n2){
 			/* Give up */
-			sendctl(axp,RESPONSE,DM|PF);
+			sendctl(axp,RESPONSE,DM);
 			free_q(&axp->txq);
 			lapbstate(axp,DISCONNECTED);
 		} else {
@@ -76,7 +70,7 @@ int *n;
 		break;
 	case FRAMEREJECT:
 		if(axp->n2 != 0 && axp->retries == axp->n2){
-			sendctl(axp,RESPONSE,DM|PF);
+			sendctl(axp,RESPONSE,DM);
 			free_q(&axp->txq);
 			lapbstate(axp,DISCONNECTED);
 		} else {
@@ -91,28 +85,76 @@ int *n;
 		del_ax25(axp);
 }
 
-#ifdef notdef /* this function replaced by dlapb_out() */
-/* T2 has expired, we can't delay an acknowledgement any further */
+/* Start data transmission on link, if possible
+ * Return number of frames sent -- This is called on T2 expiration
+ * Moved from lapb.c.  Replaces previous T2 scheme which only controlled
+ * acks and was ineffective.
+ */
 void
-send_ack(n)
-int *n;
+dlapb_output(axp)
+struct ax25_cb *axp;
 {
+	register struct mbuf *bp;
+	struct mbuf *tbp;
 	char control;
-	register struct ax25_cb *axp;
+	int sent = 0;
+	int i;
 
-	axp = (struct ax25_cb *)n;
-	switch(axp->state){
-	case CONNECTED:
-	case RECOVERY:
-		control = len_mbuf(axp->rxq) > axp->window ? RNR : RR;
-		sendctl(axp,RESPONSE,control);
-		axp->response = 0;
-		break;
+	/* wait until now for this in case something went bad before t2 timed
+	 * out
+	 */
+	if(axp == NULLAX25
+	 || (axp->state != RECOVERY && axp->state != CONNECTED)
+	 || axp->remotebusy)
+		return;
+
+	/* Dig into the send queue for the first unsent frame */
+	bp = axp->txq;
+	for(i = 0; i < axp->unack; i++){
+		if(bp == NULLBUF)
+			break;	/* Nothing to do */
+		bp = bp->anext;
 	}
-}
-#endif
 
-/* Send a poll (S-frame command with the poll bit set) */
+	/* Start at first unsent I-frame, stop when either the
+	 * number of unacknowledged frames reaches the maxframe limit,
+	 * or when there are no more frames to send
+	 */
+	while(bp != NULLBUF && axp->unack < axp->maxframe){
+		control = I | (axp->vs++ << 1) | (axp->vr << 5);
+		axp->vs &= MMASK;
+		dup_p(&tbp,bp,0,len_mbuf(bp));
+		if(tbp == NULLBUF)
+			return;	/* Probably out of memory */
+		/* this had COMMAND, gonna try something else */
+		bp = bp->anext;
+		axp->unack++;
+#ifdef FINALPOLL	/* if you wanna play play "monkey see, monkey do" */
+		/* Will put PF bit on last one in set.  NET prev. didn't do this */
+		sendframe(axp,bp == NULLBUF || axp->unack == axp->maxframe ? COMMAND :
+			C_NOPOLL,control,tbp);
+#else
+		sendframe(axp,C_NOPOLL,control,tbp);
+#endif
+		start_timer(&axp->t4);
+		/* We're implicitly acking any data he's sent, so stop any
+		 * delayed ack
+		 */
+		axp->response = 0;
+		if(!run_timer(&axp->t1)){
+			stop_timer(&axp->t3);
+			start_timer(&axp->t1);
+		}
+		sent++;
+	}
+	if(axp->response != 0)
+		sendctl(axp,RESPONSE,axp->response);
+	axp->response = 0;
+
+	return;
+}
+
+/* Send a poll (S-frame command with the poll bit set) - the t3 function */
 void
 pollthem(n)
 int *n;
@@ -133,7 +175,7 @@ int *n;
 }
 
 void
-disc_stale(p)	/* same as NOS's redundant(), used in conjunction with T4 */
+disc_stale(p)	/* same as NOS's redundant(), T4's function */
 char *p;
 {
 	register struct ax25_cb *axp;
@@ -144,7 +186,7 @@ char *p;
 	case CONNECTED:
 	case RECOVERY:
 		axp->retries = 0;
-		sendctl(axp,COMMAND,DISC|PF);
+		sendctl(axp,COMMAND,DISC);
 		start_timer(&axp->t1);
 		free_q(&axp->txq);
 		lapbstate(axp,DISCPENDING);
@@ -152,7 +194,7 @@ char *p;
 	}
 }
 
-/* Transmit query */
+/* Transmit query - called on T1 or T3 expiration */
 void
 tx_enq(axp)
 register struct ax25_cb *axp;
@@ -160,28 +202,15 @@ register struct ax25_cb *axp;
 	char ctl;
 	struct mbuf *bp;
 
-	/* I believe that retransmitting the oldest unacked
-	 * I-frame tends to give better performance than polling,
-	 * as long as the frame isn't too "large", because
-	 * chances are that the I frame got lost anyway.
-	 * This is an option in LAPB, but not in the official AX.25.
-	 */
-	if(axp->txq != NULLBUF && len_mbuf(axp->txq) < axp->pthresh
-	 && (axp->proto == V1 || !axp->remotebusy)){
+	/* this correction does what I think author intended - K5JB */
+	if(axp->txq != NULLBUF && !axp->remotebusy &&
+			(axp->proto == V1 || len_mbuf(axp->txq) < axp->pthresh) ){
 		/* Retransmit oldest unacked I-frame */
 		dup_p(&bp,axp->txq,0,len_mbuf(axp->txq));
-
-/* compiler thought this was ambiguous?  K5JB */
-/*		ctl = PF | I | ((axp->vs - axp->unack) & MMASK) << 1
-		 | axp->vr << 5; So I added parens as below (K&R would have approved,
-		 since bit shifting has precedence over bitwise or.) */
-
-		ctl = PF | I | (((axp->vs - axp->unack) & MMASK) << 1)
-		 | (axp->vr << 5);
-
+		ctl = I | (((axp->vs - axp->unack) & MMASK) << 1) | (axp->vr << 5);
 		sendframe(axp,COMMAND,ctl,bp);
 	} else {
-		ctl = len_mbuf(axp->rxq) >= axp->window ? RNR|PF : RR|PF;
+		ctl = len_mbuf(axp->rxq) >= axp->window ? RNR : RR;
 		sendctl(axp,COMMAND,ctl);
 	}
 	axp->response = 0;

@@ -29,6 +29,10 @@
 #include "session.h"
 #include "nr4.h"
 
+#ifdef _OSK
+#include "os9stat.h"
+#endif
+
 /* Command table */
 static char *commands[] = {
 	"user",
@@ -133,9 +137,9 @@ ftp0()
 }
 /* FTP Server Control channel State change upcall handler */
 static void
-ftpscs(tcb,old,new)
+ftpscs(tcb,unused,new)
 struct tcb *tcb;
-char old,new;
+char unused,new;
 {
 	extern char hostname[], versionf[];
 	struct ftp *ftp,*ftp_create();
@@ -201,9 +205,9 @@ char old,new;
 
 /* FTP Server Control channel Receiver upcall handler */
 static void
-ftpscr(tcb,cnt)
+ftpscr(tcb,unused)
 struct tcb *tcb;
-int16 cnt;
+int16 unused;
 {
 	register struct ftp *ftp;
 	char c;
@@ -625,11 +629,6 @@ char *pass;
 	char buf[80],*cp,*cp1,*getnenv();
 	FILE *fp;
 	int anony = 0;
-#ifdef UNIX
-	char *p;
-	char userfn[256];
-	char *getenv();
-#endif /* UNIX */
 	int i;
 
 	if((fp = fopen(userfile,"r")) == NULLFILE){
@@ -712,7 +711,9 @@ struct ftp *ftp;
 int op;
 char *file;
 {
+#if	(defined(MSDOS) || defined(ATARI_ST))
 	char *cp;
+#endif
 	int i,access();
 
 	if(file == NULLCHAR || ftp->path[0] == NULLCHAR)

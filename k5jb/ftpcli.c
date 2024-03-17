@@ -1,13 +1,18 @@
 /* added "dele" for file deletion.  It was already available in
-frpserv.c, performed general cleanup, added loop in login process, then
-added help to escape from a problem login. 9/2/91 - K5JB */
-/* Re-read RFC 959 and modified the logon helper 11/9/93 */
+	ftpserv.c, performed general cleanup, added loop in login process, then
+	added help to escape from a problem login. 9/2/91 - K5JB */
+/* 11/9/93 Re-read RFC 959 and modified the logon helper.  Decided to
+ * to look for 230 (succeed) instead of 550 (fail) to proceed.  Also added
+ * another state, SETUP_STATE, before RECEIVING_STATE, to better control
+ * data channel message flow, particularly the NOS "226 File send OK"
+ * message while doing directory list or namelist.
+ */
+#define FTPPROMPT
 
 /* FTP client (interactive user) code */
 #define LINELEN 128     /* Length of command buffer */
 #include <stdio.h>
 #include <string.h>
-#include "options.h"
 #include "config.h"
 #include "global.h"
 #include "mbuf.h"
@@ -25,10 +30,6 @@ added help to escape from a problem login. 9/2/91 - K5JB */
 #include "finger.h"
 #include "nr4.h"
 
-/* #ifdef __TURBOC__    */
-/* #include <fcntl.h>   */
-/* #endif               */
-
 extern struct session *current;
 extern char nospace[];
 extern char badhost[];
@@ -38,6 +39,7 @@ char cantread[] = "Can't read %s\n";
 #ifdef CUTE_FTP
 char helpesc[] = "(Abort with \"close\" from command mode.)\n";
 char *userprompt = "Enter user name: ";
+void echo(),noecho();
 #endif
 
 int donothing(),doftpcd(),dolist(),doget(),dols(),doput(),dotype(),doabort(),
@@ -46,7 +48,7 @@ int donothing(),doftpcd(),dolist(),doget(),dols(),doput(),dotype(),doabort(),
 struct cmds ftpabort[] = {
 	"",       donothing, 0, NULLCHAR,   NULLCHAR,
 	"abort",  doabort,   0, NULLCHAR,   NULLCHAR,
-	NULLCHAR, NULLFP,    0, "Only valid command is \"abort\"", NULLCHAR,
+	NULLCHAR, NULLFP,    0, NULLCHAR, NULLCHAR	/* removed message */
 };
 
 struct cmds ftpcmds[] = {
@@ -62,7 +64,7 @@ struct cmds ftpcmds[] = {
 	"put",      doput,      2, "put localfile <remotefile>",   NULLCHAR,
 	"type",     dotype,     0, NULLCHAR,               NULLCHAR,
 	"dele",     dodele,     2, "delete remotefile",    NULLCHAR, /* K5JB */
-	NULLCHAR,   NULLFP,		0,	NULLCHAR,              NULLCHAR,
+	NULLCHAR,   NULLFP,		0,	NULLCHAR,              NULLCHAR
 };
 
 /* Send a message on the control channel */
@@ -101,12 +103,12 @@ int16 len;
 								routines need this, or won't hurt - K5JB */
 
 	switch(current->cb.ftp->state){
+		case SETUP_STATE:
 		case RECEIVING_STATE:
 		case SENDING_STATE:
 			/* The only command allowed in data transfer state is ABORT */
-			if(cmdparse(ftpabort,line) == -1){
+			if(cmdparse(ftpabort,line) == -1)
 				printf("Transfer in progress; only ABORT is acceptable\n");
-			}
 			fflush(stdout);
 			break;
 		case COMMAND_STATE:
@@ -133,9 +135,10 @@ int16 len;
 			fflush(stdout);
 			break;
 #ifdef CUTE_FTP
-		case USER_STATE:                /* Got the user name */
+		case USER_STATE:	/* Send user name */
 			return sndftpmsg(current->cb.ftp,"USER %s",line);
-		case PASS_STATE:                /* Got the password */
+		case PASS_STATE:
+			echo();		/* Send password, turn echo back on */
 			return sndftpmsg(current->cb.ftp,"PASS %s",line);
 #endif
 	}
@@ -204,6 +207,11 @@ donothing(argc,argv)
 int argc;
 char *argv[];
 {
+
+#ifdef FTPPROMPT
+	printf("FTP> ");
+	fflush(stdout);
+#endif
 	return(0);
 }
 /* Translate 'cd' to 'cwd' for convenience */
@@ -268,26 +276,28 @@ char *argv[];
 				printf("Ascii\n");
 				break;
 			}
-		return 0;
-	}
-	switch(*argv[1]){
-		case 'i':
-		case 'b':
-			ftp->type = IMAGE_TYPE;
-			sndftpmsg(ftp,"TYPE I\015\012","");
-			break;
-		case 'a':
-			ftp->type = ASCII_TYPE;
-			sndftpmsg(ftp,"TYPE A\015\012","");
-			break;
-		case 'l':
-			ftp->type = IMAGE_TYPE;
-			sndftpmsg(ftp,"TYPE L %s\015\012",argv[2]);
-			break;
-		default:
-			printf("Invalid type %s\n",argv[1]);
-			return 1;
-	}
+#ifdef FTPPROMPT
+			donothing();
+#endif
+	}else
+		switch(*argv[1]){
+			case 'i':
+			case 'b':
+				ftp->type = IMAGE_TYPE;
+				sndftpmsg(ftp,"TYPE I\015\012","");
+				break;
+			case 'a':
+				ftp->type = ASCII_TYPE;
+				sndftpmsg(ftp,"TYPE A\015\012","");
+				break;
+			case 'l':
+				ftp->type = IMAGE_TYPE;
+				sndftpmsg(ftp,"TYPE L %s\015\012",argv[2]);
+				break;
+			default:
+				printf("Invalid type %s\n",argv[1]);
+				return 1;
+		}
 	return 0;
 }
 
@@ -334,6 +344,7 @@ struct tcb *tcb;
 char old,new;
 {
 	struct ftp *ftp;
+	void ftpccr();
 
 	if((ftp = (struct ftp *)tcb->user) == NULLFTP){
 		/* Unknown connection, kill it */
@@ -341,6 +352,11 @@ char old,new;
 		return;
 	}
 	switch(new){
+		case ESTABLISHED:	/* added to deal with NOS's 226 message */
+			if(ftp->state == SETUP_STATE)
+				ftp->state = RECEIVING_STATE;	/* output stifled in this state */
+		break;
+
 		case FINWAIT2:
 		case TIME_WAIT:
 			if(ftp->state == SENDING_STATE){
@@ -371,6 +387,8 @@ char old,new;
 					printf("Get complete, %lu bytes received\n",
 					tcb->rcv.nxt - tcb->irs - 2);
 					fflush(stdout);
+					/* Now flush NOS's 226 message if there is one */
+					ftpccr(ftp->control,ftp->cnt);
 				}
 			}
 			break;
@@ -379,6 +397,7 @@ char old,new;
 			del_tcp(tcb);
 			break;
 	}
+
 }
 /* Start receive transfer. Syntax: get <remote name> [<local name>] */
 static int
@@ -413,9 +432,10 @@ char *argv[];
 
 	if((ftp->fp = fopen(localname,mode)) == NULLFILE){
 		printf(cantwrite,localname);
+		donothing();
 		return 1;
 	}
-	ftp->state = RECEIVING_STATE;
+	ftp->state = SETUP_STATE;
 	ftpsetup(ftp,ftpdr,NULLVFP,ftpcds);
 
         /* Generate the command to start the transfer */
@@ -443,9 +463,12 @@ char *argv[];
 		ftp->fp = stdout;
 	} else if((ftp->fp = fopen(argv[2],"w")) == NULLFILE){
 		printf(cantwrite,argv[2]);
+#ifdef FTPPROMPT
+		donothing();
+#endif
 		return 1;
 	}
-	ftp->state = RECEIVING_STATE;
+	ftp->state = SETUP_STATE;
 	ftpsetup(ftp,ftpdr,NULLVFP,ftpcds);
         /* Generate the command to start the transfer
          * It's done this way to avoid confusing the 4.2 FTP server
@@ -480,9 +503,12 @@ char *argv[];
 		ftp->fp = stdout;
 	} else if((ftp->fp = fopen(argv[2],"w")) == NULLFILE){
 		printf(cantwrite,argv[2]);
+#ifdef FTPPROMPT
+		donothing();
+#endif
 		return 1;
 	}
-	ftp->state = RECEIVING_STATE;
+	ftp->state = SETUP_STATE;
 	ftpsetup(ftp,ftpdr,NULLVFP,ftpcds);
         /* Generate the command to start the transfer */
 	if(argc > 1)
@@ -521,6 +547,9 @@ char *argv[];
 
 	if((ftp->fp = fopen(localname,mode)) == NULLFILE){
 		printf(cantread,localname);
+#ifdef FTPPROMPT
+		donothing();
+#endif
 		return 1;
 	}
 	ftp->state = SENDING_STATE;
@@ -554,6 +583,7 @@ doabort()
 			close_tcp(ftp->data);
 			printf("Put aborted\n");
 			break;
+		case SETUP_STATE:
 		case RECEIVING_STATE:
 			/* Just exterminate the data channel TCB; this will
 			 * generate a RST on the next data packet which will
@@ -585,8 +615,9 @@ int16 cnt;
 		return;
 	}
 	/* Hold output if we're not the current session */
-	if(mode != CONV_MODE || current == NULLSESSION || current->cb.ftp != ftp)
-		return;
+	if(mode != CONV_MODE || current == NULLSESSION || current->cb.ftp != ftp
+		|| ftp->state == RECEIVING_STATE)	/* latter added to defer NOS's */
+		return;                             /* 226 message */
 
 	if(recv_tcp(tcb,&bp,cnt) > 0){
 		while(pullup(&bp,&c,1) == 1){
@@ -599,7 +630,7 @@ int16 cnt;
 					ftp->cnt = 0;
 					break;
 				default:        /* Assemble line */
-					if(ftp->cnt != LINELEN-1)
+					if(ftp->cnt != LINELEN - 1)
 						ftp->buf[ftp->cnt++] = c;
 					break;
 			}
@@ -614,22 +645,25 @@ static void
 doreply(ftp)
 register struct ftp *ftp;
 {
-	void noecho(),echo();
 
 	fwrite(ftp->buf,1,(unsigned)ftp->cnt,stdout);
+	printf("\n");
+#ifdef notdef /* only place used in NET */
 	fputc('\n', stdout);
+#endif
 	if (ftp->cnt < 4) return;	/* note that space after 3 numbers is rqd */
 	ftp->buf[4] = '\0';
 	switch(ftp->state){
-		case SENDING_STATE:
+		case SETUP_STATE:
 		case RECEIVING_STATE:
-			if (ftp->buf[0] == '5')
+		case SENDING_STATE:
+			if (ftp->buf[0] == '5')	/* any permanent neg completion reply */
 				doabort();
 			break;
 #ifdef CUTE_FTP
 		case STARTUP_STATE:
 			if (!strcmp(ftp->buf, "220 ")){	/* note required space */
-				ftp->state = USER_STATE;
+				ftp->state = USER_STATE;	/* in final line of multiline reply */
 				printf(userprompt);
 				fflush(stdout);
 			}
@@ -644,15 +678,16 @@ register struct ftp *ftp;
 				ftp->state = COMMAND_STATE;	/* something's wacko */
 			break;
 		case PASS_STATE:
-			echo();
-			if (!strcmp(ftp->buf, "550 ")){
-				ftp->state = USER_STATE;
+			/* Think I prefer looking for success */
+			if(ftp->buf[0] == '2')	/* 230 Logged in */
+				ftp->state = COMMAND_STATE;	/* probably made it in */
+			else{
+				ftp->state = USER_STATE;	/* loop back and try again */
 				printf("%s%s",helpesc,userprompt);
 				fflush(stdout);
-			}else
-					ftp->state = COMMAND_STATE;	/* probably made it in */
+			}
 			break;
-#else
+#else	/* this method removes all the echo/noecho stuff */
 		case STARTUP_STATE:
 				printf("\nEnter \"user\" followed by your username and later when requested, send \"pass\"\n");
 				printf("followed by your password: ");
@@ -660,6 +695,10 @@ register struct ftp *ftp;
 			break;
 #endif
 	}
+#ifdef FTPPROMPT
+	if(ftp->state == COMMAND_STATE)
+		donothing();
+#endif
 }
 
 /* FTP Client Control channel State change upcall routine */
@@ -676,6 +715,7 @@ char old,new;
 	extern char *unreach[];
 	extern char *exceed[];
 	int cmdmode();
+	extern int noprompt;	/* k35 */
 
 	/* Can't add a check for unknown connection here, it would loop
 	 * on a close upcall! We're just careful later on.
@@ -692,6 +732,8 @@ char old,new;
 			close_tcp(tcb);
 			break;
 		case CLOSED:    /* heh heh */
+			if(tcb->reason == RESET)
+				noprompt = 1;	/* k35 */
 			if(notify){
 				printf("%s (%s",tcpstates[new],reasons[tcb->reason]);
 				if(tcb->reason == NETWORK){
@@ -705,7 +747,6 @@ char old,new;
 					}
 				}
 				printf(")\n");
-				cmdmode();
 			}
 			del_tcp(tcb);
 			if(ftp != NULLFTP)
@@ -716,6 +757,7 @@ char old,new;
 				printf("%s\n",tcpstates[new]);
 			break;
 	}
-	if(notify)
+	if(notify && !(new == ESTABLISHED || new == SYN_SENT || new == LAST_ACK)) /* k35 */
+		cmdmode();
 	fflush(stdout);
 }

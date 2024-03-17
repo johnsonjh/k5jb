@@ -22,7 +22,6 @@ ntohnr3(hdr,bpp)
 register struct nr3hdr *hdr ;	/* output structure */
 struct mbuf **bpp ;
 {
-	register struct ax25_addr *axp ;
 	char *getaxaddr() ;
 	char buf[AXALEN] ;
 

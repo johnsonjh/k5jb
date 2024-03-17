@@ -28,23 +28,19 @@ int check;		/* If 0, bypass checksum verify */
 		return;
 
  /* Can't believe I didn't find this until 7/7/91 - K5JB */
-	fprintf(trfp,"UDP:");
 	/* Compute checksum */
 	ph.source = source;
 	ph.dest = dest;
 	ph.protocol = UDP_PTCL;
 	ph.length = len_mbuf(*bpp);
-	if((csum = cksum(&ph,*bpp,ph.length)) == 0)
-		check = 0;	/* No checksum error */
+	csum = cksum(&ph,*bpp,ph.length);
 
-	ntohudp(&udp,bpp);
+	ntohudp(&udp,bpp);	/* will set udp.checksum */
+	fprintf(trfp,"UDP: %u->%u len %u",udp.source,udp.dest,udp.length);
 
-	fprintf(trfp," %u->%u",udp.source,udp.dest);
-	fprintf(trfp," len %u",udp.length);
-	if(udp.checksum == 0)
-		check = 0;
-	if(check)
-		fprintf(trfp," CHECKSUM ERROR (%u)",csum);
+	/* This part is not well thought out - K5JB */
+	if(csum || udp.checksum)
+		fprintf(trfp," CHECKSUM ERROR (%u)",check ? csum : udp.checksum);
 
 	fprintf(trfp,"\n");
 }

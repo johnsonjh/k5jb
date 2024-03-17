@@ -1,5 +1,9 @@
 /* OS- and machine-dependent stuff for SYS5 */
 /* This file was revised with k5jb version k24 11-9-92 */
+/* V.k34: When used with telunix on my brain-damaged pty, telunix.c2 or
+ * telunix.c3 must be used.  Provides for telnet client stub in telserv.c
+ * and forked child that does shell command. - K5JB
+ */
 
 /*
 	FILE: UNIX.io.c
@@ -35,9 +39,9 @@
 #ifndef COH386
 #include <sys/file.h>
 #endif
-#include <sys/dir.h>
 #include <time.h>
 #include <fcntl.h>
+#include <errno.h>
 #include "global.h"
 #include "asy.h"
 #include "mbuf.h"
@@ -63,30 +67,47 @@ int	IORser[ASY_MAX];
 char *ttbuf;
 int slipisopen;
 
-#define SHL		/* shell layer capability - quit sets reportquit_flag */
-					/* check for that flag in main loop and if set call */
-					/* report_quit() - A signal handler shouldn't printf */
-
-#ifdef SHL
+#ifdef USE_QUIT	/* the forked shell depends on quit signals too */
 int reportquit_flag = 0;
 
-static int
+/* note that when we do shell escape, this will be replaced by a
+ * user signal so quit can be ignored
+ */
+int
 onquit()
 {
-extern int backgrd;
+	extern int backgrd;
+#ifdef FORKSHELL
+	extern int shellpid;
+	extern char prompt[];
+	int stat_loc;
+#endif
 
 	signal(SIGQUIT,onquit);	/* SIGQUIT is a Ctrl \ */
+
+#ifdef FORKSHELL
+	if(shellpid){  /* we only want to do this once */
+		kill(shellpid,SIGKILL);
+		wait(&stat_loc);	/* revisit this.  We will have more than one child */
+		printf(prompt);
+		fflush(stdout);
+		shellpid = 0;
+		return 0;
+	}
+#endif
+
 	backgrd = !backgrd;
 	reportquit_flag = 1;
 	return(0);
 }
 
+/* this is called only if we need it for shell layers */
 void
 report_quit()
 {
 extern int backgrd;
 
-	reportquit_flag = 0;
+	reportquit_flag = 0;	/* flag that brought us here */
 	printf("\nKeyboard input is ");
 	if(backgrd)
 		printf("IGNORED.  Inactive shell OK now.  Ctrl-\\ to restore.\n");
@@ -100,13 +121,13 @@ ioinit()
 {
 	struct termio ttybuf;
 	extern int iostop();
-#ifdef SHL
+#ifdef USE_QUIT
 	extern int onquit();
 #endif
 
 	(void) signal(SIGHUP, iostop);
 	(void) signal(SIGINT, iostop);
-#ifdef SHL
+#ifdef USE_QUIT
 	(void) signal(SIGQUIT,onquit);	/* SIGQUIT is a Ctrl \ */
 #else
 	(void) signal(SIGQUIT, iostop);
@@ -140,7 +161,10 @@ ioinit()
 iostop()
 {
 	extern int exitval;
-	setbuf(stdout,NULLCHAR);
+#if defined(PTY_PIPE) && defined(TELUNIX)
+	extern int pipepid;
+#endif
+/*	setbuf(stdout,NULLCHAR); we aren't doing a setbuf anywhere on setup */
 
 	while (ifaces != NULLIF) {
 		if (ifaces->stop != NULLFP)
@@ -150,6 +174,10 @@ iostop()
 
 	ioctl(0, TCSETAW, &savecon);
 	fcntl(0, F_SETFL, saveconfl);
+#if defined(PTY_PIPE) && defined(TELUNIX)
+	if(pipepid)
+		kill(pipepid,SIGKILL);
+#endif
 	exit(exitval);
 }
 
@@ -247,7 +275,7 @@ int speed;
 	asy[dev].speed = speed;
 
 	if (ioctl(IORser[dev], TCGETA, &sgttyb) < 0) {
-		perror("ioctl could not set parameters");
+		perror("ioctl could not get parameters");
 		return -1;
 	}
 
@@ -373,7 +401,7 @@ int dev;
 char *buf;
 unsigned cnt;
 {
-#define	IOBUFLEN	256
+#define	IOBUFLEN	330	/* max ax.25 frame, was 256 */
 	unsigned tot;
 	int r;
 	static struct	{
@@ -415,13 +443,18 @@ unsigned cnt;
 		r = read(IORser[dev], IOBUF[dev].data, IOBUFLEN);
 		/* check the read */
 		if (r == -1) {
-#ifndef COH386	/* apparently read() in coherent returns -1 when nothing
-		available from port */
+#ifndef COH386	/* apparently read() in coherent returns -1 when nothing */
+				/* available from port */
 			IOBUF[dev].cnt = 0;	/* bad read */
-			if(!reportquit_flag){
+#ifdef USE_QUIT
+			if(errno != EINTR){
 				perror("asy_recv");
 				printf("asy_recv: error in reading from device %d\n", dev);
 			}
+#else
+			perror("asy_recv");
+			printf("asy_recv: error in reading from device %d\n", dev);
+#endif
 #endif
 			return(0);
 		} else

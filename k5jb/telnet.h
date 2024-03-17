@@ -41,4 +41,4 @@ struct telnet {
 #define	NULLTN	(struct telnet *)0
 extern int refuse_echo;
 struct telnet *open_telnet();
-int send_tel(),tel_input();
+int send_tel();

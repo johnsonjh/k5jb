@@ -19,18 +19,15 @@ doicmpstat()
 	extern char *icmptypes[];
 	register int i;
 
-	printf("ICMP: chksum err %u, no space %u, icmp %u, bdcsts %u\n",
+	printf(
+	"ICMP: chksum err %u, no space %u, icmp %u, bdcsts %u\ntype  rcvd  sent\n",
 	 icmp_errors.checksum,icmp_errors.nospace,icmp_errors.noloop,
 	 icmp_errors.bdcsts);
-	printf("type  rcvd  sent\n");
 	for(i=0;i<ICMP_TYPES;i++){
 		if(icmp_stats.input[i] == 0 && icmp_stats.output[i] == 0)
 			continue;
-		printf("%-6u%-6u%-6u",i,icmp_stats.input[i],
-			icmp_stats.output[i]);
-		if(icmptypes[i] != NULLCHAR)
-			printf("  %s",icmptypes[i]);
-		printf("\n");
+		printf("%-6u%-6u%-6u  %s\n",i,icmp_stats.input[i],
+			icmp_stats.output[i],icmptypes[i] != NULLCHAR ? icmptypes[i] : "");
 	}
 	return 0;
 }
@@ -39,7 +36,7 @@ doicmpstat()
 struct ping *ping[PMOD];
 
 /* Counter for generating seq numbers */
-static int16 iclk;
+int16 iclk;	/* made value global - K5JB */
 
 /* Increment counter -- called by low level clock tick */
 void
@@ -68,13 +65,11 @@ char *argv[];
 		printf("Host                Sent    Rcvd   %%   Avg RTT  Interval\n");
 		for(i=0;i<PMOD;i++){
 			for(pp = ping[i];pp != NULLPING;pp = pp->next){
-				printf("%-16s",inet_ntoa(pp->remote));
-				printf("%8lu%8lu",pp->count,pp->echoes);
-				printf("%4lu%10lu%10lu\n",
-				 (long)pp->echoes * 100 / pp->count,
-				 pp->echoes != 0 ?
-				 (long)pp->ttotal * MSPTICK / pp->echoes : 0,
-				 ((pp->timer.start * MSPTICK) + 500) / 1000); /* K5JB */
+				printf("%-16s%8lu%8lu%4lu%10lu%10lu\n",
+					inet_ntoa(pp->remote),pp->count,pp->echoes,
+					(long)pp->echoes * 100 / pp->count,
+					pp->echoes != 0 ? (long)pp->ttotal * MSPTICK / pp->echoes : 0,
+					((pp->timer.start * MSPTICK) + 500) / 1000); /* K5JB */
 			}
 		}
 		return 0;

@@ -9,8 +9,11 @@ pathname(cd,path)
 char *cd;	/* Current working directory */
 char *path;	/* Pathname argument */
 {
-	register char *buf,*cp;
+	register char *buf;
+#if	(defined(MSDOS) || defined(ATARI_ST))
+	register char *cp;
 	char *cdtmp,*pathtmp;
+#endif
 	void free();
 
 	if(cd == NULLCHAR || path == NULLCHAR)

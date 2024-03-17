@@ -6,11 +6,34 @@
  * 3/18/92 - K5JB
  */
 /* TTY input driver */
-/* #define CUTE_FTP in options.h to enable FTP login prompting */
+/* #define CUTE_FTP in config.h to enable FTP login prompting */
 #include <stdio.h>
 #include <ctype.h>
 #include "options.h"
 #include "config.h"
+#include "global.h"
+#include "mbuf.h"
+#include "netuser.h"
+#include "timer.h"
+#ifdef AX25
+#include "ax25.h"
+#include "lapb.h"
+#endif
+#ifdef NETROM
+#include "nr4.h"
+#endif
+#include "iface.h"
+#include "tcp.h"
+#include "session.h"
+#include "cmdparse.h"
+#include "telnet.h"
+#include "ftp.h"
+#ifdef _FINGER
+#include "finger.h"
+#endif
+#ifdef UNIX
+#include "unixopt.h"
+#endif
 
 #ifndef TRUE
 #define TRUE 1
@@ -19,7 +42,7 @@
 
 #define EDIT
 
-int ttymode;
+int ttymode,cmdmode(),go();
 #define	TTY_LIT	0		/* Send next char literally */
 #define	TTY_RAW	1
 #define TTY_COOKED	2
@@ -30,11 +53,16 @@ int ttyecho=1;
 #define	TTY_ECHO	1
 #endif
 
+#ifdef CUTE_VIDEO
+extern unsigned int saved_attrib;
+void putca();
+#endif
+
 #ifdef	FLOW
 int ttyflow=1;
 #endif
 
-#define	LINESIZE	80
+#define	KBLINSIZ	80
 
 #ifdef EDIT
 #define CTLE	5	/* redisplay last line */
@@ -52,22 +80,124 @@ int ttyflow=1;
 #define	CTLZ	26
 #define	RUBOUT	127
 
+#ifdef  SYS5
+extern int background;
+#ifdef USE_QUIT
+extern int reportquit_flag;
+void report_quit();
+#endif
+#ifdef FORKSHELL
+extern int shellpid;
+#endif
+#endif
+
+#if defined(UNIX)
+extern char escape;
+#endif
+
+extern int mode;
+int Keyhit = -1;
+int noprompt;	/* things to control prompts */
+int closepending; /* k35 */
+
+/* Process any keyboard input - removed from main() to make accessable
+ * by other processes - K5JB
+ */
+void
+check_kbd()
+{
+	char *ttybuf;
+	int c;
+	int16 cnt;
+	int ttydriv(),cmdparse(),kbread();
+#ifdef  FLOW
+	extern int ttyflow;
+#endif
+	extern struct cmds cmds[];
+	extern char prompt[];
+#ifdef  SYS5
+#ifdef USE_QUIT
+	if(reportquit_flag)	/* set by quit signal and report is deferred */
+		report_quit();		/* until now */
+#endif
+	/* note that if shellpid, kbread() always returns -1 */
+	while((background == 0) && ((c = kbread()) != -1))
+#else
+	while((c = kbread()) != -1)
+#endif
+	{
+#ifdef MSDOS
+		/* c == -2 means the command escape key (F10) */
+		Keyhit = c;	/* a global we use for haktc */
+		if(c == -2){
+			if(mode != CMD_MODE){
+#ifdef CUTE_VIDEO
+				putca('\n',saved_attrib); /* in case we were in session */
+#else
+				printf("\n");
+#endif
+				cmdmode();
+			}
+			continue;
+		}
+#endif
+#if defined(UNIX) || defined(_OSK)
+		if(c == escape && escape != 0){
+			if(mode != CMD_MODE){
+				printf("\n");
+				cmdmode();
+			}
+			continue;
+		}
+#endif   /* UNIX or _OSK */
+
+#ifndef FLOW
+		if ((cnt = ttydriv(c, &ttybuf)) == 0)
+			continue;
+#else
+		cnt = ttydriv(c, &ttybuf);
+		if (ttyflow && (mode != CMD_MODE))
+			go();           /* display pending chars */
+		if (cnt == 0)
+			continue;
+#endif  /* FLOW */
+		switch(mode){
+			case CMD_MODE:
+				(void)cmdparse(cmds,ttybuf);
+				fflush(stdout);
+			break;
+			case CONV_MODE:
+				if(current->parse != NULLFP)
+					(*current->parse)(ttybuf,cnt);
+			break;
+		}
+#if defined(FORKSHELL) && defined(SYS5)
+		if(mode == CMD_MODE && !shellpid)
+#else
+		if(mode == CMD_MODE)
+#endif
+		{
+			if(noprompt || closepending){	/* k35 */
+				noprompt = 0;
+				closepending = 0;
+			}else{
+				printf(prompt);
+				fflush(stdout);
+			}
+		}
+	}  /* while */
+}
+
 void
 raw()
 {
 	ttymode = TTY_RAW;
-#ifdef	ATARI_ST
-	set_stdout(ttymode);	/* CR/LF vs LF madness...  -- hyc */
-#endif
 }
 
 void
 cooked()
 {
 	ttymode = TTY_COOKED;
-#ifdef	ATARI_ST
-	set_stdout(ttymode);
-#endif
 }
 
 #ifdef CUTE_FTP
@@ -110,20 +240,22 @@ Special characters:
 ^H or DEL destructive backspace
 */
 
+/* moved to global scope so kaktc (session.c) could reset pointer */
+char linebuf[KBLINSIZ];
+char *kbcp = linebuf;
+
 int
 ttydriv(c,buf)
 char c;
 char **buf;
 {
-	static char linebuf[LINESIZE];
 #ifdef EDIT
-	static char lastline[LINESIZE];
+	static char lastline[KBLINSIZ];
 	static char *ep = linebuf;
 	static int editing;
 	int i;
 #endif
 	int erase = FALSE;
-	static char *cp = linebuf;
 	char *rp ;
 	int cnt;
 
@@ -140,7 +272,7 @@ char **buf;
 	switch(ttymode){
 		case TTY_LIT:
 			ttymode = TTY_COOKED;	/* Reset to cooked mode */
-			*cp++ = c;	/* run a slight risk of array violation here */
+			*kbcp++ = c;	/* run a slight risk of array violation here */
 #ifdef UNIX
 			putchar('.');	/* Terminal may prefer no Ctrl-chars */
 #else
@@ -148,26 +280,21 @@ char **buf;
 #endif
 			break;
 		case TTY_RAW:
-			*cp++ = c;
-			cnt = cp - linebuf;
-			cp = linebuf;
+			*kbcp++ = c;
+			cnt = kbcp - linebuf;
+			kbcp = linebuf;
 			break;
 		case TTY_COOKED:
 			/* Perform cooked-mode line editing */
-#ifdef PC9801
-			switch(c)
-#else
-			switch(c & 0x7f)
-#endif
-			{
+			switch(c & 0x7f){
 				case '\015':	/* Terminal may generate either */
 				case '\012':
-					*cp++ = '\015';
-					*cp++ = '\012';	/* guaranteed to bust array! K5JB */
+					*kbcp++ = '\015';
+					*kbcp++ = '\012';	/* guaranteed to bust array! K5JB */
 					printf("\n");
-					cnt = cp - linebuf;
+					cnt = kbcp - linebuf;
 #ifdef EDIT
-					for(i=0;i<LINESIZE;i++){   /* save in lastline */
+					for(i=0;i<KBLINSIZ;i++){   /* save in lastline */
 						if(linebuf[i] == '\012')	/* will use '\r' as marker */
 							break;
 						lastline[i] = linebuf[i];
@@ -175,7 +302,7 @@ char **buf;
 					editing = FALSE;
 					ep = linebuf;
 #endif
-               cp = linebuf;
+               kbcp = linebuf;
 					break;
 
 				case CTLU:
@@ -188,11 +315,11 @@ char **buf;
 #endif
 #ifdef CUTE_FTP
 					if(!ttyecho)
-						cp = linebuf;
+						kbcp = linebuf;
 					else
 #endif
-					while(cp != linebuf){
-						cp--;
+					while(kbcp != linebuf){
+						kbcp--;
 						printf("\b \b");
 					}
 					if(erase)
@@ -202,13 +329,13 @@ char **buf;
 					if(!ttyecho) 	/* don't need to edit */
 						break;				/* when no echo */
 #endif
-					cp = linebuf;
-					for(i=0;i<LINESIZE;i++){
+					kbcp = linebuf;
+					for(i=0;i<KBLINSIZ;i++){
 						if(lastline[i] == '\015')
 							break;
 						linebuf[i] = lastline[i];
 						putchar(linebuf[i]);
-						cp++;
+						kbcp++;
 					}
 					if(i){
 						ep = &linebuf[i];
@@ -217,34 +344,34 @@ char **buf;
 				break;
 
 				case CTLD:	/* forward one char */
-					if(editing && cp < ep){
-						putchar(*cp++);
+					if(editing && kbcp < ep){
+						putchar(*kbcp++);
 					}
 					break;
 
 				case CTLF:	/* forward one word */
 					if(editing)
-						while(cp < ep){
-							putchar(*cp++);
-							if(isspace(*cp)){ /* isspace() costs 258 bytes but it is*/
-								if(cp < ep)		/* already used in smtpserv.c */
-									putchar(*cp++);
+						while(kbcp < ep){
+							putchar(*kbcp++);
+							if(isspace(*kbcp)){ /* isspace() costs 258 bytes but it is*/
+								if(kbcp < ep)		/* already used in smtpserv.c */
+									putchar(*kbcp++);
 								break;
 							}
 						}
 					break;
 
 				case CTLS:	/* backward one char */
-					if (editing && cp != linebuf){
+					if (editing && kbcp != linebuf){
 						printf("\b");
-						cp--;
+						kbcp--;
 					}
 					break;
 #endif
 				case RUBOUT:
 				case '\b':		/* Backspace - note this works when no echo */
-					if(cp != linebuf){
-						cp--;
+					if(kbcp != linebuf){
+						kbcp--;
 						printf("\b \b");	/* this isn't cool if no ttyecho, but */
 					}
 					break;
@@ -255,7 +382,7 @@ char **buf;
 #endif
 					printf("^R\n");
 					rp = linebuf ;
-					while (rp < cp)
+					while (rp < kbcp)
 						putchar(*rp++);
 					break ;
 				case CTLV:
@@ -268,25 +395,25 @@ char **buf;
 					if(!ttyecho)
 						break;
 #endif
-					if(cp != linebuf && isspace(*(cp-1))){/* not at end of line */
-						cp--;	/* back up onto the space */
+					if(kbcp != linebuf && isspace(*(kbcp-1))){/* not at end of line */
+						kbcp--;	/* back up onto the space */
 						putchar('\b');
 					}
-					while (cp != linebuf) {
-						cp--;
+					while (kbcp != linebuf) {
+						kbcp--;
 						if(erase)
 							printf("\b \b") ;
 						else
 							printf("\b");
-						if (isspace(*cp)) {
-							putchar(*cp++);
+						if (isspace(*kbcp)) {
+							putchar(*kbcp++);
 							break;
 						}
 					}
 				break ;
 
 				default:	/* Ordinary character */
-					*cp++ = c;
+					*kbcp++ = c;
 
 				/* ^Z is a common screen clear character - K5JB */
 #ifdef CUTE_FTP
@@ -297,12 +424,12 @@ char **buf;
 						putchar(c);
 
 				/* if line is too long, we truncate it */
-					if(cp > &linebuf[LINESIZE - 3]){	/* room for \r\n
+					if(kbcp > &linebuf[KBLINSIZ - 3]){	/* room for \r\n
 														but NO null */
-						linebuf[LINESIZE - 2] = '\015';
-						linebuf[LINESIZE - 1] = '\012';
-						cnt = LINESIZE;
-						cp = linebuf;
+						linebuf[KBLINSIZ - 2] = '\015';
+						linebuf[KBLINSIZ - 1] = '\012';
+						cnt = KBLINSIZ;
+						kbcp = linebuf;
 					}
 					break;
 			}	/* switch ch in case TTY_COOKED */
@@ -312,7 +439,7 @@ char **buf;
 	else
 		*buf = (char *)0;	/* K5JB */
 #ifdef	FLOW
-	if(cp > linebuf)
+	if(kbcp > linebuf)
 		ttyflow = 0;
 	else
 		ttyflow = 1;

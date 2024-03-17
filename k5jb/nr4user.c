@@ -97,9 +97,9 @@ struct mbuf *bp ;
 
 /* Receive incoming net/rom transport data */
 struct mbuf *
-recv_nr4(cb,cnt)
+recv_nr4(cb,unused)
 struct nr4cb *cb ;
-int16 cnt ;
+int16 unused;
 {
 	struct mbuf *bp ;
 
@@ -128,7 +128,6 @@ disc_nr4(cb)
 struct nr4cb *cb ;
 {
 	struct nr4hdr hdr ;
-	int i ;
 	
 	if (cb->state != NR4STCON)
 		return ;

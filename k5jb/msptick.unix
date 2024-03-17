@@ -1,0 +1,34 @@
+Timing for NET depends on your compiling it with the correct value of
+MSPTICK, which is the manifest constant for milliseconds per tick.  If
+you don't know what value your machine needs, information in this file
+should help you.
+
+The basic timer on most Unix computers runs at 60 or 100 Hertz (60 or
+100 ticks per second).  This value can usually be found in a header file
+in /usr/include/sys.  Grep for HZ and see if you find it in param.h,
+const.h, machine.h, or some such.  If you don't find it, read the
+description in your compiler manual for the function times().  Normally
+this function is used to fill in a structure with values based on the
+computer's basic ticker.  times() may or may not return a time_t value
+of ticks from some arbitrary point in time, like system boot up.  The
+reference manual may provide a clue on the value of HZ.
+
+Once you have found HZ, divide it into 1000 to find the milliseconds per
+tick.  Round this value and use it for MSPTICK in the Makefile.  For ex-
+ample, if HZ is 60, MSPTICK is 17.  If HZ is 100, MSPTICK is 10.
+
+You can verify that you used the correct MSPTICK by checking one of
+NET's timers when it is running.  Using smtp for an example, look at the
+second hand on your watch when you issue the command, smtp t 1800.  Type
+in the command, smtp t, and don't hit carriage return.  When your watch
+indicates that one minute has elapsed enter the C/R.  NET should return
+something close to, 60/1800.  If the first number is not close to 60,
+get out a pencil and paper and figure out what correction you need to
+apply to MSPTICK, and recompile NET.
+
+Coherent users note that I can't dig out the machine's tick value in my
+version of the OS so I made do with one second ticks.  Your MSPTICK is
+therefore 1000.
+
+Good luck, and enjoy!
+Joe, K5JB

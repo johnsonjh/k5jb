@@ -1,3 +1,11 @@
+/* you can either define a command to twiddle, or pick a reasonable time
+ * for ip reassembly time limit.  Original code was 30 seconds which is
+ * kind of unreasonable for radio work.  Adjust TLB to suit yourself - K5JB
+ */
+#undef RTIMER	/* ability to change reassembly timer */
+
+#define TLB (300*1000L)/MSPTICK      /* Reassembly limit time */
+
 #define	NROUTE	5	/* Number of hash chains in routing table */
 
 extern int32 ip_addr;	/* Our IP address for ICMP and source routing */

@@ -16,8 +16,11 @@
 #include "lapb.h"
 #include "finger.h"
 #include "nr4.h"
+#include <string.h>
 
 struct tcb *tnet_tcb;
+void log();
+
 tn1(argc,argv)
 char *argv[];
 {
@@ -25,6 +28,7 @@ char *argv[];
 	extern int32 ip_addr;
 	void tnet_state();
 	void t_state(),rcv_char();
+	int atoi();
 
 	/* Incoming Telnet */
 	lsocket.address = ip_addr;
@@ -40,25 +44,25 @@ char *argv[];
  *
  */
 static void
-tnet_state(tcb,old,new)
+tnet_state(tcb,unused,new)
 struct tcb *tcb;
-char old,new;
+char unused,new;
 {
 	struct telnet *tn;
 	struct session *s,*newsession();
+#ifdef POLITE
+	struct session *tmpsession;
+#endif
 	void tn_tx(),t_state(),sndmsg();
 	char *a, *psocket();
 #ifdef SOKNAME
 	char *puname();
 #endif
-/* To enable incoming telnet connects to print to screen instead of bit-bucket
- * enable AUTOSESSION.  Don't know of undesirable side effects yet - K5JB */
-#define AUTOSESSION
-#ifdef AUTOSESSION
 	extern struct session *current;
 	int go();
+#ifdef TN_MOTD
+	extern char tn_motd[];
 #endif
-
 	switch(new){
 	case ESTABLISHED:
 		log(tcb,"open Telnet");
@@ -108,10 +112,20 @@ char old,new;
 		fflush(stdout);
 		tcb->s_upcall = t_state;
 		tcb->t_upcall = tn_tx;	/* oops, was missing k33 */
-
-#ifdef AUTOSESSION	/* testing for current == NULLSESSION to avoid butt-in */
-	/* causes 2nd and subsequent sessions, without kb activity, not to print */
-		current = s;
+#ifdef POLITE
+		tmpsession = current; /* may need this later */
+#endif
+		current = s;    /* this may be only temporary if we are busy */
+#ifdef TN_MOTD
+		if(tn_motd[0])
+			sndmsg(tcb,tn_motd);
+#endif
+#ifdef POLITE
+		if((s - sessions) == 0)   /* if we aren't busy */
+			go();
+		else
+			current = tmpsession;	/* back to what we were doing */
+#else
 		go();
 #endif
 		return;

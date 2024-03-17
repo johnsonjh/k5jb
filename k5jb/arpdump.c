@@ -1,3 +1,4 @@
+#include "options.h"
 #include "config.h"
 #if defined(ETHER) || defined(AX25)
 #ifdef TRACE

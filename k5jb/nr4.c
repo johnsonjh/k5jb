@@ -58,13 +58,13 @@ struct mbuf *bp ;
 	int gotchoke ;		/* The choke flag was set in this packet */
 
 	op = hdr->opcode & NR4OPCODE ;	/* Mask off flags */
-	
+
 	if (op == NR4OPCONRQ) {			/* process connect request first */
 		acceptc = 1 ;
 		newconn = 0 ;
 
 		/* These fields are sent regardless of success */
-		
+
 		rhdr.yourindex = hdr->u.conreq.myindex ;
 		rhdr.yourid = hdr->u.conreq.myid ;
 		dest = hdr->u.conreq.node ;
@@ -72,9 +72,9 @@ struct mbuf *bp ;
 		/* Check to see if we have already received a connect */
 		/* request for this circuit. */
 
-		if ((cb = match_n4circ(hdr->u.conreq.myindex, hdr->u.conreq.myid,
-								  &hdr->u.conreq.user, &hdr->u.conreq.node))
-			 == NULLNR4CB) {	/* No existing circuit if NULL */
+		if ((cb = match_n4circ((int)hdr->u.conreq.myindex,
+			(int)hdr->u.conreq.myid,&hdr->u.conreq.user,
+			&hdr->u.conreq.node)) == NULLNR4CB) {	/* No existing circuit if NULL */
 
 			/* Try to get a new circuit */
 
@@ -139,7 +139,7 @@ struct mbuf *bp ;
 
 	/* validate circuit number */
 
-	if ((cb = get_n4circ(hdr->yourindex, hdr->yourid)) == NULLNR4CB) {
+	if ((cb = get_n4circ((int)hdr->yourindex, (int)hdr->yourid)) == NULLNR4CB) {
 		free_p(bp) ;
 		return ;
 	}

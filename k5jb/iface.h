@@ -21,24 +21,10 @@ struct interface {
 #define	IF_TRACE_ASCII	0x100	/* Dump packets in ascii */
 #define	IF_TRACE_HEX	0x200	/* Dump packets in hex/ascii */
 	char *hwaddr;		/* Device hardware address, if any */
+	int kissport;		/* for multidropped kiss */
 #ifdef FORWARD
 	struct interface *forw;	/* Forwarding interface for output, if rx only */
 #endif
 };
 #define	NULLIF	(struct interface *)0
 extern struct interface *ifaces;	/* Head of interface list */
-
-/* Header put on front of each packet in input queue (used by drsi) */
-struct phdr {
-	struct interface *iface;
-	unsigned short type;
-#define	TYPE_AX25	0
-#define	TYPE_ETHER	1
-#define	TYPE_IP		2
-#define TYPE_APPLETALK	3
-#define	TYPE_KISS	4
-#define	TYPE_NETROM	5
-#define	TYPE_NONE	6
-#define	TYPE_SLIP	7
-#define	NLTYPE		8
-};

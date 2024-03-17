@@ -12,7 +12,7 @@
 
 extern FILE *trfp;
 
-int
+void
 ip_dump(bpp,check)
 struct mbuf **bpp;
 int check;
@@ -44,10 +44,8 @@ int check;
 	/* Trim data segment if necessary. */
 	length = ip.length - ip_len;	/* Length of data portion */
 	trim_mbuf(bpp,length);
-	fprintf(trfp," len %u",ip.length);
-	fprintf(trfp," %s",inet_ntoa(ip.source));
-	fprintf(trfp,"->%s ihl %u ttl %u",
-		inet_ntoa(ip.dest),ip_len,uchar(ip.ttl));
+	fprintf(trfp," len %u %s->",ip.length,inet_ntoa(ip.source));
+	fprintf(trfp,"%s ihl %u ttl %u",inet_ntoa(ip.dest),ip_len,uchar(ip.ttl));
 	if(ip.tos != 0)
 		fprintf(trfp," tos %u",uchar(ip.tos));
 	offset = (ip.fl_offs & F_OFFSET) << 3;

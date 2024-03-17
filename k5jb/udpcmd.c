@@ -12,7 +12,7 @@ int doudpstat();
 struct cmds udpcmds[] = {
 	"status",	doudpstat,	0,	NULLCHAR,	NULLCHAR,
 	NULLCHAR,	NULLFP,		0,
-		"udp subcommands: status",	NULLCHAR,
+		"udp subcommands: status",	NULLCHAR
 };
 
 doudp(argc,argv)

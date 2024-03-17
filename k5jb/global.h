@@ -108,20 +108,8 @@ long	ptr2long();			/* for fuzzy segment addresses */
 #define ptr2long(x)	((long) (x))	/* typecast suffices for others */
 #endif
 
-#ifdef	MPU8080	/* Assembler routines are available */
-int16 hinibble(),lonibble(),hibyte(),lobyte(),hiword(),loword();
-
-#else
-
 /* Extract a short from a long */
-/* According to my docs, this bug is fixed in MWC 3.0. (from 3.0.6 release
-   notes.) -- hyc */
-#if	(ATARI_ST && (MWC < 306))
-extern int Sixteen;
-#define hiword(x)	((int16)((x) >> Sixteen)) /* hide compiler bug.. */
-#else
 #define hiword(x)	((int16)((x) >> 16))
-#endif
 #define	loword(x)	((int16)(x))
 
 /* Extract a byte from a short */
@@ -131,8 +119,6 @@ extern int Sixteen;
 /* Extract nibbles from a byte */
 #define	hinibble(x)	(((x) >> 4) & 0xf)
 #define	lonibble(x)	((x) & 0xf)
-
-#endif
 
 #if	(defined(SYS5) || (defined(ATARI_ST) && defined(LATTICE)))
 #define rindex	strrchr
@@ -144,22 +130,4 @@ char *index(),*rindex(),*malloc(),*calloc(),*tmpnam();
 
 #ifndef	_OSK
 char *ctime();
-#endif
-
-#if	ATARI_ST && MICRORTX
-/* the 68000 processor won't let you disable interrupts in user mode
- * therefore, a trap handler has been defined to do this, and it's
- * installed as trap #5. The Mark Williams compiler generates a trap #5
- * when you call the magic function "micro_rtx" (their multi-tasking
- * executive).
- * the trap handler returns the previous processor level as a char.
- */
-
-#define disable()	micro_rtx(6)
-#define restore(state)	micro_rtx(state)
-
-/* a quick, non-checking free() function as a macro */
-#ifdef QFREE
-#define free(p)		((char *) (p))[-1] |= 1;
-#endif
 #endif

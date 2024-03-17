@@ -25,8 +25,8 @@ char rxbroadcast;
 	struct icmp icmp;	/* ICMP header */
 	struct ip ip;		/* Offending datagram header */
 	int16 type, cksum();		/* Type of ICMP message */
-	void ntohicmp(),echo_proc();
-	int ntohip(),tcp_icmp();
+	void ntohicmp(),echo_proc(),tcp_icmp();
+	int ntohip();
 
 	if(rxbroadcast){
 		/* Broadcast ICMP packets are to be IGNORED !! */

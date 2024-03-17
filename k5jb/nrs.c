@@ -4,8 +4,8 @@
  * if we want to do packet switching for multi-line wormholes.
  * Dan Frank, W9NK
  */
-#include "config.h"
 #include "options.h"	/* included in case SERIALTEST changes */
+#include "config.h"
 #ifdef NRS
 #include <stdio.h>
 #include "global.h"

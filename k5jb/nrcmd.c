@@ -4,6 +4,8 @@
  * 10/18/92 Added a netrom bcstifle <iface> 0|1 command - K5JB
  * 10/19/92 Munged a little to recover size lost to the above, added
  * test for bad format callsigns in netrom connect command.
+ * Put constraints on most vital values.  Left some alone though - K5JB
+ * Put n ro report in aligned columns.
  */
 
 #include "config.h"
@@ -26,11 +28,15 @@
 #include "cmdparse.h"
 #include "session.h"
 #include <ctype.h>
-
+#ifdef SYS5
+#include <sys/types.h>
+#include <sys/inode.h>
+#include <sys/stat.h>
+#endif
 #undef NRDEBUG
 
 void donodetick(),stop_timer(),start_timer();
-long atol();	/* K5JB fix some wierd timer values with this */
+long htol(),atol();	/* K5JB fix some wierd timer values with this */
 void free();
 int pax25(),atoi();
 
@@ -51,38 +57,52 @@ char *Nr4reasons[] = {
 	"Refused"
 } ;
 
+#ifdef NR_VERBOSE
+static int donrverbose();
+#endif
+
 static int dointerface(), dobcnodes(), donodetimer(), donrroute(),
-		   donrttl(), doobsotimer(), donodefilter(), donrverbose(),
+		   donrttl(), doobsotimer(), donodefilter(),
 		   donrconnect(), donrreset(), donrwindow(), donrirtt(),
 		   donracktime(), donrqlimit(), donrchoketime(), donrretries(),
 			donrstatus(), donrstifle(), donrkick() ;
 
+extern char notval[];
+extern char range[];	/* in smtpcli.c */
+
 static struct cmds nrcmds[] = {
-	"acktime",	donracktime,	0,	NULLCHAR,	NULLCHAR,
+	"acktime",	donracktime,	0,	NULLCHAR, range,
 	"bcnodes",	dobcnodes,	2,	"netrom bcnodes <iface>", NULLCHAR,
-	"bcstifle",	donrstifle, 3, "netrom bcstifle <iface> 0|1", NULLCHAR,
+	"bcstifle",	donrstifle, 3, "netrom bcstifle <iface> on|off", NULLCHAR,
+
 
 /* Put connect before choketime to make it the default expansion of 'c' */
 
-	"connect",	donrconnect,2,	"netrom connect <node>",	NULLCHAR,
-	"choketime",	donrchoketime,	0,	NULLCHAR,	NULLCHAR,
+	"connect",	donrconnect,2,	"netrom connect <node>", "Too many sessions",
+	"choketime",	donrchoketime,	0,	NULLCHAR, range,	/* k34, in global.h */
 	"interface",	dointerface,	4,
-		"netrom interface <iface> <alias> <qual>",	NULLCHAR,
-	"irtt",			donrirtt,		0,	NULLCHAR,	NULLCHAR,
-	"kick",			donrkick,		2,	"netrom kick <&nrcb>",	NULLCHAR,
+		"netrom interface <iface> <alias> <qual>", "Attach netrom iface first",
+	"irtt",			donrirtt,		0,	NULLCHAR, range,
+	"kick",			donrkick,		2,	"netrom kick <cb#>",	notval,
 	"nodefilter",	donodefilter,	0,	NULLCHAR,	NULLCHAR,
 	"nodetimer",	donodetimer,	0,	NULLCHAR,	NULLCHAR,
 	"obsotimer",	doobsotimer,	0,	NULLCHAR,	NULLCHAR,
-	"qlimit",	donrqlimit,	0,	NULLCHAR,	NULLCHAR,
-	"reset",	donrreset,	2,	"netrom reset <&nrcb>",	NULLCHAR,
-	"retries",	donrretries,0,	NULLCHAR,	NULLCHAR,
+	"qlimit",	donrqlimit,	0,	NULLCHAR, range,
+	"reset",	donrreset,	2,	"netrom reset <cb#>",	notval,
+	"retries",	donrretries,0,	NULLCHAR,	range,
 	"route",	donrroute,	0,	NULLCHAR,	NULLCHAR,
-	"status",	donrstatus,	0,	NULLCHAR,	NULLCHAR,
-	"ttl",		donrttl,	0,	NULLCHAR,	NULLCHAR,
-	"verbose",	donrverbose,0,	NULLCHAR,	NULLCHAR,
-	"window",	donrwindow,	0,	NULLCHAR,	NULLCHAR,
+	"status",	donrstatus,	0,	NULLCHAR, notval,
+	"ttl",		donrttl,	0,	NULLCHAR, "ttl must be between 2 and 20",
+#ifdef NR_VERBOSE
+	"verbose",	donrverbose,0, NULLCHAR, "netrom verbose [on|off]",
+#endif
+	"window",	donrwindow,	0,	NULLCHAR, range,
 	NULLCHAR,	NULLFP,		0,
+#ifdef NR_VERBOSE
 	"netrom subcmds: acktime bcnodes bcstifle connect choketime interface irtt kick\n  nodefilter nodetimer obsotimer qlimit reset retries route status ttl verbose\n  window",
+#else
+	"netrom subcmds: acktime bcnodes bcstifle connect choketime interface irtt kick\n  nodefilter nodetimer obsotimer qlimit reset retries route status ttl window",
+#endif
 		NULLCHAR
 } ;
 
@@ -134,12 +154,15 @@ doroutedump()
 	register struct nrroute_tab *rp ;
 	register int i, column ;
 	char buf[16] ;
+#ifdef ORIG_DISPLAY
 	char *cp ;
-	
+#endif
+
 	column = 1 ;
-	
+
 	for (i = 0 ; i < NRNUMCHAINS ; i++)
 		for (rp = nrroute_tab[i] ; rp != NULLNRRTAB ; rp = rp->next) {
+#ifdef ORIG_DISPLAY
 			strcpy(buf,rp->alias) ;
 			/* remove trailing spaces */
 			if ((cp = index(buf,' ')) == NULLCHAR)
@@ -152,11 +175,13 @@ doroutedump()
 				printf("\n") ;
 				column = 1 ;
 			}
+#else	/* I find it easier to scan if in straight columns */
+			pax25(buf,&rp->call);
+			printf("%-7s%-9s%s",rp->alias,buf,column++ % 4 ? "     " : "\n");
+#endif
 		}
-
-	if (column != 1)
-		printf("\n") ;
-
+/*	printf("%s",column % 4 == 1 ? "" : "\n");  Who cares? */
+	printf("\n");
 	return 0 ;
 }
 
@@ -233,7 +258,7 @@ int complain ;
 		else
 			*to++ = ' ' ;
 	}
-			
+
 	*to = '\0' ;
 	return 0 ;
 }
@@ -296,7 +321,7 @@ char *argv[] ;
 	/* format neighbor address string */
 	setpath(neighbor,&argv[5],naddr) ;
 
-	return nr_routeadd(alias,&dest,i,quality,neighbor,1,0) ;
+	return nr_routeadd(alias,&dest,(unsigned)i,quality,neighbor,1,0) ;
 }
 
 
@@ -333,10 +358,8 @@ char *argv[] ;
 	register struct interface *ifp ;
 	extern struct interface *ifaces ;
 
-	if (nr_interface == NULLIF) {
-		printf("Attach netrom iface first\n") ;
-		return 1 ;
-	}
+	if (nr_interface == NULLIF)
+		return -1;                 
 
 	if (nr_numiface >= NRNUMIFACE) {
 		printf("Only %d net/rom ifaces available\n",NRNUMIFACE) ;
@@ -398,11 +421,10 @@ char *argv[] ;
 	int i ;
 	if((i = find_iface(argv[1])) == -1)
 		return 1;
-
-	if(argv[2][0] == '0')
-		nrifaces[i].bcstifle = 0;
-	else
-		nrifaces[i].bcstifle = 1;
+	/* this command doesn't report state.  On error it will switch to
+	 * default, not stifled.  Only looks for "on".
+	 */
+	nrifaces[i].bcstifle = argv[2][1] == 'n' ? 1 : 0;
 	return 0;
 }
 
@@ -422,6 +444,7 @@ char *argv[];
 		return 0;
 	}
 	stop_timer(&nodetimer) ;	/* in case it's already running */
+	nodetimer.count = 0;	/* k34 */
 	nodetimer.func = (void (*)())donodetick;/* what to call on timeout */
 	nodetimer.arg = NULLCHAR;		/* dummy value */
 	nodetimer.start = atol(argv[1])*TICKSPERSEC;	/* set timer duration */
@@ -456,6 +479,7 @@ char *argv[];
 		return 0;
 	}
 	stop_timer(&obsotimer) ;	/* just in case it's already running */
+	obsotimer.count = 0;	/* k34 */
 	obsotimer.func = (void (*)())doobsotick;/* what to call on timeout */
 	obsotimer.arg = NULLCHAR;		/* dummy value */
 	obsotimer.start = atol(argv[1])*TICKSPERSEC;	/* set timer duration */
@@ -521,7 +545,6 @@ doobsotick()
 			}
 		}
 	}
-
 	start_timer(&obsotimer) ;
 }
 
@@ -535,7 +558,9 @@ static struct cmds nfcmds[] = {
 	"drop",	donfdrop,	3,
 		"netrom nodefilter drop <neighbor> <iface>",
 		"drop failed",
-	"mode",	donfmode,	0,	NULLCHAR,	NULLCHAR,
+	"mode",	donfmode,	0,
+		NULLCHAR,
+		"modes: none accept reject",
 	NULLCHAR,	NULLFP,	0,
 		"nodefilter subcommands: add drop mode",
 		NULLCHAR
@@ -562,23 +587,16 @@ char *argv[] ;
 static void
 donfdump()
 {
-	int i, column = 1 ;
+	int i;
 	struct nrnf_tab *fp ;
 	char buf[16] ;
 
 	for (i = 0 ; i < NRNUMCHAINS ; i++)
 		for (fp = nrnf_tab[i] ; fp != NULLNRNFTAB ; fp = fp->next) {
 			pax25(buf,&fp->neighbor) ;
-			printf("%-7s %-8s  ",
-					buf,nrifaces[fp->interface].interface->name) ;
-			if (column++ == 4) {
-				printf("\n") ;
-				column = 1 ;
-			}
+			printf("%-10s%s\n",	/* removed columns */
+					buf,nrifaces[fp->interface].interface->name);
 		}
-
-	if (column != 1)
-		printf("\n") ;
 }
 
 /* add an entry to the filter table */
@@ -613,7 +631,6 @@ char *argv[] ;
 	if (try_setcall("neighbor",&neighbor,argv[1]) == -1)
 		return -1 ;
 
-
 	if((i = find_iface(argv[2])) == -1)
 		return -1;
 
@@ -626,43 +643,17 @@ donfmode(argc,argv)
 int argc ;
 char *argv[] ;
 {
-	if (argc < 2) {
-		printf("filter mode is ") ;
-		switch (nr_nfmode) {
-			case NRNF_NOFILTER:
-				printf("none\n") ;
-				break ;
-			case NRNF_ACCEPT:
-				printf("accept\n") ;
-				break ;
-			case NRNF_REJECT:
-				printf("reject\n") ;
-				break ;
-			default:
-				printf("Goofey!\n") ;
-		}
-		return 0 ;
-	}
+	if (argc < 2)
+		printf("filter mode is %s\n",nr_nfmode == NRNF_NOFILTER ? "none" :
+			nr_nfmode == NRNF_ACCEPT ? "accept" : "reject");
+	else
+		if(argv[1][0] == 'n' || argv[1][0] == 'a' || argv[1][0] == 'r')
+			nr_nfmode = argv[1][0] == 'n' ? NRNF_NOFILTER :
+			argv[1][0] == 'a' ? NRNF_ACCEPT : NRNF_REJECT;
+		else
+			return -1;
 
-	switch (argv[1][0]) {
-		case 'n':
-		case 'N':
-			nr_nfmode = NRNF_NOFILTER ;
-			break ;
-		case 'a':
-		case 'A':
-			nr_nfmode = NRNF_ACCEPT ;
-			break ;
-		case 'r':
-		case 'R':
-			nr_nfmode = NRNF_REJECT ;
-			break ;
-		default:
-			printf("modes are: none accept reject\n") ;
-			return -1 ;
-	}
-
-	return 0 ;
+	return 0;
 }
 
 
@@ -674,50 +665,34 @@ char *argv[] ;
 {
 	int val ;
 
-	if (argc < 2) {
-		printf("%u\n", (unsigned)nr_ttl) ;
-		return 0 ;
-	}
-
-	val = atoi(argv[1]) ;
-
-	if (val < 0 || val > 255) {
-		printf("ttl must be between 0 and 255\n") ;
-		return 1 ;
-	}
-
-	nr_ttl = (unsigned char)val ;	/* K5JB */
+	if (argc < 2)
+		printf("%u\n", (unsigned)nr_ttl);
+	else	/* purely arbitrary, but reasonable limits, default is 16 */
+		if((val = atoi(argv[1])) < 2 || val > 20)
+			return -1;
+		else
+			nr_ttl = (unsigned char)val ;	/* K5JB */
 
 	return 0 ;
 }
 
+#ifdef NR_VERBOSE
 /* verbose route broadcast */
 static
 donrverbose(argc,argv)
 int argc ;
 char *argv[] ;
 {
-	if (argc < 2) {
-		printf("verbose is %s\n", nr_verbose ? "yes" : "no" ) ;
-		return 0 ;
-	}
-	
-	switch (argv[1][0]) {
-		case 'n':
-		case 'N':
-			nr_verbose = 0 ;
-			break ;
-		case 'y':
-		case 'Y':
-			nr_verbose = 1 ;
-			break ;
-		default:
-			printf("use: netrom verbose [yes|no]\n") ;
-			return -1 ;
-	}
-
-	return 0 ;
+	if(argc > 1)
+		if(argv[1][1] == 'f' || argv[1][1] == 'n')
+			nr_verbose = argv[1][1] == 'n' ? 1 : 0;
+		else
+			return -1;
+	else
+		printf("verbose is %s\n", nr_verbose ? "on" : "off" ) ;
+	return 0;
 }
+#endif
 
 /* Initiate a NET/ROM transport connection */
 static int
@@ -743,10 +718,8 @@ char *argv[] ;
 
 	/* Get a session descriptor */
 
-	if ((s = newsession()) == NULLSESSION) {
-		printf("Too many sessions\n") ;
-		return 1 ;
-	}
+	if ((s = newsession()) == NULLSESSION)
+		return -1;
 
 	if((s->name = malloc((unsigned)strlen(argv[1])+1)) != NULLCHAR)
 		strcpy(s->name,argv[1]);
@@ -768,12 +741,15 @@ int old,new;
 	struct session *s;
 	int cmdmode();
 	void freesession();
+	extern int noprompt;
 
 	s = (struct session *)cb->puser;
 
 	if(current != NULLSESSION && current->type == NRSESSION && current == s){
 		printf("%s",Nr4states[new]);
 		if(new == NR4STDISC) {
+			if(cb->dreason == NR4RRESET)	/* k35 */
+				noprompt = 1;
 			printf(" (%s)\n", Nr4reasons[cb->dreason]) ;
 			cmdmode();
 		} else
@@ -793,16 +769,11 @@ char *buf;
 int16 cnt;
 {
 	struct mbuf *bp;
-	register char *cp;
-	int16 size, i ;
-	char c;
+	int16 size;
+	void term_send();
 
 	if(current == NULLSESSION || current->type != NRSESSION)
 		return;	/* "can't happen" */
-
-	/* If recording is on, record outgoing stuff too */
-	if(current->record != NULLFILE)
-		fwrite(buf,1,cnt,current->record);
 
 	/* Parse it out, splitting at transport frame boundaries */
 
@@ -813,15 +784,7 @@ int16 cnt;
 		size = min(cnt, NR4MAXINFO) ;
 		if ((bp = alloc_mbuf(size)) == NULLBUF)
 			break ;
-		/* Copy keyboard buffer to output, stripping line feeds */
-		cp = bp->data ;
-		for (i = 0 ; i < size ; i++){
-			c = *buf++;
-			if(c != '\012'){
-				*cp++ = c;
-				bp->cnt++;
-			}
-		}
+		term_send(bp,buf,size,0);
 		cnt -= size ;
 		send_nr4(current->cb.nr4_cb,bp);
 	}
@@ -862,13 +825,14 @@ nr4_session(cb)
 struct nr4cb *cb ;
 {
 	struct session *s;
+#ifdef POLITE
+	struct session *tmpsession;
+#endif
 	char remote[10];
-/* To enable incoming telnet connects to print to screen instead of bit-bucket
- * enable AUTOSESSION.  Don't know of undesirable side effects yet - K5JB */
-#define AUTOSESSION
-#ifdef AUTOSESSION
 	extern struct session *current;
 	int go();
+#ifdef AX_MOTD
+	extern char ax_motd[];
 #endif
 
 	pax25(remote,&cb->user);
@@ -886,14 +850,22 @@ struct nr4cb *cb ;
 	cb->s_upcall = nr4_state;
 	cb->t_upcall = nr4_tx;
 	cb->puser = (char *)s;
-#if	(defined(MAC) || defined(AMIGA))
-	printf("\007Incoming NET/ROM session %lu from %s\n",s - sessions,remote);
-#else
 	printf("\007Incoming NET/ROM session %u from %s\n",s - sessions,remote);
-#endif
 	fflush(stdout);
-#ifdef AUTOSESSION
-	current = s;
+#ifdef POLITE
+	tmpsession = current; /* may need this later */
+#endif
+	current = s;    /* this may be only temporary if we are busy */
+#ifdef AX_MOTD
+	if(ax_motd[0])
+		nr4_parse(ax_motd,(int16)strlen(ax_motd));
+#endif
+#ifdef POLITE
+	if((s - sessions) == 0) /* if not busy, */
+		go();
+	else
+		current = tmpsession;	/* back to what we were doing */
+#else
 	go();
 #endif
 }
@@ -905,37 +877,22 @@ struct nr4cb *cb ;
 int16 cnt;
 {
 	register struct mbuf *bp;
-	char c;
+	int term_recv();
+#ifdef FLOW
+	extern int ttyflow;	/* k34 */
+#endif
 
-	/* Hold output if we're not the current session */
+	/* Hold output if we're not the current session or typing a line */
 	if(mode != CONV_MODE || current == NULLSESSION
+#ifdef FLOW
+		|| !ttyflow /* blocked by keyboard input */
+#endif
 	 || current->type != NRSESSION || current->cb.nr4_cb != cb)
 		return;
 
 	if((bp = recv_nr4(cb,cnt)) == NULLBUF)
 		return;
-
-	/* Display received characters, translating CR's to newlines, and to
-		CR/LF in MS-DOS record file */
-	while(bp != NULLBUF){
-		while(bp->cnt-- != 0){
-			c = *bp->data++;
-			if(c == '\015')
-				c = '\n';
-			putchar(c);
-			if(current->record){
-#ifdef MSDOS
-				if(c == '\n')
-					fputc('\r',current->record);
-#endif
-				fputc(c,current->record);
-			}
-		}
-		bp = free_mbuf(bp);
-	}
-	if(current->record)
-		fflush(current->record);
-	fflush(stdout);
+	term_recv(bp,current->record,0);
 }
 
 /* Handle transmit upcalls. Used only for file uploading */
@@ -949,6 +906,9 @@ int16 cnt;
 	register struct mbuf *bp;
 	int16 size;
 	int c;
+#ifdef SYS5
+	struct stat ss_buf;
+#endif
 
 	if((s = (struct session *)cb->puser) == NULLSESSION
 	 || s->upload == NULLFILE)
@@ -963,7 +923,7 @@ int16 cnt;
 		 * keyboard end-of-line sequences and the (unwritten)
 		 * AX.25 convention, which is carriage-return only
 		 */
-		 
+
 		while(bp->cnt < size){
 			if((c = getc(s->upload)) == EOF)
 				break;
@@ -973,16 +933,16 @@ int16 cnt;
 			if(c == '\012')
 				continue;
 #endif
-#if	(defined(UNIX) || defined(MAC) || defined(AMIGA))
+#ifdef UNIX
 			/* These give lf only so we convert */
 			if(c == '\012')
 				c = '\015';
 #endif
 			*cp++ = c;
 			bp->cnt++;
-		}	
+		}
 		cnt -= bp->cnt;
-		
+
 		if (bp->cnt != 0)	/* might happen with a newline at EOF */
 			send_nr4(cb,bp);
 		else
@@ -996,15 +956,43 @@ int16 cnt;
 #if defined(_OSK) && !defined(_UCC)
 		tmpclose(s->upload);
 #else
-#ifdef UNIX
-		if(pclose(s->upload) < 0)	/* only needed when Unix uses a pipe  */
+#ifdef SYS5
+	/* Note that this area is VERY Unix system-dependent.  See note in
+	 * ax25cmd.c for alternate method if your fstat can't detect a pipe.
+	 * Note also that I included ionode.h, not types.h.
+	 */
+		if(fstat(fileno(s->upload),&ss_buf) < 0)
+			perror("nr4_tx");
+#ifdef COH386
+		if ((ss_buf.st_mode & S_IFPIP) == S_IFPIP)
+#else
+		if((ss_buf.st_mode & IFIFO) == IFIFO)
 #endif
+			pclose(s->upload);  /* close pipe from dir */
+		else
+#endif	/* SYS5 */
 		fclose(s->upload);
-#endif
+#endif	/* OSK */
 		s->upload = NULLFILE;
 		free(s->ufile);
 		s->ufile = NULLCHAR;
 	}
+}
+
+struct nr4cb *
+simple_getnr(arg)
+int arg;
+{
+	int i,j;
+	struct nr4cb *cb;
+	
+	for(i=0,j=1; i < NR4MAXCIRC; i++){
+		if((cb = Nr4circuits[i].ccb) == NULLNR4CB)
+			continue ;
+		if(j++ == arg)
+			return cb;
+	}
+	return NULLNR4CB;
 }
 
 /* Reset a net/rom connection abruptly */
@@ -1015,14 +1003,12 @@ int argc;
 char *argv[];
 {
 	struct nr4cb *cb ;
-	extern char notval[];
 
-	cb = (struct nr4cb *)htol(argv[1]);
-	if(!nr4valcb(cb)){
-		printf(notval);
-		return 1;
-	}
-	reset_nr4(cb);
+	if((cb = simple_getnr(atoi(argv[1]))) == NULLNR4CB)
+	/* don't think we need to test: nr4valcb(cb) */
+		return -1;
+	else
+		reset_nr4(cb);
 	return 0;
 }
 
@@ -1034,15 +1020,10 @@ int argc;
 char *argv[];
 {
 	struct nr4cb *cb ;
-	extern char notval[];
 
-	cb = (struct nr4cb *)htol(argv[1]);
-
-	if (kick_nr4(cb) == -1) {
-		printf(notval);
-		return 1;
-	} else
-		return 0;
+	if((cb = simple_getnr(atoi(argv[1]))) == NULLNR4CB || kick_nr4(cb) == -1)
+		return -1;
+	return 0;
 }
 
 /* netrom transport ACK delay timer */
@@ -1054,14 +1035,13 @@ char *argv[] ;
 {
 	long val ;
 
-	if (argc < 2) {
-		printf("%lu\n", Nr4acktime) ;
-		return 0 ;
-	}
-
-	val = atol(argv[1]) ;
-
-	Nr4acktime = val ;
+	if (argc < 2)
+		printf("%lu\n", Nr4acktime);
+	else	/* note that 3000 is default */
+		if((val = atol(argv[1])) < 2000l)	/* could constrain this further */
+			return -1;
+		else
+			Nr4acktime = val ;
 
 	return 0 ;
 }
@@ -1075,15 +1055,13 @@ char *argv[] ;
 {
 	long val ;
 
-	if (argc < 2) {
-		printf("%lu\n", Nr4choketime) ;
-		return 0 ;
-	}
-
-	val = atol(argv[1]) ;
-
-	Nr4choketime = val ;
-
+	if(argc < 2)
+		printf("%lu\n", Nr4choketime);
+	else	/* 180,000 is default here */
+		if((val = atol(argv[1])) < 60000l)
+			return -1;
+		else
+			Nr4choketime = val;
 	return 0 ;
 }
 
@@ -1096,15 +1074,13 @@ char *argv[] ;
 {
 	long val ;
 
-	if (argc < 2) {
-		printf("%lu\n", Nr4irtt) ;
-		return 0 ;
-	}
-
-	val = atol(argv[1]) ;
-
-	Nr4irtt = val ;
-
+	if (argc < 2)
+		printf("%lu\n", Nr4irtt);
+	else
+		if((val = atol(argv[1])) < 15000l)	/* arbitrary */
+			return -1;
+		else
+			Nr4irtt = val ;
 	return 0 ;
 }
 
@@ -1118,20 +1094,13 @@ char *argv[] ;
 {
 	unsigned val ;
 
-	if (argc < 2) {
-		printf("%u\n", Nr4qlimit) ;
-		return 0 ;
-	}
-
-	val = atoi(argv[1]) ;
-
-	if (val == 0) {
-		printf("You cannot set the queue limit to 0\n") ;
-		return 1 ;
-	}
-	
-	Nr4qlimit = val ;
-
+	if (argc < 2)
+		printf("%u\n", Nr4qlimit);
+	else
+		if((val = atoi(argv[1])) < 128)	/* arbitrary, little over one line */
+			return -1;
+		else
+			Nr4qlimit = val;
 	return 0 ;
 }
 
@@ -1145,21 +1114,13 @@ char *argv[] ;
 {
 	unsigned val ;
 
-	if (argc < 2) {
-		printf("%u\n", Nr4window) ;
-		return 0 ;
-	}
-
-	val = atoi(argv[1]) ;
-
-	if (val == 0 || val > NR4MAXWIN) {
-		printf("Illegal NET/ROM window size.  Range is [1,%d]\n",
-			   NR4MAXWIN) ;
-		return 1 ;
-	}
-	
-	Nr4window = val ;
-
+	if(argc < 2)
+		printf("%u\n", Nr4window);
+	else
+		if((val = atoi(argv[1])) < 1 || val > NR4MAXWIN)
+			return -1;
+		else
+			Nr4window = val ;
 	return 0 ;
 }
 
@@ -1174,19 +1135,13 @@ char *argv[] ;
 {
 	unsigned val ;
 
-	if (argc < 2) {
-		printf("%u\n", Nr4retries) ;
-		return 0 ;
-	}
-
-	val = atoi(argv[1]) ;
-
-	if (val == 0) {
-		printf("Impatient, aren't we?  Zero retries not possible\n") ;
-		return 1 ;
-	}
-	
-	Nr4retries = val ;
+	if(argc < 2)
+		printf("%u\n", Nr4retries);
+	else
+		if((val = atoi(argv[1])) < 1 || val > 16)	/* arbitrary */
+			return -1;
+		else
+			Nr4retries = val ;
 
 	return 0 ;
 }
@@ -1201,32 +1156,28 @@ char *argv[] ;
 	int i ;
 	struct nr4cb *cb ;
 	char luser[10], ruser[10], node[10] ;
-	extern char notval[] ;
 	void donrdump() ;
-	
-	if (argc < 2) {
-		printf("     &CB Snd-W Snd-Q Rcv-Q     LUser      RUser @Node     State\n");
-		for (i = 0 ; i < NR4MAXCIRC ; i++) {
-			if ((cb = Nr4circuits[i].ccb) == NULLNR4CB)
-				continue ;
+
+	if (argc < 2){
+		printf(" CB# Snd-W Snd-Q Rcv-Q     LUser      RUser @Node     State\n");
+		for (i=1;;i++){
+			if((cb = simple_getnr(i)) == NULLNR4CB)
+				break;
 			pax25(luser,&cb->luser) ;
 			pax25(ruser,&cb->user) ;
 			pax25(node,&cb->node) ;
-			printf("%8lx   %3d %5d %5d %9s  %9s %-9s %s\n",
-				   (long)cb, cb->nbuffered, len_q(cb->txq),
+			printf(" %2d%7d%6d%6d%10s%11s %-9s %s\n",
+				   i, cb->nbuffered, len_q(cb->txq),
 				   len_mbuf(cb->rxq), luser, ruser, node,
 				   Nr4states[cb->state]) ;
 		}
-		return 0 ;
+	}else{
+		if((cb = simple_getnr(atoi(argv[1]))) == NULLNR4CB)
+		/* don't think we need to check: nr4valcb(cb) */
+			return -1;
+		else
+			donrdump(cb);
 	}
-
-	cb = (struct nr4cb *)htol(argv[1]) ;
-	if (!nr4valcb(cb)) {
-		printf(notval) ;
-		return 1 ;
-	}
-
-	donrdump(cb) ;
 	return 0 ;
 }
 
@@ -1302,7 +1253,7 @@ struct nr4cb *cb ;
 			b = &cb->txbufs[seq % cb->window] ;
 			t = &b->tretry ;
 
-			printf("            %3u   %3d  %5d  %lu/%lu\n",
+			printf("%15u%6d%7d  %lu/%lu\n",
 				   seq, len_mbuf(b->data), b->retries + 1,
 				   (t->start - t->count) * MSPTICK, t->start * MSPTICK) ;
 		}

@@ -20,13 +20,19 @@ struct timer {
 };
 #define	NULLTIMER	(struct timer *)0
 #define	MAX_TIME	(int32)4294967295L	/* Max long integer */
+
+/* note that Unix defines MSPTICK with Makefile */
 #ifndef MSPTICK
 #if	ATARI_ST && (!MWC)
 #define	MSPTICK		100		/* Milliseconds per tick */
 #else
-#define	MSPTICK		55		/* Milliseconds per tick */
+/* for only a 10% error you can make all time reports pretty by using
+ * 50 instead of 55 here
+ */
+#define	MSPTICK		55		/* (approx) Milliseconds per tick */
+#endif /* ATARI, etc */
 #endif
-#endif
+
 /* Useful user macros that hide the timer structure internals */
 #define	set_timer(t,x)	(((t)->start) = (x)/MSPTICK)
 #define	dur_timer(t)	((t)->start)

@@ -7,7 +7,7 @@
 #define	TCP_PTCL	6	/* Transmission Control Protocol */
 #define	UDP_PTCL	17	/* User Datagram Protocol */
 
-#define	MAXTTL		255	/* Maximum possible IP time-to-live value */
+#define	MAXTTL	16	/* Default ip_ttl (time to live) */
 
 /* DoD-style precedences */
 #define	ROUTINE		0x00

@@ -17,13 +17,20 @@
 #include "cmdparse.h"
 #include "session.h"
 #include "nr4.h"
+#include "arp.h"
 
 #ifdef AX25_HEARD
 #include <time.h>
 #include "heard.h"
 #endif
 
-long atol();	/* K5JB to fix t3 a little bit */
+long htol(),atol();	/* K5JB to fix t3 a little bit */
+#ifdef SYS5
+#include <sys/inode.h>	/* Need flag to detect pipe fd */
+#include <sys/stat.h>
+#endif
+char badcall[] = "Call?";
+extern char notval[];
 
 char *ax25states[] = {
 	"Disconnected",
@@ -35,10 +42,14 @@ char *ax25states[] = {
 };
 
 int domycall(),dodigipeat(),doaxstat(),dot1(),dot2(),dot3(),dot4(),
-	domaxframe(),doaxwindow(),dopaclen(),don2(),doaxreset(),dopthresh();
+	domaxframe(),doaxwindow(),dopaclen(),don2(),doaxreset(),dopthresh(),
+	doaxvers();
 #if defined(SEGMENT) && defined(SEG_CMD)
 int dosegment();
 #endif
+
+extern char ouraxvers;
+
 #ifdef AX25_HEARD
 int doheard();
 #endif
@@ -47,25 +58,29 @@ int doheard();
 int dombxcall();
 extern struct ax25_addr bbscall;
 #endif
+#ifdef VCIP_SSID
+extern struct ax25_addr ip_call;
+int doipcall();
+#endif
 
-void pax25();
+void pax25(),send_ax25(),freesession();
 int setcall();
 
 static struct cmds axcmds[] = {
 	"digipeat",	dodigipeat,	0, NULLCHAR,	NULLCHAR,
 #ifdef AX25_HEARD	/* heard stuff */
-	"heard",		doheard,		0,	NULLCHAR,	NULLCHAR,
+	"heard",		doheard,		0,	NULLCHAR, "ax25 heard [on|off|clear]",
 #endif
 	"maxframe",	domaxframe,	0, NULLCHAR,	NULLCHAR,
-	"mycall",	domycall,	0, NULLCHAR,	NULLCHAR,
+	"mycall",	domycall,	0, NULLCHAR,	badcall,
 #ifdef SID2
-	"mboxcall",	dombxcall,	0, NULLCHAR,	NULLCHAR,
+	"mboxcall",	dombxcall,	0, NULLCHAR,	badcall,
 #endif
 	"paclen",	dopaclen,	0, NULLCHAR,	NULLCHAR,
 	"pthresh",	dopthresh,	0, NULLCHAR,	NULLCHAR,
-	"reset",	doaxreset,	2, "ax25 reset <axcb>", NULLCHAR,
+	"reset",	doaxreset,	2, "ax25 reset <cb#>", notval,
 	"retry",	don2,		0, NULLCHAR,	NULLCHAR,
-	"status",	doaxstat,	0, NULLCHAR,	NULLCHAR,
+	"status",	doaxstat,	0, NULLCHAR, notval,
 #if defined(SEGMENT) && defined(SEG_CMD)	/* want status to come up with "s" */
 	"segment",	dosegment,	0, NULLCHAR,	NULLCHAR,
 #endif
@@ -73,39 +88,15 @@ static struct cmds axcmds[] = {
 	"t2",		dot2,		0, NULLCHAR,	NULLCHAR,
 	"t3",		dot3,		0, NULLCHAR,	NULLCHAR,
 	"t4",		dot4,		0, NULLCHAR,	NULLCHAR,
+#ifdef VCIP_SSID
+	"vcipcall",	doipcall,	0, NULLCHAR,	badcall,
+#endif
+	"vers",	doaxvers,0,	NULLCHAR,	NULLCHAR,
 	"window",	doaxwindow,	0, NULLCHAR,	NULLCHAR,
 
-#if defined(SEGMENT) && defined(SEG_CMD)
-#ifdef SID2
-#ifdef AX25_HEARD
-	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat heard maxframe mboxcall mycall paclen pthresh reset\n   retry segment status t1 t2 t3 t4 window", NULLCHAR
-#else
-	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat maxframe mboxcall mycall paclen pthresh reset retry\n   segment status t1 t2 t3 t4 window",	NULLCHAR
-#endif /* AX25_HEARD */
-#else
-#ifdef AX25_HEARD
-	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat heard maxframe mycall paclen pthresh reset retry\n   segment status t1 t2 t3 t4 window", NULLCHAR
-#else
-	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat maxframe mycall paclen pthresh reset retry\n   segment status t1 t2 t3 t4 window",	NULLCHAR
-#endif /* AX25_HEARD */
-#endif
-#else /* SEGMENT */
-#ifdef SID2
-#ifdef AX25_HEARD
-	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat heard maxframe mboxcall mycall paclen pthresh reset\n   retry status t1 t2 t3 t4 window", NULLCHAR
-#else
-	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat maxframe mboxcall mycall paclen pthresh reset retry\n   status t1 t2 t3 t4 window",	NULLCHAR
-#endif /* AX25_HEARD */
-#else
-#ifdef AX25_HEARD
-	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat heard maxframe mycall paclen pthresh reset retry\n   status t1 t2 t3 t4 window", NULLCHAR
-#else
-	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat maxframe mycall paclen pthresh reset retry\n   status t1 t2 t3 t4 window",	NULLCHAR
-#endif /* AX25_HEARD */
-#endif
-#endif /* SEGMENT */
-
+	NULLCHAR,	NULLFP,0, AXCMDDISP, NULLCHAR	/* AXCMDLIST in options.h */
 };
+
 /* Multiplexer for top-level ax25 command */
 doax25(argc,argv)
 int argc;
@@ -115,23 +106,42 @@ char *argv[];
 	return subcmd(axcmds,argc,argv);
 }
 
+/* give this a number from 1 to ..., this will return a axp if there is one */
+struct ax25_cb *
+simple_getax(arg)
+int arg;
+{
+	int i,j;
+	struct ax25_cb *axp;
+	for(i=0,j=1;i<NHASH;i++)
+		for(axp=ax25_cb[i];axp != NULLAX25;axp = axp->next)
+			if(j++ == arg)
+				return axp;
+	return NULLAX25;
+}
+
 static
 doaxreset(argc,argv)
 int argc;
 char *argv[];
 {
+	int atoi();
 	struct ax25_cb *axp;
-	extern char notval[];
 	int ax25val(),reset_ax25();
+	extern int noprompt;
 
-	axp = (struct ax25_cb *)htol(argv[1]);
-	if(!ax25val(axp)){
-		printf(notval);
-		return 1;
+
+	if((axp = simple_getax(atoi(argv[1]))) == NULLAX25)
+/*	 || !ax25val(axp)	I doubt we need this test */
+		return -1;
+	else{
+		noprompt = 1;	/* k35 */
+		reset_ax25(axp);
 	}
-	reset_ax25(axp);
 	return 0;
 }
+
+
 
 /* Display AX.25 link level control blocks */
 static
@@ -147,26 +157,26 @@ char *argv[];
 	void dumpstat();
 
 	if(argc < 2){
-		printf("    &AXB IF   Snd-Q   Rcv-Q   Remote    State\n");
-		for(i=0;i<NHASH;i++){
-			for(axp = ax25_cb[i];axp != NULLAX25; axp = axp->next){
-				pax25(tmp,&axp->addr.dest);
-				printf("%8lx %-5s%-8d%-8d%-10s%s\n",
-					(long)axp,axp->interface->name,
-					len_q(axp->txq),len_mbuf(axp->rxq),
-					tmp,ax25states[axp->state]);
-			}
+		printf("AXB# IF   Snd-Q  Rcv-Q  Local     Remote    V State\n");
+		for(i=1;;i++){
+			if((axp = simple_getax(i)) == NULLAX25)
+				break;
+			pax25(tmp,&axp->addr.source);
+			printf(" %3d %-5s%-7d%-7d%-10s",i,axp->interface->name,
+				len_q(axp->txq),len_mbuf(axp->rxq),tmp);
+			pax25(tmp,&axp->addr.dest);
+			printf("%-10s%-2d%s\n",tmp,axp->proto,ax25states[axp->state]);
 		}
 		return 0;
 	}
-	axp = (struct ax25_cb *)htol(argv[1]);
-	if(!ax25val(axp)){
-		printf(notval);
-		return 1;
-	}
-	dumpstat(axp);
+	if((axp = simple_getax(atoi(argv[1]))) == NULLAX25)
+		/* || !ax25val(axp) try without this */
+		return -1;
+	else
+		dumpstat(axp);
 	return 0;
 }
+
 /* Dump one control block */
 static void
 dumpstat(axp)
@@ -179,13 +189,11 @@ register struct ax25_cb *axp;
 		return;
 	printf("    &AXB IF   Remote   RB N(S) N(R) Unack V Retry State\n");
 	pax25(tmp,&axp->addr.dest);
-	printf("%8lx %-5s%-9s",(long)axp,axp->interface->name,tmp);
-	putchar(axp->rejsent ? 'R' : ' ');
-	putchar(axp->remotebusy ? 'B' : ' ');
-	printf(" %-4d %-4d",axp->vs,axp->vr);
-	printf(" %02u/%02u %u",axp->unack,axp->maxframe,axp->proto);
-	printf(" %02u/%02u",axp->retries,axp->n2);
-	printf(" %s\n",ax25states[axp->state]);
+	printf("%8lx %-5s%-9s%c%c",(long)axp,axp->interface->name,tmp,
+		axp->rejsent ? 'R' : ' ',axp->remotebusy ? 'B' : ' ');
+	printf(" %-4d %-4d %02u/%02u %u %02u/%02u %s\n",
+			axp->vs,axp->vr,axp->unack,axp->maxframe,axp->proto,
+			axp->retries,axp->n2,ax25states[axp->state]);
 
 	printf("T1: ");
 	if(run_timer(&axp->t1))
@@ -265,6 +273,43 @@ char *argv[];
 }
 #endif
 
+#ifdef VCIP_SSID
+/* Display or change our AX.25 IP only Call */
+static
+doipcall(argc,argv)
+int argc;
+char *argv[];
+{
+	char buf[15];
+	int psax25(), setpath(), arp_init();
+
+	if(argc < 2){
+		pax25(buf,&ip_call);
+		printf("%s\n",buf);
+		return 0;
+	}
+
+	if(setcall(&ip_call,argv[1]) == -1)
+		return -1;
+	bbscall.ssid |= E;
+	return 0;
+
+}
+#endif
+
+/* Display or change our default AX.25 protocol version */
+static
+doaxvers(argc,argv)
+int argc;
+char *argv[];
+{
+	if(argc == 2)
+		ouraxvers = argv[1][1] == '2' ? V2 : V1;	/* see my bias? */
+	else
+		printf("AX.25 version is %s\n",ouraxvers == V1 ? "V1" : "V2");
+	return 0;
+}
+
 #if defined(SEGMENT) && defined(SEG_CMD)
 extern int rx_segment;
 
@@ -275,11 +320,9 @@ int argc;
 char *argv[];
 {
 	if(argc == 2)
-		if(strcmp(argv[1],"on") == 0)
-			rx_segment = 1;
-		else
-			rx_segment = 0;
-	printf("AX.25 RX segmentation (on/off) is %s\n",rx_segment ? "ON" : "OFF");
+		rx_segment = argv[1][1] == 'n' ? 1 : 0;
+	else
+		printf("AX.25 RX segmentation is %s\n",rx_segment ? "on" : "off");
 	return 0;
 }
 #endif
@@ -292,15 +335,18 @@ char *argv[];
 {
 	extern int digipeat;
 
-	if(argc == 1) {
+	if(argc == 1)
 		printf("digipeat %s\n",digipeat ? "on" : "off");
-	} else {
-		if(strcmp(argv[1],"on") == 0)
-			digipeat = 1;
-		else
-			digipeat = 0;
-	}
+	else
+		digipeat = argv[1][1] == 'n' ? 1 : 0;	/* k34 */
 }
+
+/* Setting t1 or t2 too short causes real subtile problems.  Setting
+ * t3 or t4 too small causes the user to get what he deserves - K5JB
+ * (I guess that applys to the other parameters too)
+ */
+#define MIN_T1_TIMER 5000	/* milliseconds -- even this is kinda short */
+#define MIN_T2_TIMER 1000
 
 /* Set retransmission timer */
 static
@@ -313,7 +359,9 @@ char *argv[];
 	if(argc == 1) {
 		printf("T1 %lu ms\n",(long)t1init * MSPTICK);
 	} else {
-		t1init = atol(argv[1]) / MSPTICK;
+		if((t1init = atol(argv[1])) < MIN_T1_TIMER)
+			t1init = MIN_T1_TIMER;
+		t1init /= MSPTICK;
 	}
 }
 
@@ -328,7 +376,9 @@ char *argv[];
 	if(argc == 1) {
 		printf("T2 %lu ms\n",(long)t2init * MSPTICK);
 	} else {
-		t2init = atol(argv[1]) / MSPTICK;
+		if((t2init = atol(argv[1])) < MIN_T2_TIMER)
+			t2init = MIN_T2_TIMER;
+		t2init /= MSPTICK;
 	}
 }
 
@@ -371,11 +421,12 @@ char *argv[];
 	extern int16 n2;
 	int atoi();
 
-	if(argc == 1) {
+	if(argc == 1)
 		printf("Retry %u\n",n2);
-	} else {
-		n2 = atoi(argv[1]);
-	}
+	else
+		if(!((n2 = atoi(argv[1])) > 0 && n2 < 16))
+			n2 = 10;
+	return 0;
 }
 
 /* Set maximum number of frames that will be allowed in flight */
@@ -386,11 +437,10 @@ char *argv[];
 {
 	extern int16 maxframe;
 
-	if(argc == 1) {
+	if(argc == 1)
 		printf("Maxframe %u\n",maxframe);
-	} else {
+	else
 		maxframe = atoi(argv[1]);
-	}
 }
 
 /* Set maximum length of I-frame data field */
@@ -401,12 +451,12 @@ char *argv[];
 {
 	extern int16 paclen;
 
-	if(argc == 1) {
+	if(argc == 1)
 		printf("Paclen %u\n",paclen);
-	} else {
+	else
 		paclen = atoi(argv[1]);
-	}
 }
+
 /* Set size of I-frame above which polls will be sent after a timeout */
 static
 dopthresh(argc,argv)
@@ -415,11 +465,10 @@ char *argv[];
 {
 	extern int16 pthresh;
 
-	if(argc == 1) {
+	if(argc == 1)
 		printf("Pthresh %u\n",pthresh);
-	} else {
+	else
 		pthresh = atoi(argv[1]);
-	}
 }
 
 /* Set high water mark on receive queue that triggers RNR */
@@ -430,26 +479,27 @@ char *argv[];
 {
 	extern int16 axwindow;
 
-	if(argc == 1) {
+	if(argc == 1)
 		printf("Axwindow %u\n",axwindow);
-	} else {
+	else
 		axwindow = atoi(argv[1]);
-	}
 }
+
 /* End of ax25 subcommands */
 
 /* Initiate interactive AX.25 connect to remote station */
+int
 doconnect(argc,argv)
 int argc;
 char *argv[];
- {
-	void ax_rx(),ax_tx(),ax_state();
+{
+	void ax_rx(),ax_tx(),ax_state(),free();
 	int ax_parse();
 	struct ax25_addr dest;
 	struct ax25 addr;
 	struct ax25_cb *open_ax25();
 	struct interface *ifp;
-	struct session *s;
+	struct session *s,*ps;	/* k34 added prior session in case of bad call */
 	extern int16 axwindow;
 	int i, addreq(),go();
 
@@ -466,17 +516,13 @@ char *argv[];
 		printf("Interface %s unknown\n",argv[1]);
 		return 1;
 	}
-	setcall(&dest,argv[2]);
+	if(setcall(&dest,argv[2]))	/* k34 */
+		return -1;
 	/* See if a session already exists */
 	for(s = sessions; s < &sessions[nsessions]; s++){
 		if(s->type == AX25TNC
 		 && addreq(&s->cb.ax25_cb->addr.dest,&dest)){
-#if	(defined(MAC) || defined(AMIGA))
-			printf("Session %lu to %s already exists\n",
-#else
-			printf("Session %u to %s already exists\n",
-#endif
-				s - sessions,argv[2]);
+			printf("Session %u to %s already exists\n",s - sessions,argv[2]);
 			return 1;
 		}
 	}
@@ -489,11 +535,16 @@ char *argv[];
 		strcpy(s->name,argv[2]);
 	s->type = AX25TNC;
 	s->parse = ax_parse;
+	ps = current;	/* save ps in case a call is bad k34 */
 	current = s;
 	ASSIGN(addr.source,mycall);
-	setcall(&addr.dest,argv[2]);
+	ASSIGN(addr.dest,dest);
 	for(i=3; i < argc; i++)
-		setcall(&addr.digis[i-3],argv[i]);
+		if(setcall(&addr.digis[i-3],argv[i])){	/* k34 */
+			current = ps;
+			freesession(s);	/* will free name */
+			return -1;
+		}
 
 	addr.ndigis = i - 3;
 	s->cb.ax25_cb = open_ax25(&addr,axwindow,ax_rx,ax_tx,ax_state,ifp,(char *)s);
@@ -510,7 +561,6 @@ int old,new;
 {
 	struct session *s;
 	int cmdmode();
-	void freesession();
 
 	s = (struct session *)axp->user;
 
@@ -518,15 +568,16 @@ int old,new;
 		/* Don't print transitions between CONNECTED and RECOVERY */
 		if(new != RECOVERY && !(old == RECOVERY && new == CONNECTED))
 			printf("%s\n",ax25states[new]);
-		if(new == DISCONNECTED)
+		fflush(stdout);	/* moved up - k35 */
+		if(new == DISCONNECTED || new == DISCPENDING)
 			cmdmode();
-		fflush(stdout);
 	}
 	if(new == DISCONNECTED){
 		axp->user = NULLCHAR;
 		freesession(s);
 	}
 }
+
 /* Handle typed characters on AX.25 connection */
 int
 ax_parse(buf,cnt)
@@ -534,34 +585,20 @@ char *buf;
 int16 cnt;
 {
 	struct mbuf *bp;
-	register char *cp;
-	char c;
-	void send_ax25();
+	void term_send();
 
 	if(current == NULLSESSION || current->type != AX25TNC)
 		return;	/* "can't happen" */
-
-	/* If recording is on, record outgoing stuff too */
-	if(current->record != NULLFILE)
-		fwrite(buf,1,cnt,current->record);
 
 	/* Allocate buffer and start it with the PID */
 	bp = alloc_mbuf(cnt+1);
 	*bp->data = PID_NO_L3;
 	bp->cnt++;
 
-	/* Copy keyboard buffer to output, stripping line feeds */
-/* could be portability problems here -- test with non UNIX or MS-DOS - K5JB */
-	cp = bp->data + 1;
-	while(cnt-- != 0){
-		c = *buf++;
-		if(c != '\012'){
-			*cp++ = c;
-			bp->cnt++;
-		}
-	}
+	term_send(bp,buf,cnt,1);
 	send_ax25(current->cb.ax25_cb,bp);
 }
+
 /* Handle new incoming terminal sessions
  * This is the default receive upcall function, used when
  * someone else connects to us
@@ -587,20 +624,20 @@ int16 cnt;
 
 /* This function sets up an ax25 chat session */
 void
-ax_session(axp,cnt)
+ax_session(axp,unused)
 register struct ax25_cb *axp ;
-int16 cnt ;
+int16 unused;
 {
 	struct session *s;
+#ifdef POLITE
+	struct session *tmpsession;
+#endif
 	char remote[10];
 	void ax_rx(),ax_state(),ax_tx();
-	int disc_ax25();
-/* To enable incoming ax.25 connects to print to screen instead of bit-bucket
- * enable AUTOSESSION.  Don't know of undesirable side effects yet - K5JB */
-#define AUTOSESSION
-#ifdef AUTOSESSION
+	int disc_ax25(),go();
 	extern struct session *current;
-	int go();
+#ifdef AX_MOTD
+	extern char ax_motd[];
 #endif
 
 	pax25(remote,&axp->addr.dest);
@@ -618,15 +655,23 @@ int16 cnt ;
 	axp->s_upcall = ax_state;
 	axp->t_upcall = ax_tx;
 	axp->user = (char *)s;
-#if	(defined(MAC) || defined(AMIGA))
-	printf("\007Incoming AX25 session %lu from %s\n",s - sessions,remote);
-#else
 	printf("\007Incoming AX25 session %u from %s\n",s - sessions,remote);
-#endif
 	fflush(stdout);
-#ifdef AUTOSESSION
-		current = s;
+#ifdef POLITE
+	tmpsession = current; /* may need this later */
+#endif
+	current = s;	/* this may be only temporary if we are busy */
+#ifdef AX_MOTD
+	if(ax_motd[0])
+		ax_parse(ax_motd,strlen(ax_motd));
+#endif
+#ifdef POLITE
+	if((s - sessions) == 0)	/* will prevent us from doing self test */
 		go();
+	else
+		current = tmpsession;
+#else
+	go();
 #endif
 }
 
@@ -638,7 +683,7 @@ int16 cnt;
 {
 	register struct mbuf *bp;
 	struct mbuf *recv_ax25();
-	char c;
+	int term_recv();
 #ifdef	FLOW
 	extern int ttyflow;	/* added - K5JB */
 #endif
@@ -653,29 +698,9 @@ int16 cnt;
 
 	if((bp = recv_ax25(axp,cnt)) == NULLBUF)
 		return;
-
-	/* Display received characters, translating CR's to newlines for screen
-	and CR/LF for MS-DOS If recording */
-	while(bp != NULLBUF){
-		while(bp->cnt-- != 0){
-			c = *bp->data++;
-			if(c == '\015')
-				c = '\n';
-			putchar(c);
-			if(current->record){
-#ifdef MSDOS
-				if(c == '\n')
-					fputc('\r',current->record);
-#endif
-				fputc(c,current->record);
-			}
-		}
-		bp = free_mbuf(bp);
-	}
-	if(current->record)
-		fflush(current->record);
-	fflush(stdout);
+	(void)term_recv(bp,current->record,0);
 }
+
 /* Handle transmit upcalls. Used only for file uploading */
 void
 ax_tx(axp,cnt)
@@ -688,6 +713,9 @@ int16 cnt;
 	int16 size;
 	int c;
 	void free();
+#ifdef SYS5
+	struct stat ss_buf;
+#endif
 
 	if((s = (struct session *)axp->user) == NULLSESSION
 	 || s->upload == NULLFILE)
@@ -717,7 +745,7 @@ int16 cnt;
 				continue;
 #endif
 
-#if	(defined(UNIX) || defined(MAC) || defined(AMIGA))
+#ifdef UNIX
 			/* These give lf only */
 			if(c == '\012')
 				c = '\015';
@@ -735,15 +763,27 @@ int16 cnt;
 		cnt -= bp->cnt;
 	}
 	if(cnt != 0){
-		/* Error or end-of-file */
 #if defined(_OSK) && !defined(_UCC)
 		tmpclose(s->upload);
-#else		
-#ifdef UNIX
-		if(pclose(s->upload) < 0)	/* only needed when Unix uses a pipe  */
+#else
+	/* Note that this area is VERY Unix system-dependent.  If you aren't
+    * using the shell escape, you can just do pclose(), and if err, do
+	 * fclose, but this method messes up the forked child doing shell.
+	 * Note also that I included ionode.h, not types.h.
+	 */
+#ifdef SYS5
+		if(fstat(fileno(s->upload),&ss_buf) < 0)
+			perror("ax_tx");
+#ifdef COH386
+		if ((ss_buf.st_mode & S_IFPIP) == S_IFPIP)
+#else
+		if((ss_buf.st_mode & IFIFO) == IFIFO)
 #endif
-		fclose(s->upload);
+			pclose(s->upload);  /* close pipe from dir */
+		else
 #endif
+			fclose(s->upload);
+#endif	/* _OSK */
 		s->upload = NULLFILE;
 		free(s->ufile);
 		s->ufile = NULLCHAR;
@@ -841,22 +881,22 @@ char *argv[];
 			free(pp);
 		}else
 			printf("not enabled\n");
-	}else if (strcmp(argv[1],"clear") == 0) {
+	}else if(argv[1][1] == 'l'){	/* ell */
 		heard.cnt = 0;
 		heard.first = -1;
-	} else if (strcmp(argv[1],"on") == 0) {
+	} else if(argv[1][1] == 'n'){
 		if (!heard.enabled) {
 			heard.enabled = 1;
 			heard.cnt = 0;
 			heard.first = -1;
 		}
-	} else if (strcmp(argv[1],"off") == 0) {
+	} else if(argv[1][1] == 'f'){
 		heard.enabled = 0;
 	} else
-		printf("Usage: ax25 heard [on|off|clear]\n");
+		return -1;
+	return 0;
 }
 /* heard stuff */
 
 #endif /* AX25_HEARD */
-
 #endif	/* AX25 */

@@ -3,7 +3,8 @@
 # Only the SCO Unix 3.2 (native and GNU compilers), AT&T Sys V, v3.2
 # have been used to compile with this Makefile recently.  See Makefile.coh
 # for Coherent.  All common option macros have been defined in config.h
-# options.h, and unixopt.h. -- Joe, K5JB
+# options.h, and unixopt.h.  Make sure you get MSPTICK correct for your
+# system.  See the file msptick.unix for more information.  Joe, K5JB
 #
 
 SHELL = /bin/sh
@@ -27,15 +28,9 @@ CURSES=-lcurses
 #
 ####################################################################
 #
-# GNU v 1.39 C compiler on SCO Unix 3.2,  (80386) with shared libraries.
+# GNU v 2.2.2 C compiler on SCO Unix 3.2,  (80386) with shared libraries.
 #
-# More from W5GFE:
-# Here is a portion of a makefile that works under the GNU C compiler,
-# version 1.39.  That compiler is a very strict one, and I recommend it
-# to all comers.
-# The compile will be "noisy" due the the much better error checking
-# of the GNU C compiler.  (Editor's note: "Errors"?  Not here sir!
-# "Quibbling" maybe, but not errors, harrumph!)
+# W5GFE sez:
 #
 # Under gcc, to set the "Quibble Level" (not unlike the S/N ratio)
 # uncover one of the next three options.
@@ -46,11 +41,11 @@ CURSES=-lcurses
 #
 #   73 de Bill W5GFE [44.78.32.12] w5gfe@w5gfe.okla.ampr
 # Use the next three options for gcc compiler on SCO Unix.  
-#CFLAGS= -s -O -DUNIX -DSYS5 -DSLOWCHECK -DLITTLE_ENDIAN -DMSPTICK=17 \
+#CFLAGS= -s -O -DUNIX -DSYS5 -DSLOWCHECK -DLITTLE_ENDIAN -DMSPTICK=10 \
 #	-U__STDC__ $(QUIBBLEFLAG)
 #
 # These flags should be used for gcc
-#LINTFLAGS = -s -O -DUNIX -DSYS5 -DSLOWCHECK -DLITTLE_ENDIAN -DMSPTICK=17
+#LINTFLAGS = -s -O -DUNIX -DSYS5 -DSLOWCHECK -DLITTLE_ENDIAN -DMSPTICK=10
 #LIBS =$(SHLIB) $(CURSES)
 # And use the gcc compiler
 #CC= gcc
@@ -61,8 +56,10 @@ CURSES=-lcurses
 # SCO Unix 3.2,  (80386) with shared libraries. (From W5GFE)
 # (Is same for Microport Sys V, rel 3 -- 80386 with shared libraries)
 #
-#CFLAGS = -g -O -DUNIX -DSYS5 -DSLOWCHECK -DLITTLE_ENDIAN -DMSPTICK=17
-#LINTFLAGS = -g -O -DUNIX -DSYS5 -DSLOWCHECK -DLITTLE_ENDIAN -DMSPTICK=17
+# Note: Verify that 10 is the correct value of MSPTICK - K5JB
+#
+#CFLAGS = -g -O -DUNIX -DSYS5 -DSLOWCHECK -DLITTLE_ENDIAN -DMSPTICK=10
+#LINTFLAGS = -g -O -DUNIX -DSYS5 -DSLOWCHECK -DLITTLE_ENDIAN -DMSPTICK=10
 #LIBS =$(SHLIB) $(CURSES)
 ########################################################################
 #
@@ -99,28 +96,28 @@ LIBS =$(SHLIB) $(CURSES)
 ########################################################################
 
 SRCS =	main.c arp.c arpcmd.c arpdump.c ax25.c ax25cmd.c \
-	ax25dump.c ax25subr.c ax25user.c ax_mbx.c cmdparse.c \
+	ax25dump.c ax25subr.c ax25user.c ax_mbx.c cmdparse.c ekiss.c \
 	files.c fingcli.c fingserv.c ftp.c ftpcli.c ftpserv.c icmp.c \
 	icmpcmd.c icmpdump.c icmpmsg.c iface.c ip.c ipcmd.c ipdump.c \
-	iproute.c kiss.c kpc.c lapb.c lapbtime.c lcsum.c mbuf.c misc.c \
-	mulport.c ndir.c netuser.c nrcmd.c nrs.c nr3.c nrsubr.c nr4.c \
+	iproute.c kiss.c lapb.c lapbtime.c lcsum.c mbuf.c misc.c \
+	motd.c mulport.c ndir.c netuser.c nrcmd.c nrs.c nr3.c nrsubr.c nr4.c \
 	nr4subr.c nr4user.c nr4timer.c pathname.c session.c slip.c \
 	smisc.c smtpcli.c smtpserv.c sys5_io.c sys5unix.c tcpcmd.c \
 	tcpdump.c tcpin.c tcpout.c tcpsubr.c tcptimer.c tcpuser.c telnet.c \
-	telunix.c timer.c tnserv.c trace.c ttydriv.c udp.c udpcmd.c \
-	udpdump.c vcircuit.c version.c wildmat.c
+	telserv.c telunix.c timer.c tnserv.c trace.c ttydriv.c udp.c udpcmd.c \
+	udpdump.c version.c wildmat.c
 
 OBJS =	main.o arp.o arpcmd.o arpdump.o ax25.o ax25cmd.o \
-	ax25dump.o ax25subr.o ax25user.o ax_mbx.o cmdparse.o \
+	ax25dump.o ax25subr.o ax25user.o ax_mbx.o cmdparse.o ekiss.o \
 	files.o fingcli.o fingserv.o ftp.o ftpcli.o ftpserv.o icmp.o \
 	icmpcmd.o icmpdump.o icmpmsg.o iface.o ip.o ipcmd.o ipdump.o \
-	iproute.o kiss.o kpc.o lapb.o lapbtime.o lcsum.o mbuf.o misc.o \
-	mulport.o ndir.o netuser.o nrcmd.o nrs.o nr3.o nrsubr.o nr4.o \
+	iproute.o kiss.o lapb.o lapbtime.o lcsum.o mbuf.o misc.o \
+	motd.o mulport.o ndir.o netuser.o nrcmd.o nrs.o nr3.o nrsubr.o nr4.o \
 	nr4subr.o nr4user.o nr4timer.o pathname.o session.o slip.o \
 	smisc.o smtpcli.o smtpserv.o sys5_io.o sys5unix.o tcpcmd.o \
 	tcpdump.o tcpin.o tcpout.o tcpsubr.o tcptimer.o tcpuser.o telnet.o \
-	telunix.o timer.o tnserv.o trace.o ttydriv.o udp.o udpcmd.o \
-	udpdump.o vcircuit.o version.o wildmat.o
+	telserv.o telunix.o timer.o tnserv.o trace.o ttydriv.o udp.o udpcmd.o \
+	udpdump.o version.o wildmat.o
 
 net:	$(OBJS)
 	$(CC) $(CFLAGS) -s -o net $(OBJS) $(LIBS)

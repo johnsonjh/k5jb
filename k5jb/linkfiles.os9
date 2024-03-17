@@ -8,6 +8,7 @@ ax25dump.r
 ax25subr.r 
 ax25user.r 
 cmdparse.r
+ekiss.r
 files.r 
 fingcli.r 
 fingserv.r 
@@ -23,7 +24,6 @@ ipcmd.r
 ipdump.r
 iproute.r 
 kiss.r 
-kpc.r 
 lapb.r 
 lapbtime.r 
 lcsum.r 
@@ -56,8 +56,7 @@ trace.r
 ttydriv.r 
 udp.r 
 udpcmd.r
-udpdump.r 
-vcircuit.r 
+udpdump.r  
 version.r 
 wildmat.r
 ax_mbx.r
@@ -66,4 +65,6 @@ nrcmd.r
 nr4user.r 
 smtpcli.r 
 osk_io.r
+telserv.r
 telunix.r
+motd.r

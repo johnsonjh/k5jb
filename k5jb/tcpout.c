@@ -22,7 +22,8 @@ register struct tcb *tcb;
 	int16 usable;		/* Usable window */
 	int16 sent;		/* Sequence count (incl SYN/FIN) already in the pipe */
 	int16 backoff();	/* K5JB */
-	int32 backoffval;
+	/* note that unsigned int32 doesn't work here */
+	unsigned long backoffval;
 	extern int32 backoffcap;	/* set in tcpcmd.c */
 
 	if(tcb == NULLTCB)
@@ -174,9 +175,10 @@ register struct tcb *tcb;
 		 * and round trip timers if they aren't already running.
 		 */
 		if(ssize != 0){
-			backoffval = (int32)backoff(tcb->backoff) *
+			backoffval = backoff(tcb->backoff) *
 			 (2 * tcb->mdev + tcb->srtt + (int32)MSPTICK) / (int32)MSPTICK;
 
+			/* this must be unsigned comparison, because, well, shit happens! */
 			tcb->timer.start = backoffval < backoffcap ? backoffval : backoffcap;
 			start_timer(&tcb->timer);
 

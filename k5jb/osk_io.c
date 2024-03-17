@@ -6,16 +6,16 @@ Version Log
 -----------
 012093 - First OSK release.
 022493 - Fixed bug in smtp, wasn't doing cr/lf correctly and SOME nos hosts
-		 objected.
-		 Fixed various FTP bugs (also caused by cr/lf conversions.
-		 Fixed problem in ftpserver ls command response which should now
-		  allow mgets from a remote host to work correctly (directory
-		  access routines in this file altered).
+                 objected.
+                 Fixed various FTP bugs (also caused by cr/lf conversions.
+                 Fixed problem in ftpserver ls command response which should now
+                  allow mgets from a remote host to work correctly (directory
+                  access routines in this file altered).
 081293 - Fixed bug in rename which was causing an abort on mailbox reads.
 081693 - Fixed memory allocation bugs, space used by make_path was not
-		  being freed.
-		 Added the code for getcwd and cd.
-		 
+                  being freed.
+                 Added the code for getcwd and cd.
+                 
 */
 
 #include "global.h"
@@ -38,11 +38,11 @@ unsigned nasy;
 int IORser[ASY_MAX];
 struct sgbuf orgsgbufi, orgsgbufo;
 
-#ifndef	_UCC
+#ifndef _UCC
 #define MAXTMP 26
 struct FILREC {
-	FILE *filptr;
-	char tmpnam[32];
+        FILE *filptr;
+        char tmpnam[32];
 };
 
 struct FILREC tmpfils[MAXTMP];
@@ -59,13 +59,13 @@ disable()
 
 kbread()
 {
-	unsigned char c;
+        unsigned char c;
 
     if (getstat(1,0) < 0)
       return -1;
 
-	read(0, &c, 1);
-	return c;
+        read(0, &c, 1);
+        return c;
 }
 
 
@@ -78,34 +78,34 @@ struct interface *ifaces = NULL;
 /* Called at startup time to set up console I/O, memory heap */
 ioinit()
 {
-	char termname[40];
-	struct sgbuf sbuf;
-	int i;
-	
+        char termname[40];
+        struct sgbuf sbuf;
+        int i;
+        
 /* tmp file tracking array init, non-ucc */
 
-#ifndef	_UCC
-	for (i=0;i<MAXTMP;i++)
-		tmpfils[i].filptr=NULL;
+#ifndef _UCC
+        for (i=0;i<MAXTMP;i++)
+                tmpfils[i].filptr=NULL;
 #endif
-	_gs_devn(2, termname+1);
-	termname[0] = '/';
-	fclose(stdin);
-	if (fopen(termname, "r+") != stdin)
-	  exit(1000);
-	  
-	fclose(stdout);
-	if (fopen(termname, "w+") != stdout)
-	  exit(2000);
-	
+        _gs_devn(2, termname+1);
+        termname[0] = '/';
+        fclose(stdin);
+        if (fopen(termname, "r+") != stdin)
+          exit(1000);
+          
+        fclose(stdout);
+        if (fopen(termname, "w+") != stdout)
+          exit(2000);
+        
     if (fileno(stdin) != 0)
       exit(3000);
       
     if (fileno(stdout) != 1)
       exit(4000);
 
-	_gs_opt(0,&sbuf);
-	memcpy(&orgsgbufi,&sbuf,sizeof(sbuf));
+        _gs_opt(0,&sbuf);
+        memcpy(&orgsgbufi,&sbuf,sizeof(sbuf));
     sbuf.sg_case = 0;
     sbuf.sg_backsp = 0;
     sbuf.sg_delete = 0;
@@ -127,12 +127,12 @@ ioinit()
     sbuf.sg_xoff = 0;
     sbuf.sg_tabcr = 0;
     sbuf.sg_tabsiz = 0;
-	sbuf.sg_kbich = 0;
-	sbuf.sg_kbach = 0;
-	_ss_opt(0,&sbuf);
-	
+        sbuf.sg_kbich = 0;
+        sbuf.sg_kbach = 0;
+        _ss_opt(0,&sbuf);
+        
 
-	_gs_opt(1,&sbuf);
+        _gs_opt(1,&sbuf);
     memcpy(&orgsgbufo,&sbuf,sizeof(sbuf));
     sbuf.sg_case = 0;
     sbuf.sg_backsp = 0;
@@ -157,16 +157,16 @@ ioinit()
     sbuf.sg_tabsiz = 0;
     sbuf.sg_kbich = 0;
     sbuf.sg_kbach = 0;
-	_ss_opt(1,&sbuf);
+        _ss_opt(1,&sbuf);
 
-	setbuf(stdin,NULL);
+        setbuf(stdin,NULL);
 }
 
 /* Called just before exiting to restore console state */
 iostop()
 {
-	_ss_opt(0,&orgsgbufi);
-	_ss_opt(0,&orgsgbufo);
+        _ss_opt(0,&orgsgbufi);
+        _ss_opt(0,&orgsgbufo);
 }
 
 eihalt()
@@ -174,23 +174,23 @@ eihalt()
     tsleep(1);
 }
 
-#ifdef	SLOWCHECK
+#ifdef  SLOWCHECK
 
 int clksec()
 {
-	long tim;
-	(void) time(&tim);
+        time_t tim;
+        (void) time(&tim);
 /* 1 second resolution, return hundredths */
-	return (int)(tim * 100);
+        return (int)(tim * 100);
 }
 
 #else
 
-#ifdef	_UCC
+#ifdef  _UCC
 _asm("clksec:   moveq   #3,d0");
 _asm("          os9     F$Time");
-_asm("          move.l	#0,d0");
-_asm("		move.w	d3,d0");
+_asm("          move.l  #0,d0");
+_asm("          move.w  d3,d0");
 _asm("          rts");
 #else
 #include "clksec.a"
@@ -200,28 +200,28 @@ _asm("          rts");
 void
 check_time()
 {
-	int32 iss();
-	void tickle();
+        int32 iss();
+        void tickle();
 
-	static long clkval;
-	long ntime, offset;
+        static long clkval;
+        long ntime, offset;
 
-	/* read elapsed real time (typ. 100 Hz) */
-	ntime=clksec();	
+        /* read elapsed real time (typ. 100 Hz) */
+        ntime=clksec(); 
 
-	/* resynchronize if the error is large (10 seconds or more) */
-	offset = ntime - clkval;
-	if (offset > (10000/MSPTICK) || offset < 0)
-		clkval = ntime;
+        /* resynchronize if the error is large (10 seconds or more) */
+        offset = ntime - clkval;
+        if (offset > (10000/MSPTICK) || offset < 0)
+                clkval = ntime;
 
-	/* Handle possibility of several missed ticks */
-	while (ntime != clkval){
-		fflush(NULL);	
-    	++clkval;
-		icmpclk();
-		tickle();
-		(void) iss();
-	}
+        /* Handle possibility of several missed ticks */
+        while (ntime != clkval){
+                fflush(NULL);   
+        ++clkval;
+                icmpclk();
+                tickle();
+                (void) iss();
+        }
 }
 /* Initialize asynch port "dev" */
 int
@@ -234,18 +234,18 @@ unsigned bufsize;
         register struct asy *ap;
         struct sgbuf sbuf;
         unsigned i=0; 
-	if (dev >= nasy)
-		return -1;
+        if (dev >= nasy)
+                return -1;
  
     ap = &asy[dev];
 
-/*	ap->tty = malloc(strlen(arg2)+1);*/
-	strcpy(ap->tty,arg2);
+/*      ap->tty = malloc(strlen(arg2)+1);*/
+        strcpy(ap->tty,arg2);
 
-	if ( (IORser[dev]=open(ap->tty, S_IREAD+S_IWRITE)) < 0) 
-	{ 	printf("asy %s: Open failed.\015\012", ap->tty);
-        	fflush(stdout);
-        	return -1;
+        if ( (IORser[dev]=open(ap->tty, S_IREAD+S_IWRITE)) < 0) 
+        {       printf("asy %s: Open failed.\015\012", ap->tty);
+                fflush(stdout);
+                return -1;
         }
         _gs_opt(IORser[dev], &sbuf);
         sbuf.sg_case = 0;
@@ -273,7 +273,7 @@ unsigned bufsize;
         sbuf.sg_tabsiz = 0;
         _ss_opt(IORser[dev], &sbuf);
 
-	switch(sbuf.sg_baud)
+        switch(sbuf.sg_baud)
                {
                case 0:      i = 50;
                               break;
@@ -302,9 +302,9 @@ unsigned bufsize;
                case 15:   i = 19200;
                               break;
                case 16:   i=38400;
-               				break;
-              default:	i= 0;
-		}
+                                        break;
+              default:  i= 0;
+                }
         printf("asy %s :Open %i Baud, Ok.\015",ap->tty,i);
         return 0;
 }
@@ -313,7 +313,7 @@ int
 asy_stop(iface)
 struct interface *iface;
 {
-	return 0;
+        return 0;
 }
 
 /* Asynchronous line I/O control (speed change not implemented */
@@ -336,7 +336,7 @@ asy_speed(dev,speed)
 int dev;
 int speed;
 {
-	return 0;
+        return 0;
 }
 
 
@@ -377,11 +377,13 @@ unsigned cnt;
 int stxrdy(dev)
 int dev;
 {
-	return 1;
+        return 1;
 }
 
 /* dir in temp file (a lot of crap to do this in the 3.2 osk compiler).
    Short/long listings. For FTP */
+char *getenv();
+void free();
 
 FILE *
 dir(path,full)
@@ -392,25 +394,24 @@ int full;
         char *name = "dirfile", *cp;
         char cmd[256], *fnamstr=cmd;
         char disk[256];
-		FILE *tmpfile();
-		unsigned char ch;
-		int i,k,fp1;
-		register int j;
-		char *getenv(), *make_path();
-		char *ep, *np;
-		void filedir();
-		void free();
-		DIR *dt;
-		int dofree=0;
-						
-		if ((ep=getenv("TMPDIR"))!=NULLCHAR)
-		{
-			np=make_path(ep,name,1);
-			dofree=1;
-		}
-		else
-			np=name;
-					        
+                FILE *tmpfile();
+                unsigned char ch;
+                int i,k,fp1;
+                register int j;
+                char *make_path();
+                char *ep, *np;
+                void filedir();
+                DIR *dt;
+                int dofree=0;
+                                                
+                if ((ep=getenv("TMPDIR"))!=NULL)
+                {
+                        np=make_path(ep,name,1);
+                        dofree=1;
+                }
+                else
+                        np=name;
+                                                
         strcpy(disk, path);
         for (cp=disk; *cp && *++cp!='/'; )
           ;
@@ -421,66 +422,66 @@ int full;
                 system(cmd);
         } else {
 
-        		fp1=creat(np,S_IREAD+S_IWRITE);
-				if ((dt=opendir(path))!=NULL)
-				{
-					closedir(dt);
-					strcat(path,"/*");
-				}
+                        fp1=creat(np,S_IREAD+S_IWRITE);
+                                if ((dt=opendir(path))!=NULL)
+                                {
+                                        closedir(dt);
+                                        strcat(path,"/*");
+                                }
 
-       			filedir(path,0,fnamstr);
-        		if (*fnamstr=='\0')
-        		    close(fp1);
-        		else
-        		{
-					write(fp1,fnamstr,strlen(fnamstr));
-					write(fp1,"\015\012",2);
-				
-					while(1)
-					{	filedir(path,1,fnamstr);
-						if (*fnamstr=='\0')
-						{
-							close(fp1);
-							break;
-						}
-						else
-						{
-							write(fp1,fnamstr,strlen(fnamstr));
-							write(fp1,"\015\012",2);
-						}
-					}
-				}
+                        filedir(path,0,fnamstr);
+                        if (*fnamstr=='\0')
+                            close(fp1);
+                        else
+                        {
+                                        write(fp1,fnamstr,strlen(fnamstr));
+                                        write(fp1,"\015\012",2);
+                                
+                                        while(1)
+                                        {       filedir(path,1,fnamstr);
+                                                if (*fnamstr=='\0')
+                                                {
+                                                        close(fp1);
+                                                        break;
+                                                }
+                                                else
+                                                {
+                                                        write(fp1,fnamstr,strlen(fnamstr));
+                                                        write(fp1,"\015\012",2);
+                                                }
+                                        }
+                                }
 /*
-				NOTE, this ALMOST worked but added the path on a wildcard
-				 dir which messed up remote mgets.
-				 
+                                NOTE, this ALMOST worked but added the path on a wildcard
+                                 dir which messed up remote mgets.
+                                 
                 sprintf(cmd,"(dir -d %s; echo; free %s; echo)>-%s",path,disk,np);
                 system(cmd);
 */
                }
         fp = fopen(np,"r");
         if((fpo = tmpfile())==NULLFILE)
-   	        return NULLFILE;
-		while ((i=fread(cmd,1,128,fp)))
-		{ 
-			k=0;
-			for(j=0;j<i;j++)
-			{
-				disk[k]=cmd[j];
-				k++;
-				if (cmd[j]=='\015')
-				{	disk[k]='\012';
-					k++;
-				}
-			}	
-			fwrite(disk,1,k,fpo);
-		}
-		fflush(fpo);
-		rewind(fpo);
-		fclose(fp);
-		unlink(np);
-		if (dofree)
-			free(np);		
+                return NULLFILE;
+                while ((i=fread(cmd,1,128,fp)))
+                { 
+                        k=0;
+                        for(j=0;j<i;j++)
+                        {
+                                disk[k]=cmd[j];
+                                k++;
+                                if (cmd[j]=='\015')
+                                {       disk[k]='\012';
+                                        k++;
+                                }
+                        }       
+                        fwrite(disk,1,k,fpo);
+                }
+                fflush(fpo);
+                rewind(fpo);
+                fclose(fp);
+                unlink(np);
+                if (dofree)
+                        free(np);               
         return fpo;
 }
 
@@ -501,164 +502,164 @@ char *dirname;
 int times;
 char *ret_str;
 {
-	DIR *d2;
-	register int masklen;
-	register char *cp;
-	int i;
-	char dname[80], filemask[80];
-	
-	for (cp=dirname+strlen(dirname); cp>dirname && *--cp != '/'; )
-	  ;
-	strncpy(dname, dirname, cp-dirname);
-	dname[cp-dirname] = '\0';
-	strcpy(filemask, cp+1);
-	
+        DIR *d2;
+        register int masklen;
+        register char *cp;
+        int i;
+        char dname[80], filemask[80];
+        
+        for (cp=dirname+strlen(dirname); cp>dirname && *--cp != '/'; )
+          ;
+        strncpy(dname, dirname, cp-dirname);
+        dname[cp-dirname] = '\0';
+        strcpy(filemask, cp+1);
+        
     masklen = strlen(filemask);
     
-	if (times==0) {   /* first time */
-		if ( (d=opendir(dname)) == NULL ) {
-			*ret_str = '\0';
-			return;
-		}
-	}
-	
-	while (1) {
-		if ( (r=readdir(d)) == NULL ) {
-			*ret_str = '\0';
-			closedir(d);
-			return;
-		}
-		if (_cmpnam(r->d_name, filemask, masklen) == 0)
-			if (r->d_name[0] != '.') {
-				strcpy(ret_str, r->d_name);
-				
-				strcat(dname,"/");
-				strcat(dname,ret_str);
-				if ((i=open(dname,S_IREAD))==-1)
-				{
-					if ((d2=opendir(dname))!=NULL)
-					{	closedir(d2);
-						strcat(ret_str,"/");
-					}
-				}
-				else
-					close(i);
-				return;
-			}
-	}
+        if (times==0) {   /* first time */
+                if ( (d=opendir(dname)) == NULL ) {
+                        *ret_str = '\0';
+                        return;
+                }
+        }
+        
+        while (1) {
+                if ( (r=readdir(d)) == NULL ) {
+                        *ret_str = '\0';
+                        closedir(d);
+                        return;
+                }
+                if (_cmpnam(r->d_name, filemask, masklen) == 0)
+                        if (r->d_name[0] != '.') {
+                                strcpy(ret_str, r->d_name);
+                                
+                                strcat(dname,"/");
+                                strcat(dname,ret_str);
+                                if ((i=open(dname,S_IREAD))==-1)
+                                {
+                                        if ((d2=opendir(dname))!=NULL)
+                                        {       closedir(d2);
+                                                strcat(ret_str,"/");
+                                        }
+                                }
+                                else
+                                        close(i);
+                                return;
+                        }
+        }
 }
 
 dodir(argc, argv)
-int	argc;
-char	**argv;
+int     argc;
+char    **argv;
 {
-	int	i, stat;
-	char	str[MAXCMD];
+        int     i, stat;
+        char    str[MAXCMD];
 
-	strcpy(str, "dir -e ");
-	for (i = 1; i < argc; i++) {
-		strcat(str, argv[i]);
-		strcat(str, " ");
-	}
+        strcpy(str, "dir -e ");
+        for (i = 1; i < argc; i++) {
+                strcat(str, argv[i]);
+                strcat(str, " ");
+        }
 
 
-	stat = system(str);
+        stat = system(str);
 
-	return stat;
+        return stat;
 }
 sysreset()
 {
-	printf("\n no system reset function \n");
+        printf("\n no system reset function \n");
 }
 doshell(argc,argv)
 int argc;
 char **argv;
 {
-	struct sgbuf sgbufi, sgbufo;
-	_gs_opt(0,&sgbufi);
-	_gs_opt(1,&sgbufo); 
-	_ss_opt(0,&orgsgbufi);
-	_ss_opt(1,&orgsgbufo);
-	system("");
-	_ss_opt(0,&sgbufi);
-	_ss_opt(1,&sgbufo);
+        struct sgbuf sgbufi, sgbufo;
+        _gs_opt(0,&sgbufi);
+        _gs_opt(1,&sgbufo); 
+        _ss_opt(0,&orgsgbufi);
+        _ss_opt(1,&orgsgbufo);
+        system("");
+        _ss_opt(0,&sgbufi);
+        _ss_opt(1,&sgbufo);
 }
 
 /* close a pipe (not different in osk)? */
 int pclose(i)
 FILE *i;
 {
-	fclose(i);
+        fclose(i);
 }
 
 mkdir(s, m)
-char	*s;
-int	m;
+char    *s;
+int     m;
 {
-	char tmp[MAXCMD];
+        char tmp[MAXCMD];
 
-	sprintf(tmp, "makdir %s", s);
-	if (system(tmp))
-		return -1;
-/*	if (chmod(s, m) < 0)
-		return -1;
+        sprintf(tmp, "makdir %s", s);
+        if (system(tmp))
+                return -1;
+/*      if (chmod(s, m) < 0)
+                return -1;
 */
-	return 0;
+        return 0;
 }
 
 
 rmdir(s)
-char	*s;
+char    *s;
 {
-	char tmp[MAXCMD];
+        char tmp[MAXCMD];
 
-	sprintf(tmp, "deldir -f -q %s", s);
-	if (system(tmp))
-		return -1;
+        sprintf(tmp, "deldir -f -q %s", s);
+        if (system(tmp))
+                return -1;
 
-	return 0;
+        return 0;
 }
 
 OpenPty()
 {
-	return -1;
+        return -1;
 }
 
 char *getcwd(tmp,siz)
 char *tmp;
 int siz;
 {
-	static int lock=0;
-	char *name="pdfile";
-	char *ep, *np, *make_path();
-	FILE *fil;
-	int dofree=0;
-	
-	while (lock);
-	
-	lock=1;
-	if ((ep=getenv("TMPDIR"))!=NULLCHAR)
-   	{
-		dofree=1;
-		np=make_path(ep,name,1);
-	}
-	else
-		np = name;
-	sprintf(tmp,"pd >-%s",np);
-	system(tmp);
-	if ((fil=fopen(np,"r"))==NULL)
-	{
-		lock=0;
-		return NULL;
-	}
-	
-	fgets(tmp,siz,fil);
-	unlink(np);
-	if (dofree) 
-		free(np);
-	lock=0;
-	return 1;
-}	
+        static int lock=0;
+        char *name="pdfile";
+        char *ep, *np, *make_path();
+        FILE *fil;
+        int dofree=0;
+        
+        while (lock);
+        
+        lock=1;
+        if ((ep=getenv("TMPDIR"))!=NULLCHAR)
+        {
+                dofree=1;
+                np=make_path(ep,name,1);
+        }
+        else
+                np = name;
+        sprintf(tmp,"pd >-%s",np);
+        system(tmp);
+        if ((fil=fopen(np,"r"))==NULL)
+        {
+                lock=0;
+                return NULL;
+        }
+        fgets(tmp,siz,fil);
+        fclose(fil);
+        unlink(np);
+        if (dofree) 
+                free(np);
+        lock=0;
+        return name;
+}       
 
 
 /* enabled this command with k28 -- it was incomplete.  Tried to do it
@@ -671,20 +672,20 @@ docd(argc, argv)
 int argc;
 char **argv;
 {
-	static char tmp[MAXCMD];
-	char *getcwd();
-	extern char *homedir;
+        static char tmp[MAXCMD];
+        char *getcwd();
+        extern char *homedir;
 
-	if(*argv[0] == 'c')
-		if(chdir(argc > 1 ? argv[1] : homedir) == -1){
-			printf("Can't change directory\n");
-			return 1;
-		}
+        if(*argv[0] == 'c')
+                if(chdir(argc > 1 ? argv[1] : homedir) == -1){
+                        printf("Can't change directory\n");
+                        return 1;
+                }
 
-	if (getcwd(tmp, sizeof(tmp) - 2) != NULL)
-		printf("%s\n", tmp);
+        if (getcwd(tmp, sizeof(tmp) - 2) != NULL)
+                printf("%s\n", tmp);
 
-	return 0;
+        return 0;
 }
 
 /***************************************************************************/
@@ -706,10 +707,7 @@ char **argv;
 /*                                                                         */
 /* Description                                                             */
 /*                                                                         */
-/*     #include <time.h>
-       time_t _secsince70 (date)
-       char date[];
-
+/*
        returns # of secs past since 01/01/1970 GMT
 
 */
@@ -850,34 +848,7 @@ time_t _secsince70 (date)
 
 */
 
-#ifndef CLK_TCK
-#include <time.h>
-#endif
-
-typedef char * dev_t;  /* pointer to the device name */
-
-/*
- * file control structure
- */
-
-struct stat
-     {
-     unsigned short  st_mode;
-     unsigned short  st_nlink;
-     unsigned short  st_uid;
-     unsigned short  st_gid;
-     long            st_size;
-     time_t          st_atime;
-     time_t          st_mtime;
-     time_t          st_ctime;
-     long            st_ino;
-     dev_t           st_dev;
-     dev_t           st_rdev;
-     } ;
-
-#ifndef S_IREAD
-#include <modes.h>
-#endif
+#include "os9stat.h"
 
 #include <direct.h>
 
@@ -946,7 +917,7 @@ int fstat (fd, buf)
 
           } /* end of fstat */
 
-#ifndef	_UCC
+#ifndef _UCC
 
 
 /***************************************************************************/
@@ -1102,114 +1073,114 @@ _build_errlist (errfile)
 
 FILE *tmpfile()
 {
-	char *ep;
-	char fname[80];
-	int done=0;
-	int indx;
-	char *make_path();
-	char *tmp;
-	extern char *getenv();
-	FILE *fil, *fopen();
-	int access();
-		
-	fname[0]='/';
-	fname[1]='a';
-	
-	if ((ep = getenv("TMPDIR")) == NULLCHAR)
-			if ((ep = getenv("NETSPOOL")) == NULLCHAR)
-				perror("must set NETSPOOL env var\n");
-	done=0;
-	indx=0;
-	while (fname[1]<'z' && !done)
-	{   fname[2]='\0';
-		
-		strcat(fname,".net_tmp");
-		tmp = make_path(ep,fname,0);
-		if	(!access(tmp,0))
-		{	indx=indx+1;
-			fname[1]=fname[1]+1;
-			free(tmp);
-		}
-		else
-		{
-			if ((fil=fopen(tmp,"w+"))!=NULL)
-			{
-				tmpfils[indx].filptr=fil;
-				strcpy(tmpfils[indx].tmpnam,tmp);
-				done=1;
-			}
-			else
-			{
-				indx=indx+1;
-				fname[1]=fname[1]+1;
-			}
-		}
-	}
-	if (done)
-	{
-		free(tmp);
-		return fil;
-	}
-	else
-		return NULLFILE;
+        char *ep;
+        char fname[80];
+        int done=0;
+        int indx;
+        char *make_path();
+        char *tmp;
+        extern char *getenv();
+        FILE *fil, *fopen();
+        int access();
+                
+        fname[0]='/';
+        fname[1]='a';
+        
+        if ((ep = getenv("TMPDIR")) == NULLCHAR)
+                        if ((ep = getenv("NETSPOOL")) == NULLCHAR)
+                                perror("must set NETSPOOL env var\n");
+        done=0;
+        indx=0;
+        while (fname[1]<'z' && !done)
+        {   fname[2]='\0';
+                
+                strcat(fname,".net_tmp");
+                tmp = make_path(ep,fname,0);
+                if      (!access(tmp,0))
+                {       indx=indx+1;
+                        fname[1]=fname[1]+1;
+                        free(tmp);
+                }
+                else
+                {
+                        if ((fil=fopen(tmp,"w+"))!=NULL)
+                        {
+                                tmpfils[indx].filptr=fil;
+                                strcpy(tmpfils[indx].tmpnam,tmp);
+                                done=1;
+                        }
+                        else
+                        {
+                                indx=indx+1;
+                                fname[1]=fname[1]+1;
+                        }
+                }
+        }
+        if (done)
+        {
+                free(tmp);
+                return fil;
+        }
+        else
+                return NULLFILE;
 }
 
 int tmpclose(t)
 FILE *t;
 {
-	int i=0;
-	
-	while(i<26)
-	{
-		if (tmpfils[i].filptr==t)
-		{   
-			fclose(t);
-			unlink(tmpfils[i].tmpnam);
-			tmpfils[i].filptr=NULL;
-	 		return 0;
-		}
-		i++;
-	}
-/*	printf("attempted to delete non-tempfile\n"); unavoidable but not important */
-	fclose(t);
-	return 0;
-}	
+        int i=0;
+        
+        while(i<26)
+        {
+                if (tmpfils[i].filptr==t)
+                {   
+                        fclose(t);
+                        unlink(tmpfils[i].tmpnam);
+                        tmpfils[i].filptr=NULL;
+                        return 0;
+                }
+                i++;
+        }
+/*      printf("attempted to delete non-tempfile\n"); unavoidable but not important */
+        fclose(t);
+        return 0;
+}       
 int rename(s,d)
 char *s;
 char *d;
 {
-	char *d2;
-	char tmp[MAXCMD];
-	int access();
-	
-	if (!access(d,0))
-	{
-		if (unlink(d))
-		{
-			printf("Can't rename file (no permission to unlink dup dest)\n");
-			return -1;
-		}
-	}			
+        char *d2;
+        char tmp[MAXCMD];
+        int access();
+        
+        if (!access(d,0))
+        {
+                if (unlink(d))
+                {
+                        printf("Can't rename file (no permission to unlink dup dest)\n");
+                        return -1;
+                }
+        }                       
     else
 /* strip path from destination */
-	{
-		d2=d;
-		while (*d != '\0')
-		{
-			if(*d++ == '/')
-				d2=d;
-		}
-		sprintf(tmp,"rename %s %s",s,d2);
-		system(tmp);
-		return 0;
-	}	
+        {
+                d2=d;
+                while (*d != '\0')
+                {
+                        if(*d++ == '/')
+                                d2=d;
+                }
+                sprintf(tmp,"rename %s %s",s,d2);
+                system(tmp);
+                return 0;
+        }       
 }
 
 int fputc(c, fp)
 int c;
 FILE *fp;
 {
-	putc(c,fp);
+        putc(c,fp);
 }
 
 

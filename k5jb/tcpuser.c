@@ -1,4 +1,6 @@
 /* User calls to TCP */
+#include <stdio.h>
+#include <string.h>
 #include "global.h"
 #include "config.h"	/*K5JB*/
 #include "timer.h"
@@ -8,9 +10,13 @@
 #include "tcp.h"
 #ifdef UNIX
 #include "unixopt.h"
+#if defined(TELSERV) && !defined(SERVNAME)
+#define SERVNAME "telserv"
+#endif
 #endif
 
 int16 tcp_window = DEF_WND;
+void free();
 
 struct tcb *
 open_tcp(lsocket,fsocket,mode,window,r_upcall,t_upcall,s_upcall,tos,user)
@@ -27,7 +33,9 @@ char *user;		/* User linkage area */
 	struct connection conn;
 	register struct tcb *tcb;
 	void send_syn();
-
+#ifdef TIMEZOMBIE
+	int32 time();
+#endif
 	if(lsocket == NULLSOCK){
 		net_error = INVALID;
 		return NULLTCB;
@@ -74,6 +82,9 @@ char *user;		/* User linkage area */
 		tcp_stat.conout++;
 		break;
 	}
+#ifdef TIMEZOMBIE
+	time(&tcb->lastheard);
+#endif
 	return tcb;
 }
 /* User send routine */
@@ -244,6 +255,7 @@ register struct tcb *tcb;
 {
 	void unlink_tcb();
 	struct reseq *rp,*rp1;
+	int stop_timer();
 
 	if(tcb == NULLTCB){
 		net_error = INVALID;
@@ -309,6 +321,8 @@ register struct tcb *tcb;
 	tcp_timeout((char *)tcb);
 	return 0;
 }
+
+void
 reset_tcp(tcb)
 register struct tcb *tcb;
 {
@@ -343,6 +357,11 @@ int16 n;
 #if defined(UNIX) && defined(TELUNIX)			/* K5JB */
 	case LOGIN_PORT:
 		return "login";
+#endif
+#if defined(UNIX) && defined(TELSERV)			/* K5JB */
+	case TTYLINK_PORT:	/* make up mind what to call it later */
+	case TNSERV_PORT:
+		return SERVNAME;
 #endif
 	default:
 		sprintf(buf,"%u",n);

@@ -41,6 +41,8 @@ struct connection {
 #define TELNET_PORT	23	/* Telnet port */
 #define SMTP_PORT	25	/* Mail port */
 #define FINGER_PORT     79      /* Finger port */
+#define TTYLINK_PORT	87	/* I'll use this for my tnserver, heh! */
+#define TNSERV_PORT	88	/* Have to look up a number for this */
 #define LOGIN_PORT	513	/* unix with telunix only */
 
 int32 aton(),resolve();

@@ -23,13 +23,16 @@
 		ether_dump()
 		mkdir()	 for those who don't have it 
 		rmdir()
+		onshellrtn()	part of forked shell process
 		
 	Written by Mikel Matthews, N9DVG
 	SYS5 stuff added by Jere Sandidge, K4FUM
-K5JB: Added some new mbox stuff that permits reading mail and files.
+	Further cleanup, maintenance and etc. by Joe Buswell, K5JB
+	#define FORK_SHELL for a child process that handles foreground
+	while you are shelled out.
 
 */
-#ifndef _OSK
+#ifndef _OSK			/* none of this applies to _OSK */
 #include <stdio.h>
 #include <signal.h>
 #include <termio.h>
@@ -52,6 +55,8 @@ int asy_attach();
 
 extern struct cmds attab[];
 extern struct termio savecon;
+extern struct interface *ifaces;
+
 
 unsigned nasy;
 
@@ -64,7 +69,7 @@ sysreset()
 
 	exitval = 3;
 	doexit();
-#ifdef NOGOOD
+#ifdef NOGOOD	/* use exitval and a shell script */
 	extern char *netexe;
 
 	execl(netexe,netexe,0);
@@ -82,6 +87,15 @@ eihalt()
 }
 #endif
 
+#ifdef FORKSHELL
+extern int mode;
+#include "session.h"
+int shellpid;
+extern int backgrd;
+int onquit();
+extern int iostop();
+#endif
+
 int
 kbread()
 {
@@ -90,6 +104,14 @@ kbread()
 	int sleep2();
 
 	sleep2(COHWAIT);	/* only needed when no async ports are used */
+#endif
+#ifdef FORKSHELL /* note that if background, kbread won't be called */
+	if(shellpid)	/* might put a micro sleep here to give up cycles */
+		return -1;
+#endif
+#ifdef USE_QUIT
+	if(backgrd)
+		return -1;
 #endif
 	if (read(fileno(stdin), &c, 1) <= 0)
 		return -1;
@@ -235,10 +257,10 @@ check_time()
 #ifdef COH386
 	long time();
 #else
+	struct tms tb;
 	long times();
 #endif
 
-	struct tms tb;
 	static long clkval;
 	long ntime, offset;
 
@@ -275,19 +297,37 @@ audit()
 {
 }
 
+#ifdef FORKSHELL
+void
+onshellrtn()
+{
+	(void)signal(SIGQUIT, onquit);	/* restore normal signals */
+   (void)signal(SIGHUP, iostop);
+   (void)signal(SIGINT, iostop);
+   (void)signal(SIGTERM, iostop);
+	/* in case someone had a session with us while we were gone */
+	if(mode != CMD_MODE)
+		mode = CMD_MODE;
+}
+#endif
+
 int
 doshell(argc, argv)		/* modified to make shell "stick" K5JB */
-char	**argv;
+char	**argv;			/* later modified to make shell a child process */
 {
 
-	int	i, retn;
+#ifndef FORKSHELL
 	char	str[MAXCMD];
+	int i,retn;
+#else
+	int parentpid;
+#endif
 	char	*cp;
 	struct termio tt_config;
 	int saverunflg;
-
 	char	*getenv();
 
+#ifndef FORKSHELL
 	str[0] = '\0';
 	for (i = 1; i < argc; i++) {
 		strcat(str, argv[i]);
@@ -313,7 +353,61 @@ char	**argv;
 	ioctl(0, TCSETAW, &tt_config);
 	printf("Returning you to net.\n");
 	return retn;
+#else
+	/* will fork a child process */
+	signal(SIGQUIT,SIG_IGN);	/* ignore these signals, and... */
+   signal(SIGHUP,SIG_IGN);
+   signal(SIGINT,SIG_IGN);
+   signal(SIGTERM,SIG_IGN);
+	signal(SIGUSR1,onshellrtn);	/* on return, this will restore them */
 
+	parentpid = getpid();	/* this will work if we don't detach */
+
+	printf("Type exit, or do Ctrl-D, to return to NET.\n");
+	fflush(stdout);
+
+	if(!(shellpid = fork())){	/* is child process */
+		ioctl(0, TCGETA, &tt_config);
+		ioctl(0, TCSETAW, &savecon);
+		if ((saverunflg = fcntl(0, F_GETFL, 0)) == -1) {
+			perror("Could not read console flags");
+			return -1;
+		}
+		fcntl(0, F_SETFL, saverunflg & ~O_NDELAY); /* blocking I/O */
+#ifdef LATER_IFNEEDED
+	while (ifaces != NULLIF) {
+		if (ifaces->stop != NULLFP)
+			(*ifaces->stop)(ifaces->dev);
+		ifaces = ifaces->next;
+	}
+#endif
+		/* Note that system() can cause problems with forked process */
+		/* we use it though so we can signal our return with kill() */
+		if((cp = getenv("SHELL")) != NULLCHAR && *cp != '\0')
+			system(cp);
+		else
+			system("exec /bin/sh");
+		fcntl(0, F_SETFL, saverunflg); /* restore non-blocking I/O, if so */
+		ioctl(0, TCSETAW, &tt_config);
+
+		kill(parentpid,SIGUSR1);	/* first restore signals, then use one */
+		/* this makes a newline so if we return with Ctrl-D NET> looks better */
+		printf("\n");
+		fflush(stdout);
+		/* apparently need some time before second kill */
+		sleep(1);
+		/* this should kill us and restore foreground */
+		kill(parentpid,SIGQUIT);
+		sleep(10);	/* will probably not awake from this one */
+		/* but if sleep time was insufficient... */
+		printf("You MAY have to use Ctrl-\\ to return to NET...\n");
+		fflush(stdout);
+		/* quit signal handler will take care of killing child properly */
+		/* but if it don't... */
+		exit(0);
+	}else
+		return 0;
+#endif
 }
 
 int
@@ -413,4 +507,5 @@ char	*s;
 
 	return 0;
 }
-#endif
+
+#endif /* OSK */

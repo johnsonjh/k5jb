@@ -2,7 +2,6 @@
  * fragment reassembly, for higher level protocols.
  * Not needed when running as a standalone gateway.
  */
-#define	TLB	30 * (1000/MSPTICK)	/* Reassembly limit time */
 #include "global.h"
 #include "mbuf.h"
 #include "timer.h"
@@ -13,6 +12,9 @@
 
 void ip_recv();
 
+#ifdef RTIMER
+int32 rtime = TLB;
+#endif
 char ip_ttl = MAXTTL;	/* Default time-to-live for IP datagrams */
 
 struct reasm *reasmq;
@@ -275,27 +277,7 @@ struct ip *ip;
 	}
 	return NULLREASM;
 }
-#ifdef	FOO
-static
-int16
-hash_reasm(source,dest,protocol,id)
-int32 source;
-int32 dest,
-char protocol;
-int16 id;
-{
-	register int16 hval;
 
-	hval = loword(source);
-	hval ^= hiword(source);
-	hval ^= loword(dest);
-	hval ^= hiword(dest);
-	hval ^= uchar(protocol);
-	hval ^= id;
-	hval %= RHASH;
-	return hval;
-}
-#endif
 /* Create a reassembly descriptor,
  * put at head of reassembly list
  */
@@ -312,7 +294,11 @@ register struct ip *ip;
 	rp->dest = ip->dest;
 	rp->id = ip->id;
 	rp->protocol = ip->protocol;
+#ifdef RTIMER
+	rp->timer.start = rtime;
+#else
 	rp->timer.start = TLB;
+#endif
 	rp->timer.func = ip_timeout;
 	rp->timer.arg = (char *)rp;
 

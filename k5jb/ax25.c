@@ -1,6 +1,7 @@
 /* Low level AX.25 frame processing - address header */
 /* added declaration to axarp and reformatted 9/7/91 */
 /* Completed the SID2 ax25 mbxcall function 3/12/92 */
+/* Added an IP only ax25 call sign as an alternative to vckt stuff 11/13/93 */
 
 #include "options.h"
 #include "config.h"	/*K5JB*/
@@ -31,12 +32,17 @@ struct ax25_addr ax25_bdcst = {
 	'Q'<<1, 'S'<<1, 'T'<<1, ' '<<1, ' '<<1, ' '<<1,
 	('0'<<1) | E
 };
-#ifdef SID2
-struct ax25_addr bbscall;
-#endif
+
 char axbdcst[AXALEN];    /* Same thing, network format */
 struct ax25_addr mycall;
 int digipeat = 1;   /* Controls digipeating */
+
+#ifdef SID2
+struct ax25_addr bbscall;
+#endif
+#ifdef VCIP_SSID
+struct ax25_addr ip_call;
+#endif
 
 #ifdef SEGMENT
 /* AX.25 transmit frame segmenter used by NOS. Returns queue of segmented
@@ -109,23 +115,37 @@ char reliability;
 #endif
 	int atohax25();
 	void send_ax25();
-
+#ifdef VCIP_SSID			/* For ARP_VAX25, we have boogered res_arp to not */
+	int use_vc = 0;	/* enqueue UI frames and call arp_output */
+	if((hw_addr = res_arp(interface,ARP_VAX25,gateway,bp)) != NULLCHAR)
+		use_vc = 1;
+	else
+#endif
 	if((hw_addr = res_arp(interface,ARP_AX25,gateway,bp)) == NULLCHAR)
-		return 0; /* Wait for address resolution */
+			return 0; /* Wait for address resolution */
 
-	if(delay || (!reliability && (interface->flags == DATAGRAM_MODE))){
+#ifdef VCIP_SSID
+	if(!use_vc)
+#endif
+	if(delay || (!reliability && (interface->flags == DATAGRAM_MODE)))
 		/* Use UI frame */
 		return (*interface->output)(interface,hw_addr,
 			interface->hwaddr,PID_IP,bp);
-	}
+
 	/* Reliability is needed; use I-frames in AX.25 connection */
 	memcpy(destaddr.call,hw_addr,ALEN);
 	destaddr.ssid = hw_addr[ALEN];
 
-	if((axp = find_ax25(&destaddr)) == NULLAX25 || (axp->state != CONNECTED && axp->state!=RECOVERY)){
+	if((axp = find_ax25(&destaddr)) == NULLAX25 ||
+			(axp->state != CONNECTED && axp->state!=RECOVERY)){
 		/*NOTE: ADDED W9NK's SABM FIX OF && AXP->STATE!=RECOVERY GRC*/
 		/* Open a new connection or reinitialize the old one */
-		atohax25(&addr,hw_addr,(struct ax25_addr *)interface->hwaddr);
+#ifdef VCIP_SSID
+		if(use_vc)
+			atohax25(&addr,hw_addr,&ip_call);
+		else
+#endif
+			atohax25(&addr,hw_addr,(struct ax25_addr *)interface->hwaddr);
 		axp = open_ax25(&addr,axwindow,ax_incom,NULLVFP,NULLVFP,interface,(char *)0);
 		if(axp == NULLAX25){
 			free_p(bp);
@@ -170,7 +190,7 @@ struct interface *interface;
 char *dest;				/* Destination AX.25 address (7 bytes, shifted) */
 							/* Also includes digipeater string */
 char *source;			/* Source AX.25 address (7 bytes, shifted) */
-char pid;				/* Protocol ID */
+unsigned char pid;				/* Protocol ID */
 struct mbuf *data;	/* Data field (follows PID) */
 {
 	struct mbuf *abp,*cbp,*htonax25();
@@ -235,7 +255,7 @@ struct mbuf *bp;
 	int nrnodes = 0;
 	int nr_nodercv();
 #endif
-	char control;
+	unsigned char control;
 	struct ax25 hdr;
 	struct ax25_cb *axp,*find_ax25(),*cr_ax25();
 	struct ax25_addr ifcall;
@@ -253,7 +273,7 @@ struct mbuf *bp;
 	}
 
 #ifdef AX25_HEARD
-	/* heard stuff */
+	/* heard stuff - note that the heard structure is 1602 bytes */
 	if (heard.enabled) {
 	/* scan heard list.  if not there, add it */
 		prev = -1;
@@ -370,9 +390,16 @@ struct mbuf *bp;
 				; /* Packet directed at us */
 			else
 #ifdef NETROM
-				if(addreq(&hdr.dest,&nr_nodebc))
-					nrnodes = 1 ;
-				else
+			if(addreq(&hdr.dest,&nr_nodebc))
+				nrnodes = 1 ;
+			else
+#endif
+#ifdef VCIP_SSID
+			if(addreq(&hdr.dest,&ip_call))  /* our IP only call */
+			;       /* keep it -- probably coming from ROSE. lapb will discard
+						* it if it has F0 PID
+						*/
+			else
 #endif
 				{
 		/* Flunked all the if-else tests, No interest to us */
@@ -390,8 +417,8 @@ struct mbuf *bp;
 	 * bypassed.
 	 */
 	control = *bp->data & ~PF;
-	if(uchar(control) == UI){
-		char pid;
+	if(control == UI){
+		unsigned char pid;
 
 		(void)pullup(&bp,&pid,1);	/* toss the first character */
 		if(pullup(&bp,&pid,1) != 1)
@@ -402,7 +429,7 @@ struct mbuf *bp;
 		 * field.
 		 */
 		if(nrnodes){
-			if(uchar(pid) == PID_NETROM)
+			if(pid == PID_NETROM)
 				nr_nodercv(interface,&hdr.source,bp) ;
 			else      /* regular UI packets to "nodes" aren't for us */
 				free_p(bp) ;
@@ -466,9 +493,12 @@ struct mbuf *bp;
 				axp->addr.digis[j].ssid &= ~(E|REPEATED);
 			}
 			/* Scale timers to account for extra delay */
+			/* Note, this is not as agressive as typical TNCs */
 			axp->t1.start *= hdr.ndigis+1;
+/* we don't scale these
 			axp->t2.start *= hdr.ndigis+1;
 			axp->t3.start *= hdr.ndigis+1;
+*/
 		}
 		axp->addr.ndigis = hdr.ndigis;
 	}
@@ -479,8 +509,10 @@ struct mbuf *bp;
 	lapb_input(axp,hdr.cmdrsp,bp);
 }
 
-/* Initialize AX.25 entry in arp device table */
 /* General purpose AX.25 frame output */
+/* Everything comes here where decision on whether to use AX.25 V1 or V2
+ * is made.  Previously, V2 was hard coded into this thing - K5JB
+ */
 int
 sendframe(axp,cmdrsp,ctl,data)
 struct ax25_cb *axp;
@@ -500,15 +532,22 @@ struct mbuf *data;
 		return -1;
 	}
 	cbp->data[0] = ctl;
-
-	axp->addr.cmdrsp = cmdrsp;
+	if(axp->proto == V1)
+		axp->addr.cmdrsp = UNKNOWN;
+	else
+		if(cmdrsp == C_NOPOLL)  /* an I frame we don't want PF set on */
+			axp->addr.cmdrsp = COMMAND;
+		else{	/* do what caller wants with all other frames */
+			cbp->data[0] |= PF;
+			axp->addr.cmdrsp = cmdrsp;
+		}
 	/* Create address header */
 	if((hbp = htonax25(&axp->addr,cbp)) == NULLBUF){
 		free_p(cbp);
 		return -1;
 	}
 	/* The packet is all ready, now send it */
-#ifdef FORWARD
+#ifdef FORWARD	/* nobody would want to use this */
 	if(axp->interface->forw != NULLIF)
 		i = (*axp->interface->forw->raw)(axp->interface->forw,hbp);
 	else
@@ -518,6 +557,7 @@ struct mbuf *data;
 	return i;
 }
 
+/* Initialize AX.25 entry in arp device table */
 void
 axarp()
 {

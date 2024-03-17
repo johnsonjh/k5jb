@@ -26,13 +26,9 @@
 #define	ARP_BLANK	6	/* hate to see a blank - K5JB */
 #define	ARP_ARCNET	7
 #define	ARP_APPLETALK	8
-#ifdef NOTNEEDED
-#define ARP_ROSE	9	/* Fake ROSE to trick its packets */
+#define ARP_VAX25	9	/* To enable IP only AX.25 calling - K5JB */
 
 #define	NTYPES 10	/* Was HW something or other -- inconsistent */
-#else
-#define NTYPES 9
-#endif
 
 extern char *arptypes[];
 

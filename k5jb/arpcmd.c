@@ -1,5 +1,5 @@
 /* 7/29/91 Corrected placement of ifdef NETROM in arpadd() */
-/* 2/18/92 Added a pseudo ROSE arp entry to try and trick ROSE ckts */
+/* 11/14/93 Added support for an IP only address - K5JB */
 #include "config.h"
 #if defined(ETHER) || defined(AX25)
 #include <stdio.h>
@@ -14,12 +14,27 @@
 #include "arp.h"
 #include "cmdparse.h"
 
+#ifdef VCIP_SSID
+extern struct ax25_addr ip_call;
+#endif
+
 extern char badhost[];
 extern char nospace[];
 
 int doarpadd(),doarpdrop();
 struct cmds arpcmds[] = {
 	"add", doarpadd, 4,
+#ifdef VCIP_SSID
+#ifdef NETROM
+#ifdef ETHER
+	"arp add <hostid> ether|ax25|vax25|netrom <ether addr|callsign>",
+#else
+	"arp add <hostid> ax25|vax25|netrom <callsign>",
+#endif	/* ETHER */
+#else	/* NETROM */
+	"arp add <hostid> ax25|vax25 <callsign>",
+#endif	/* NETROM */
+#else /* VCIP_SSID */
 #ifdef NETROM
 #ifdef ETHER
 	"arp add <hostid> ether|ax25|netrom <ether addr|callsign>",
@@ -29,10 +44,22 @@ struct cmds arpcmds[] = {
 #else	/* NETROM */
 	"arp add <hostid> ax25 <callsign>",
 #endif	/* NETROM */
+#endif /* VCIP_SSID */
 
 	"arp add failed",
 
 	"drop", doarpdrop, 3,
+#ifdef VCIP_SSID
+#ifdef NETROM
+#ifdef ETHER
+	"arp drop <hostid> ether|ax25|netrom|vax25",
+#else
+	"arp drop <hostid> ax25|netrom|vax25",
+#endif	/* ETHER */
+#else	/* NETROM */
+	"arp drop <hostid> ax25|vax25",
+#endif	/* NETROM */
+#else /* VCIP_SSID */
 #ifdef NETROM
 #ifdef ETHER
 	"arp drop <hostid> ether|ax25|netrom",
@@ -42,10 +69,22 @@ struct cmds arpcmds[] = {
 #else	/* NETROM */
 	"arp drop <hostid> ax25",
 #endif	/* NETROM */
+#endif /* VCIP_SSID */
 
 	"not in table",
 
 	"publish", doarpadd, 4,
+#ifdef VCIP_SSID
+#ifdef NETROM
+#ifdef ETHER
+	"arp publish <hostid> ether|ax25|netrom|vax25 <ether addr|callsign>",
+#else
+	"arp publish <hostid> ax25|netrom|vax25 <callsign>",
+#endif /* ETHER */
+#else	/* NETROM */
+	"arp publish <hostid> ax25|vax25 <callsign>",
+#endif	/* NETROM */
+#else /* VCIP_SSID */
 #ifdef NETROM
 #ifdef ETHER
 	"arp publish <hostid> ether|ax25|netrom <ether addr|callsign>",
@@ -55,11 +94,12 @@ struct cmds arpcmds[] = {
 #else	/* NETROM */
 	"arp publish <hostid> ax25 <callsign>",
 #endif	/* NETROM */
+#endif /* VCIP_SSID */
 	"arp publish failed",
 
 	NULLCHAR, NULLFP, 0,
 	"arp subcommands: add, drop, publish",
-	NULLCHAR,
+	NULLCHAR
 };
 char *arptypes[] = {	/* little bit of wasted space here - K5JB */
 	"NET/ROM",			/* but arp.h would have to be also modified */
@@ -71,6 +111,7 @@ char *arptypes[] = {	/* little bit of wasted space here - K5JB */
 	"Blank",
 	"Arcnet",
 	"Appletalk",
+	"VAX.25"
 };
 
 int
@@ -116,8 +157,8 @@ char *argv[];
 		hardware = ARP_NETROM;
 		naddr = argc - 3 ;
 		if (naddr != 1) {
-			printf("No digipeaters in NET/ROM arp entries - ") ;
-			printf("use netrom route add\n") ;
+			printf(
+			"No digipeaters in NET/ROM arp entries - Use netrom route add\n") ;
 			return 1 ;
 		}
 		break;
@@ -132,10 +173,14 @@ char *argv[];
 		hardware = ARP_AX25;
 		naddr = argc - 3;
 		break;
-#ifdef APPLETALK
-	case 'm':	/* "mac appletalk" */
-		hardware = ARP_APPLETALK;
-		naddr = 1;
+#ifdef VCIP_SSID
+	case 'v':	/* VC AX.25 */
+		if(ip_call.call[0] == '\0'){
+			printf("Set vcipcall first\n");
+			return -1;
+		}
+		hardware = ARP_VAX25;
+		naddr = argc - 3;
 		break;
 #endif
 	default:
@@ -145,7 +190,11 @@ char *argv[];
 	/* If an entry already exists, clear it */
 	if((ap = arp_lookup(hardware,addr)) != NULLARP)
 		arp_drop(ap);
-
+#ifdef VCIP_SSID
+	if(hardware == ARP_VAX25)
+		at = &arp_type[ARP_AX25];
+	else
+#endif
 	at = &arp_type[hardware];
 	if(at->scan == NULLFP){
 		printf("Attach device first\n");
@@ -196,6 +245,11 @@ char *argv[];
 	case 'a':	/* "ax25" */
 		hardware = ARP_AX25;
 		break;
+#ifdef VCIP_SSID
+	case 'v':	/* VC AX.25 */
+		hardware = ARP_VAX25;
+		break;
+#endif
 #ifdef APPLETALK
 	case 'm':	/* "mac appletalk" */
 		hardware = ARP_APPLETALK;
@@ -219,23 +273,28 @@ dumparp()
 	register struct arp_tab *ap;
 	char e[128];
 	char *inet_ntoa();
-/*	extern char *arptypes[]; this is in arp.h */
 
-	printf("received %u badtype %u bogus addr %u reqst in %u replies %u reqst out %u\n",
+	printf(
+	"received %u badtype %u bogus addr %u reqst in %u replies %u reqst out %u\n",
 	 arp_stat.recv,arp_stat.badtype,arp_stat.badaddr,arp_stat.inreq,
 	 arp_stat.replies,arp_stat.outreq);
 
 	printf("IP addr         Type           Time Q Addr\n");
 	for(i=0;i<ARPSIZE;i++){
 		for(ap = arp_tab[i];ap != (struct arp_tab *)0;ap = ap->next){
-			printf("%-16s",inet_ntoa(ap->ip_addr));
-			printf("%-15s",arptypes[ap->hardware]);
-			printf("%-5ld",ap->timer.count*(long)MSPTICK/1000);
+			printf("%-16s%-15s%-5ld",inet_ntoa(ap->ip_addr),
+				arptypes[ap->hardware],ap->timer.count*(long)MSPTICK/1000);
 			if(ap->state == ARP_PENDING)
 				printf("%-2u",len_q(ap->pending));
 			else
 				printf("  ");
 			if(ap->state == ARP_VALID){
+#ifdef VCIP_SSID
+				if(ap->hardware == ARP_VAX25){
+					if(arp_type[ARP_AX25].format != NULLFP)
+						(*arp_type[ARP_AX25].format)(e,ap->hw_addr);
+				}else
+#endif
 				if(arp_type[ap->hardware].format != NULLFP){
 					(*arp_type[ap->hardware].format)(e,ap->hw_addr);
 				} else {

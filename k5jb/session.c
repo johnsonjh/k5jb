@@ -1,8 +1,28 @@
 /* Session control */
+/* put all the machine dependent terminal i/o in here, term_recv(),
+ * term_send(), and text_write().  K5JB k34
+ */
 #include <stdio.h>
 #include <string.h>
-#include "global.h"
+#include "options.h"
 #include "config.h"
+/* W5GFE modified Unix version of this code to allow an incoming telnet
+ * session to present in reversed video.  I added it so it also worked on
+ * AX.25 and Netrom sessions.  Also made provisions for MS-DOS - K5JB
+ */
+#ifdef CUTE_VIDEO
+#ifdef UNIX
+#include <curses.h>
+#include <term.h>
+#else
+#include <dos.h>
+extern unsigned ourcute;
+extern unsigned saved_attrib;
+extern int htoi();
+#endif
+#endif
+
+#include "global.h"
 #include "sokname.h"
 #include "mbuf.h"
 #include "netuser.h"
@@ -31,7 +51,7 @@ struct session *sessions;
 struct session *current;
 char notval[] = "Not a valid control block\n";
 char badsess[] = "Invalid session\n";
-void free();
+void free(),reset_tcp();
 
 /* Convert a character string containing a decimal session index number
  * into a pointer. If the arg is NULLCHAR, use the current default session.
@@ -179,7 +199,8 @@ go()
 {
 	void rcv_char(),ftpccr(),ax_rx(),fingcli_rcv(),raw() ;
 
-	if(current == NULLSESSION || current->type == FREE)
+	if(current == NULLSESSION || current->type == FREE ||
+			current->parse == NULLFP)	/* k35 */
 		return 0;
 	mode = CONV_MODE;
 	switch(current->type){
@@ -211,6 +232,8 @@ go()
 	}
 	return 0;
 }
+
+
 doclose(argc,argv)
 int argc;
 char *argv[];
@@ -219,12 +242,16 @@ char *argv[];
 #ifdef AX25
 	int disc_ax25(),reset_ax25();
 #endif
-	int reset_tcp(),kick_tcp();
+	int kick_tcp();
+	extern int closepending;	/* something we need to clean up prompts */
 
 	if((s = sessptr(argc > 1 ? argv[1] : NULLCHAR)) == NULLSESSION){
 		printf(badsess);
 		return -1;
 	}
+	cmdmode();	/* k35 */
+	closepending = 1;	/* to control prompts k35 */
+
 	switch(s->type){
 #ifdef _TELNET
 	case TELNET:
@@ -250,19 +277,21 @@ char *argv[];
 		break ;
 #endif
 	}
+	current->parse = NULLFP;	/* No further need to send things - k35 */
 	return 0;
 }
 doreset(argc,argv)
 int argc;
 char *argv[];
 {
-	long htol();
 	struct session *s;
+	extern int closepending;
 
 	if((s = sessptr(argc > 1 ? argv[1] : NULLCHAR)) == NULLSESSION){
 		printf(badsess);
 		return -1;
 	}
+	closepending = 1;	/* to control prompts k35 */
 	switch(s->type){
 #ifdef _TELNET
 	case TELNET:
@@ -299,7 +328,6 @@ dokick(argc,argv)
 int argc;
 char *argv[];
 {
-	long htol();
 #ifdef AX25
 	int kick_ax25();
 #endif
@@ -435,6 +463,7 @@ char *argv[];
 {
 #ifdef _TELNET	/* actually this whole function could be ifdefed if slip only */
 	struct tcb *tcb;
+	int16 ip_mtu();
 #endif
 #ifdef AX25
 	struct ax25_cb *axp;
@@ -498,7 +527,11 @@ char *argv[];
 #endif
 #ifdef _TELNET
 		case TELNET:
-			(*tcb->t_upcall)(tcb,tcb->snd.wnd - tcb->sndcnt);
+			/* this caused some interesting crashing! K5JB k34
+			 * Note that FTP also uses tcb->window, which is may not be best
+			 */
+			/* (*tcb->t_upcall)(tcb,tcb->snd.wnd - tcb->sndcnt); */
+			(*tcb->t_upcall)(tcb,tcb->window - tcb->sndcnt);
 			break;
 #endif
 		}
@@ -510,5 +543,217 @@ char *argv[];
 		printf("Uploading off\n");
 #endif
 	return 0;
+}
+
+#if defined(MSDOS) && defined(CUTE_VIDEO)
+/* a simple method of sending attribute along with a character, but it
+ * will not handle backspace, tab, or c/r correctly.
+ */
+void
+putca(c,attrib)
+char c;
+unsigned int attrib;
+{
+	union REGS regs;
+
+	/* Where is cursor? */
+	regs.h.ah = 0x03;	/* get cursor position */
+	regs.h.bh = 0;
+	int86(0x10,&regs,&regs);
+	/* dh has row, dl has column */
+
+	if(c != '\n'){	/* ordinary character */
+		regs.h.ah = 0x09;	/* write char and attrib at cursor */
+		regs.h.al = c;
+		regs.h.bh = 0;
+		regs.h.bl = attrib;
+		regs.x.cx = 1;
+		int86(0x10,&regs,&regs);
+	}
+	/* now we have to place our cursor.  (Ignoring backspacing, etc) */
+	if(c == '\n' || regs.h.dl == 79){	/* must go to next line */
+		if(regs.h.dh == 24){	/* bottom line */
+			regs.h.ah = 0x06;	/* scroll screen */
+			regs.h.al = 1;	/* do one line */
+			regs.h.ch = 0;
+			regs.h.cl = 0;
+			regs.h.dl = 79;
+			regs.h.bh = saved_attrib; /* this can be local or global */
+			int86(0x10,&regs,&regs);
+
+		}else
+			/* no scroll, just use next line */
+			regs.h.dh++;
+
+		regs.h.dl = 0;	/* column, set up for what follows */
+	}else
+		/* stay on same line, just bumping position */
+		regs.h.dl++;	/* column */
+
+	regs.h.ah = 0x02;	/* set cursor position */
+	regs.h.bh = 0;		/* page */
+	int86(0x10,&regs,&regs);
+}
+
+void
+putsa(ch,attrib)
+char *ch;
+unsigned int attrib;
+{
+	while(*ch)
+		putca(*ch++,attrib);
+}
+
+unsigned int
+get_attr()
+{
+	union REGS regs;
+
+	regs.h.ah = 0x08;	/* read char and attrib at cursor */
+	regs.h.bh = 0;
+	int86(0x10,&regs,&regs);
+
+	return regs.h.ah;
+/*	regs.h.al; has character */
+
+}
+
+int	/* called from main */
+doattrib(argc,argv)
+int argc;
+char *argv[];
+{
+	if(argc < 2)
+		printf("Usage: attrib bold|reverse|none|color <hex#>\n");
+	else{
+		switch(argv[1][0]){
+			case 'b':
+				ourcute = OUR_BOLD;
+				break;
+			case 'r':
+				ourcute = OUR_REVERSE;
+				break;
+			case 'c':
+				if((ourcute = (unsigned)htoi(argv[2])) != 0)
+					break;	/* else fall through */
+			default:
+				ourcute = OUR_NORMAL;
+				break;
+		}
+	}
+	return 0;
+}
+#endif
+
+
+/* take received or keyboarded characters, save them in a file in the
+ * native machine's text format. Do all filtering necessary here.
+ */
+void
+text_write(buf,size,fp)
+char *buf;
+int size;
+FILE *fp;
+{
+	char c;
+
+	while(size--){	/* assume CR is common denominator */
+		if((c = *buf++) == '\012') /* linefeed */
+			continue;
+		if(c == '\015'){	/* C/R */
+#if defined(_OSK) || defined(MSDOS)
+			fprintf(fp,"%c",c);
+#endif
+#if (defined(MSDOS) || defined(UNIX)) && !defined(_OSK)
+			fprintf(fp,"%c",'\012');	/* linefeed */
+#endif
+			continue;
+		}
+		fprintf(fp,"%c",c);
+	}
+}
+
+/* used by ax25cmd, nrcmd, and telnet.  Only telnet uses return value */
+
+int
+term_recv(bp,fp,telnet)
+struct mbuf *bp;
+FILE *fp;	/* possible session recording */
+int telnet;	/* called by telnet? */
+{
+	char c;
+
+	/* Display received characters, translating CR's to newlines for screen
+	and CR/LF.  text_write handles this if recording.
+	 */
+	while(bp != NULLBUF){
+#ifdef _TELNET
+		if(telnet && memchr(bp->data,IAC,bp->cnt) != NULLCHAR)
+			return 1;
+#endif
+		if(fp)
+			text_write(bp->data,bp->cnt,fp);
+		while(bp->cnt--){
+#if defined(UNIX) && defined(CUTE_VIDEO)
+			vidattr(A_STANDOUT);
+#ifdef notdef	/* if your terminal prints a extra space when it */
+					/* switches to STANDOUT, enable this part - W5GFE */
+			putchar('\b');
+#endif
+#endif
+			if((c = *bp->data++) == '\012')	/* linefeed */
+				continue;
+			if(c == '\015'){	/* C/R */
+#if defined(UNIX) && defined(CUTE_VIDEO)
+				vidattr(A_NORMAL);
+#endif
+#ifndef _OSK
+				c = '\n';
+#endif
+			}
+#if defined(MSDOS) && defined(CUTE_VIDEO)
+				putca(c,ourcute);
+#else
+			printf("%c",c);	/* was putchar, but this is smaller code */
+#endif
+
+		}
+#if defined(UNIX) && defined(CUTE_VIDEO)
+		vidattr(A_NORMAL);
+#endif
+		bp = free_mbuf(bp);
+	}
+	if(fp)
+		fflush(fp);
+#if !(defined(MSDOS) && defined(CUTE_VIDEO))
+	fflush(stdout);
+#endif
+	return 0;
+}
+
+void
+term_send(bp,from,size,offset)
+struct mbuf *bp;
+char *from;
+int16 size;
+int offset;
+{
+	register char *cp;
+	char c;
+
+	/* If recording is on, record outgoing stuff too */
+	if(current->record)
+		text_write(from,size,current->record);
+
+	/* Copy keyboard buffer to output, stripping line feeds */
+/* could be portability problems here -- test with non UNIX or MS-DOS - K5JB */
+	cp = bp->data + offset;
+	while(size-- != 0){
+		c = *from++;
+		if(c != '\012'){
+			*cp++ = c;
+			bp->cnt++;
+		}
+	}
 }
 #endif /* _TELNET or AX25 */

@@ -1,6 +1,5 @@
-/* ax_mbx.c, non xobbs part.  Merge with full ax_mbx.c before dist-
- * ribution.  This version has some of the new mbox features.  Code is
- * Unix compatible.  K5JB
+/* ax_mbx.c, non xobbs part.  This version has some of the new mbox features.
+ * Code is Unix compatible.  K5JB
  * 3/3/90 added check for disconnected link during a download and stifled
  * use of memory a bit during that process - K5JB
  * 6/6/91 added time out timers to AX25 and Netrom sessions.  Set it at
@@ -43,9 +42,17 @@
  * 9/93 some changes for OS9/K by N0QBJ and K5JB.  Some error messages
  * made optionally verbose.  Define VERBOSE is you want them; don't if you
  * want to keep the module smaller.
+ * 12/23/93, general housekeeping and crunching.  Corrected error in
+ * send from a BBS.  in the line sp k5jb @ w1aw < jy1, the @ was being
+ * punched out.  Changed callsigns to lower case which cut SMTP processing
+ * down by one cycle.  At request of one user to add more BBS features, I
+ * was inspired to define NOPLAYBBS to see what we could save if we didn't
+ * receive BBS forwarded mail, it is 532 bytes.  k34
  */
 
 #undef VERBOSE	/* error message in newmailfile() */
+/* 10 minutes plus a little bit... */
+#define MBOXLIFE 600050L	/* don't think we need this with added ax25 t4 */
 
 #include "options.h"
 #include "config.h"
@@ -77,26 +84,31 @@
 #include "cmdparse.h"
 #include "netuser.h"
 #include "tcp.h"
+#ifdef _OSK
+#include "os9stat.h"
+#endif
 /*
 #define USERWATCH to watch user's actions
 */
 
 #define LLCMD	/* this adds 146 bytes */
-
-#ifdef CMSG
-extern char *cmsg;		/* this, would have to be defined in files.c */
-#endif                  /* and path created by fileinit() in main.c */
+#define SIZE_NAME 10
 
 /* the 3 below, are defined in files.c */
 extern char *helpbox;
 extern char *public;
 extern char *mailspool;
 
+extern char hostname[];
+
 /* miscellaneous declarations */
-int queuejob(),validate_address(),start_timer(),stop_timer(),pax25(),disc_ax25();
-void rip(),free(),genlog(),send_ax25();
+int queuejob(),validate_address(),start_timer(),stop_timer(),pax25(),
+	disc_ax25(),mbx_line();
+void rip(),free(),genlog(),send_ax25(),free_mbx();
+
 #ifdef NETROM
-int send_nr4() ;
+int send_nr4();
+void disc_nr4();
 #endif
 extern FILE *dir();
 extern void filedir();
@@ -106,16 +118,14 @@ extern char versionf[];
 #define TRUE 1
 #endif
 struct mbx *mbox[NUMMBX];
-int ax25mbox;
+int ax25mbox = 1;	/* k34 */
 
-#define BUTTIN	/* to enable "s" */
-#ifdef BUTTIN
+#ifdef MB_BUTTIN
 int butt_flag = FALSE;
-#define BUTT_LEN 80
-static char butt_msg1[BUTT_LEN];
-
+extern char butt_msg1[];	/* defined in motd.c */
+int motd();
 static char butt_msg2[] =
-	"I'm at the console.  If you want to chat, send a \"c\".\015";
+	"I'm at the console.  To do chat, send a \"c\" (QRX for prompt).\015";
 #endif
 
 static char mbbanner[] =
@@ -123,36 +133,46 @@ static char mbbanner[] =
 #ifdef LLCMD
 static char mbmenu[] =
 	"Read #, Kill #, List, LLast #, Send, Chat, What, Help, Bye >\015";
-/*	"(R)ead [#], (K)ill [#], (L)ist, (LL)ast #, (S)end, (C)hat, (H)elp, (B)ye >\015";*/
 #else
 static char mbmenu[] =
 	"Read #, Kill #, List, Send, Chat, What, Help, Bye >\015";
-/*	"(R)ead [#], (K)ill [#], (L)ist, (S)end, (C)hat, (H)elp, (B)ye >\015";*/
 #endif
 
+char *sorry = "Sorry, My owner didn't read Chapter 2.\015";
+
 static char tmpbuf[MBXLINE];	/* used by various routines */
+char *cp;	/* utility pointer */
+struct mbuf *free_p();
+
+/* collected some common frees here */
+static void
+free_misc(m)
+struct mbx *m;
+{
+	if (m->to != NULLCHAR)
+		free(m->to);
+#ifndef NOPLAYBBS
+	if (m->tofrom != NULLCHAR)
+		free(m->tofrom);
+	if (m->tomsgid != NULLCHAR)
+		free(m->tomsgid);
+#endif
+	m->to = m->tofrom = m->tomsgid = NULLCHAR;
+}
 
 static void
 free_mbx(m)		/* called by mbx_state, mbx_nr4state, and mbx_line when we */
-struct mbx *m ;/* come back from chat (ax25 or netrom) */
+struct mbx *m;/* come back from chat (ax25 or netrom) */
 {
-void free();
-
 	genlog(m->name, "outa here");
-
-	if (m->to != NULLCHAR)
-		free(m->to) ;
-	if (m->tofrom != NULLCHAR)
-		free(m->tofrom) ;
-	if (m->tomsgid != NULLCHAR)
-		free(m->tomsgid) ;
+	free_misc(m);
 	if(m->name != NULLCHAR){
 		free(m->name);
 		m->name = NULLCHAR;
 	}
 	if(m->upload != NULLFILE){
-#if defined(_OSK) && !defined(_UCC)
-		tmpclose(m->upload);
+#if defined(_OSK) && !defined(_UCC)	/* Coherent could use this too if */
+		tmpclose(m->upload);	/* somebody would do a tmpfile thing for it */
 #else
 #ifdef UNIX
 		if(pclose(m->upload) < 0)	/* only needed in case of a directory read */
@@ -168,20 +188,17 @@ void free();
 #if defined(_OSK) && !defined(_UCC)
 		tmpclose(m->tfile);
 #else
-		fclose(m->tfile) ;
+		fclose(m->tfile);
 #endif
 
 	if(m->mboxwait.state != TIMER_STOP)
 		stop_timer(&m->mboxwait);
 	if(m->prompter.state != TIMER_STOP)
 		stop_timer(&m->prompter);
+	mbox[m->mbnum] = NULLMBX;
 
-/*	m->state = MBX_FREE;	think about this */
-
-	mbox[m->mbnum] = NULLMBX ;
-
-	free(m) ;
-#ifdef BUTTIN	/* and finally ... */
+	free(m);
+#ifdef MB_BUTTIN	/* and finally ... */
 	butt_flag = FALSE;
 	*butt_msg1 = '\0';
 #endif
@@ -189,40 +206,40 @@ void free();
 
 static int
 mbx_msg(m,msg)
-struct mbx *m ;
-char msg[] ;
+struct mbx *m;
+char msg[];
 {
-	int len ;
-	struct mbuf *bp ;
-	struct ax25_cb *axp ;
+	int len;
+	struct mbuf *bp;
+	struct ax25_cb *axp;
 #ifdef NETROM
-	struct nr4cb *cb ;
+	struct nr4cb *cb;
 #endif
 
 	len = strlen(msg);
-	switch (m->type) {
+	switch (m->type){
 		case MBX_AX25:
-			axp = m->cb.ax25_cb ;
-			if ((bp = alloc_mbuf(len+1)) == NULLBUF) {
-				disc_ax25(axp) ;
+			axp = m->cb.ax25_cb;
+			if ((bp = alloc_mbuf(len+1)) == NULLBUF){
+				disc_ax25(axp);
 				return(-1);
 			}
-			bp->cnt = len + 1 ;
-			*bp->data = PID_NO_L3 ;
-			memcpy(bp->data+1, msg, len) ;
+			bp->cnt = len + 1;
+			*bp->data = PID_NO_L3;
+			memcpy(bp->data+1, msg, len);
 			send_ax25(axp,bp);
-			break ;
+			break;
 #ifdef NETROM
 		case MBX_NETROM:
-			cb = m->cb.nr4_cb ;
-			if ((bp = alloc_mbuf(len)) == NULLBUF) {
-				disc_nr4(cb) ;
+			cb = m->cb.nr4_cb;
+			if ((bp = alloc_mbuf(len)) == NULLBUF){
+				disc_nr4(cb);
 				return(-1);
 			}
-			bp->cnt = len ;
-			memcpy(bp->data, msg, len) ;
-			send_nr4(cb, bp) ;
-			break ;
+			bp->cnt = len;
+			memcpy(bp->data, msg, len);
+			send_nr4(cb, bp);
+			break;
 #endif
 	}
 	return(0);
@@ -233,32 +250,31 @@ domboxdisplay(m,remote)
 struct mbx *m;
 int remote;
 {
-	int i ;
-	struct mbx *lm ;
-	extern char tmpbuf[];
-	static char *states[] = {"NONE","CMD","SUBJ","DATA","SEND","DISC"} ;
+	int i;
+	struct mbx *lm;
+	static char *states[] = {"NONE","CMD","SUBJ","DATA","SEND","DISC"};
 #ifdef NETROM
-	static char *mbtype[] = {"NONE","AX25 ","NET/ROM"} ;
+	static char *mbtype[] = {"NONE","AX25 ","NET/ROM"};
 #else
-	static char *mbtype[] = {"NONE","AX25 "} ;
+	static char *mbtype[] = {"NONE","AX25 "};
 #endif
 
-	sprintf(tmpbuf," User       State    Type    &cb     ms left\015") ;
+	sprintf(tmpbuf," User       State    Type    &cb      ms left\015");
 	if(remote)
 		mbx_msg(m,tmpbuf);
-		else{
-			rip(tmpbuf);
-			printf("%s\n",tmpbuf);
-		}
-	for (i = 0 ; i < NUMMBX ; i++){
+	else{
+		rip(tmpbuf);
+		printf("%s\n",tmpbuf);
+	}
+	for (i = 0;i < NUMMBX;i++){
 		if ((lm = mbox[i]) != NULLMBX){
-#ifdef NETROM
-			sprintf(tmpbuf," %-10s %-4s     %-7s %-7x %ld\015",
+#ifdef NETROM                           /* %-8x is deliberate */
+			sprintf(tmpbuf," %-10s %-4s     %-7s %-8x %ld\015",
 			 lm->name, states[lm->state], mbtype[lm->type],
 			 lm->type == MBX_AX25 ? (char *)lm->cb.ax25_cb : (char *)lm->cb.nr4_cb,
 			 lm->mboxwait.count * MSPTICK);
 #else
-			sprintf(tmpbuf," %-10s %-4s     %-7s %-7x %ld\015",
+			sprintf(tmpbuf," %-10s %-4s     %-7s %-8x %ld\015",
 			 lm->name, states[lm->state], mbtype[lm->type],
 			 (char *)lm->cb.ax25_cb, lm->mboxwait.count * MSPTICK);
 #endif
@@ -274,23 +290,23 @@ int remote;
 
 int
 dombox(argc, argv)
-int argc ;
-char *argv[] ;
+int argc;
+char *argv[];
 {
-
-	if (argc < 2) {
+	if (argc < 2){
+		printf("mailbox is %s\n", ax25mbox ? "on" : "off");
 		domboxdisplay(NULLMBX,0);	/* the 0 indicates local, 1 is remote */
 		return(0);
 	}
+	if(argv[1][1] == 'n' || argv[1][1] == 'f'){	/* k34 */
+		ax25mbox = argv[1][1] == 'n' ? 1 : 0;
+		return 0;
+	}
 
-	if (argv[1][0] == 'y' || (strcmp(argv[1],"on") == 0))
-		ax25mbox = 1 ;
-	else if (argv[1][0] == 'n' || (strcmp(argv[1],"off") == 0))
-		ax25mbox = 0 ;
-#ifdef BUTTIN
-	else if (*argv[1] == 's'){
-		int i,j=0;
-		for (i = 0 ; i < NUMMBX ; i++)
+#ifdef MB_BUTTIN	/* note that if there are mult. users message can go */
+	if (*argv[1] == 's'){         /* to ANY one of them */
+		int i;
+		for (i = 0;i < NUMMBX;i++)
 			if (mbox[i] != NULLMBX)
 				break;
 		if(i == NUMMBX){
@@ -298,30 +314,18 @@ char *argv[] ;
 			return(0);
 		}
 		butt_flag = TRUE;	/* prompt routine will send our message */
-		if(argc > 2){	/* we have something to say */
-			for(i=2;i<argc;i++){
-				if(j)
-					butt_msg1[j++] = ' ';
-				do{
-					butt_msg1[j++] = *argv[i]++;
-					if(j > BUTT_LEN - 3)
-						break;
-				}while(*argv[i]);
-				if(j > BUTT_LEN - 4)
-					break;
-			}
-			butt_msg1[j++] = '\015';
-			butt_msg1[j] = '\0';
+		if(argc > 2){	/* We have something to say */
+			argc--;
+			argv++;
+			motd(argc,argv);
 		}
 	}
-#endif	/* BUTTIN */
-	else if (argv[1][0] == '?')
-		printf("ax25 mailbox is %s\n", ax25mbox ? "on" : "off") ;
+#endif	/* MB_BUTTIN */
 	else
-#ifdef BUTTIN
-		printf("usage: mbox [ y|n|?| s [<message>] ]\n") ;
+#ifdef MB_BUTTIN
+		printf("usage: mbox [on|off] [send [<line>]]\n");
 #else
-		printf("usage: mbox [y|n|?]\n") ;
+		printf("usage: mbox [on|off]\n");
 #endif
 	return(0);
 }
@@ -331,8 +335,8 @@ errorexit(m,msg)
 struct mbx *m;
 char *msg;
 {
-int doexit();
-extern int exitval;
+	int doexit();
+	extern int exitval;
 
 	exitval = 1;
 	genlog(m->name,msg);
@@ -343,9 +347,9 @@ static struct mhdr *
 inithdr(m)
 struct mbx *m;
 {
-struct mhdr *mhdr;
-struct mhdr *newhdr;
-int i;
+	struct mhdr *mhdr;
+	struct mhdr *newhdr;
+	int i;
 
 	/* calloc used to fill struct with zeros */
 	if((newhdr = (struct mhdr *)calloc(1,sizeof(struct mhdr))) == NULLMSGHDR)
@@ -363,6 +367,12 @@ int i;
 	}
 	m->msgs += 1;
 	mhdr->msgnr = m->msgs;
+#ifdef TURKEYS	/* if you deal with MSYS people and the like, use this:
+	strcpy(mhdr->from,"(no From:)");	/* costs around 84 bytes */
+	strcpy(mhdr->subj,"(no Subject:)");
+	strcpy(mhdr->date,"(no Date:)");
+#endif
+
 	return(mhdr);
 }
 
@@ -370,24 +380,22 @@ int i;
 static struct mbx *
 newmbx()
 {
-	int i ;
-	struct mbx *m ;
+	int i;
+	struct mbx *m;
 
-	for (i = 0 ; i < NUMMBX ; i++)
-		if (mbox[i] == NULLMBX) {
+	for (i = 0;i < NUMMBX;i++)
+		if (mbox[i] == NULLMBX){
 			if ((m = mbox[i] = (struct mbx *)calloc(1,sizeof(struct mbx)))
 				== NULLMBX)
 				return(NULLMBX);
-			m->mbnum = i ;
+			m->mbnum = i;
 			m->msgs = 0;
-			m->state = MBX_CMD ;	/* start in command state */
+			m->state = MBX_CMD;	/* start in command state */
 			m->prompter.state = TIMER_STOP;
 			m->promptwait = 0;
 			return(m);
 		}
-
 	/* If we get here, there are no free mailbox sessions */
-
 	return(NULLMBX);
 }
 
@@ -395,7 +403,7 @@ static int
 g_args(m)	/* return offset to first letter of arg */
 struct mbx *m;	/* or nul if none detected after command */
 {
-int i = 0;
+	int i = 0;
 
 	do
 		i++;
@@ -412,36 +420,33 @@ int i = 0;
 	return(0);
 }
 
-int mbx_line();
-
 static void
 build_line(m,bp)
 struct mbx *m;
 struct mbuf *bp;
 {
-	char c ;
-	while (pullup(&bp,&c,1) == 1) {
+	char c;
+
+	while (pullup(&bp,&c,1) == 1){
 		if(c == '\012')	/* skip linefeeds */
 			continue;
-		if (c == '\015') {
-			*m->lp = '\0' ;			/* null terminate */
-			if (mbx_line(m) == -1) {	/* call the line processor */
-				free_p(bp) ;		/* toss the rest */
-				break ;				/* get out - we're obsolete */
+		if (c == '\015'){
+			*m->lp = '\0';			/* null terminate */
+			if (mbx_line(m) == -1){	/* call the line processor */
+				free_p(bp);		/* toss the rest */
+				break;				/* get out - we're obsolete */
 			}
-			m->lp = m->line ;		/* reset the pointer */
-		}
-		else if ((m->lp - m->line) == (MBXLINE - 1)) {
-			*m->lp++ = c ;
-			*m->lp = '\0' ;
-			if (mbx_line(m) == -1) {
-				free_p(bp) ;
-				break ;
+			m->lp = m->line;		/* reset the pointer */
+		}else if ((m->lp - m->line) == (MBXLINE - 1)){
+			*m->lp++ = c;
+			*m->lp = '\0';
+			if (mbx_line(m) == -1){
+				free_p(bp);
+				break;
 			}
-			m->lp = m->line ;
-		}
-		else
-			*m->lp++ = c ;
+			m->lp = m->line;
+		}else
+			*m->lp++ = c;
 	}
 }
 
@@ -451,16 +456,16 @@ struct mbuf *bp;
 
 void
 mbx_rx(axp,cnt)
-struct ax25_cb *axp ;
-int16 cnt ;
+struct ax25_cb *axp;
+int16 cnt;
 {
-	struct mbuf *bp, *recv_ax25() ;
-	struct mbx *m ;
+	struct mbuf *bp, *recv_ax25();
+	struct mbx *m;
 
-	m = (struct mbx *)axp->user ;
+	m = (struct mbx *)axp->user;
 	start_timer(&m->mboxwait);	/* reset idle timer */
 	if ((bp = recv_ax25(axp,cnt)) == NULLBUF)
-		return ;
+		return;
 	build_line(m,bp);
 }
 
@@ -468,9 +473,9 @@ static void
 cleanup(m)
 struct mbx *m;
 {
-struct mhdr *mhdr;
-struct mhdr *tmphdr;
-int i;
+	struct mhdr *mhdr;
+	struct mhdr *tmphdr;
+	int i;
 
 	for(i=0,mhdr=m->firsthdr;i<m->msgs;i++){
 		tmphdr = mhdr->next;
@@ -484,21 +489,20 @@ int i;
 
 void
 mbx_state(axp,old,new)
-struct ax25_cb *axp ;
-int old, new ;
+struct ax25_cb *axp;
+int old, new;
 {
-	struct mbx *m ;
-	void free_mbx();
+	struct mbx *m;
 #ifdef SID2
-	void mbx_incom() ;
+	void mbx_incom();
 #endif
 
-	if (new == DISCONNECTED) {
-		m = (struct mbx *)axp->user ;
+	if (new == DISCONNECTED){
+		m = (struct mbx *)axp->user;
 		if(m->msgs)
 			cleanup(m);	/* leave mail file alone if we get here */
-		axp->user = NULLCHAR ;
-		free_mbx(m) ;
+		axp->user = NULLCHAR;
+		free_mbx(m);
 	}
 #ifdef SID2
 	/* this is a hell of a thing to do in a state upcall...
@@ -514,12 +518,11 @@ static void
 mailfetch(m)
 struct mbx *m;
 {
-FILE *mailfile;
-char tmpline[40];
-int i;
-struct mhdr *mhdr;
-extern char tmpbuf[];
-char *txtname; /* may be smaller code to do txtname[40] */
+	FILE *mailfile;
+	char tmpline[40];
+	int i;
+	struct mhdr *mhdr;
+	char *txtname; /* may be smaller code to do txtname[40] */
 
 	if((txtname = (char *)malloc(sizeof(char) * (strlen(mailspool) +
 		strlen(m->name) + 6))) == 0)
@@ -529,66 +532,80 @@ char *txtname; /* may be smaller code to do txtname[40] */
 		free(txtname);
 		return;
 	}
+
 	while(fgets(tmpbuf,MBXLINE,mailfile) != NULLCHAR){
 		rip(tmpbuf);
-/*
-From k5jb@k5jbgucci Mon Jun 17 11:32:55 1991
-*/
-		if(strncmp(tmpbuf,"From ",5) == 0){
-			mhdr = inithdr(m);
+		/*
+		From k5jb@k5jbgucci Mon Jun 17 11:32:55 1991
+		*/
+		if(strncmp(tmpbuf,"From ",5) == 0){ /* guess we could save this in */
+			mhdr = inithdr(m);		/* case mail header was noncompliant */
 #ifdef UNIX
 			mhdr->fileptr = ftell(mailfile) - strlen(tmpbuf) - 1; /* the EOL */
 #else
 			mhdr->fileptr = ftell(mailfile) - strlen(tmpbuf) - 2; /* the EOL */
 #endif
 
-/* inithdr already incremented msgs */
+			/* inithdr already incremented msgs */
 			if(m->msgs > 1)	/* size is int & fileptr long, but that's OK */
 				mhdr->prev->size = (int)(mhdr->fileptr - mhdr->prev->fileptr);
 			continue;
 		}
-/*
-Date: Mon, 17 Jun 91 11:32:04 CDT
-*/
+
+		if(m->msgs == 0)
+			break; /* badly formed file */
+
+		/* Note that many mailers are not RFC-822 compliant here
+		Date: Mon, 17 Jun 91 11:32:04 CDT
+		*/
 		if(strncmp(tmpbuf,"Date:",5) == 0){
-			if(m->msgs == 0)
-				break; /* badly formed file */
-			for(i=11;i<26;i++)
-				tmpline[i-11] = tmpbuf[i];
-			tmpline[i-11] = '\0';	/* inithdr malloced 16 chars */
+			int colons = 0;
+			cp = &tmpbuf[11];
+         /* sizeof mhdr->date is 16 chars */
+			for(i=0;i < sizeof(mhdr->date) - 1 && *cp;i++){
+				if(*cp == ':')
+					if(colons++)
+						break;	/* Common error, we only want one colon */
+				tmpline[i] = *cp++;
+			}
+			tmpline[i] = '\0';
 			strcpy(mhdr->date,tmpline);
 			continue;
 		}
-/*
-From: k5jb@k5jbgucci (K5JB_Gucci)
-*/
+		/*
+		From: k5jb@k5jbgucci (K5JB_Gucci) or Joe, K5JB <k5jb@k5jb>
+		*/
 		if(strncmp(tmpbuf,"From:",5) == 0){
-			if(m->msgs == 0)
-				break; /* badly formed file */
-			for(i=6;i<28 && tmpbuf[i] > ' ';i++)
-				tmpline[i-6] = tmpbuf[i];
-			tmpline[i-6] = '\0';	/* inithdr malloced 23 chars */
+			/* <user@host> is a common RFC-822 From: field */
+			if((cp = strchr(tmpbuf,'<')) == NULLCHAR)	/* no '<' found */
+				cp = &tmpbuf[5];
+			cp++;
+         /* sizeof mhdr->from is 23 chars */
+			for(i=0;i<sizeof(mhdr->from) - 1;i++){
+				if(*cp <= ' ' || *cp == '>')	/* don't want spaces here */
+					break;
+				tmpline[i] = *cp++;
+			}
+			tmpline[i] = '\0';
 			strcpy(mhdr->from,tmpline);
 			continue;
 		}
-/*
-Subject: First Message
-*/
+		/*
+		Subject: First Message
+		*/
 		if(strncmp(tmpbuf,"Subje",5) == 0){
-			if(m->msgs == 0)
-				break; /* badly formed file */
-			for(i=9;i<39 && tmpbuf[i] >= ' ';i++)
-				tmpline[i-9] = tmpbuf[i];
-			tmpline[i-9] = '\0';	/* inithdr malloced 31 chars */
+			cp = &tmpbuf[9];
+			/* sizeof mhdr->subj is 31 chars */
+			for(i=0;i<sizeof(mhdr->subj) - 1 && *cp >= ' ';i++) /* space ok here */
+				tmpline[i] = *cp++;                        /* but no ctrl chars */
+			tmpline[i] = '\0';
 			strcpy(mhdr->subj,tmpline);
 			continue;
 		}
-/*
-Status: R
-*/
+		/*
+		Status: R
+		*/
 		if(strncmp(tmpbuf,"Status",6) == 0){
-			if(m->msgs == 0)
-				break; /* badly formed file */
 			mhdr->status |= STATREAD;
 			continue;
 		}
@@ -623,7 +640,7 @@ struct mbx *m; /* if promptwait flag != 0.  Otherwise, send prompt now. */
 			m->promptwait = 0;	/* abort happens in mbx_line() */
 		}
 	}
-#ifdef BUTTIN
+#ifdef MB_BUTTIN
 	if(butt_flag){
 		butt_flag = FALSE;
 		if(*butt_msg1 != '\0'){
@@ -633,7 +650,11 @@ struct mbx *m; /* if promptwait flag != 0.  Otherwise, send prompt now. */
 		mbx_msg(m,butt_msg2);
 	}
 #endif
+#ifndef NOPLAYBBS
 	mbx_msg(m, (m->sid & MBX_SID) ? ">\015" : mbmenu);
+#else
+	mbx_msg(m, mbmenu);
+#endif
 }
 
 /* modified from doupload from session.c - triggers the t_upcall mechanism
@@ -647,9 +668,9 @@ read_fd(m,fd)	/* hand this an open file descriptor - it will launch */
 struct mbx *m; /* yer file with t_upcall, followed by a prompt from */
 FILE *fd;		/* timer daemon.  Abort sensed in mbx_line() */
 {
-struct ax25_cb *axp;
+	struct ax25_cb *axp;
 #ifdef NETROM
-struct nr4cb *cb ;
+	struct nr4cb *cb;
 #endif
 
 	switch(m->type){
@@ -658,8 +679,8 @@ struct nr4cb *cb ;
 			break;
 #ifdef NETROM
 		case MBX_NETROM:
-			cb = m->cb.nr4_cb ;
-			break ;
+			cb = m->cb.nr4_cb;
+			break;
 #endif
 	}
 	m->upload = fd;
@@ -669,15 +690,15 @@ struct nr4cb *cb ;
 	m->promptwait = 5;	/* indicates 5 sec delays */
 	do_prompt(m);	/* start the prompt daemon */
 
-/* All set, kick transmit upcall to get things rolling */
+	/* All set, kick transmit upcall to get things rolling */
 	switch(m->type){
 		case MBX_AX25:
 			(*axp->t_upcall)(axp,axp->paclen * axp->maxframe);
 			break;
 #ifdef NETROM
 		case MBX_NETROM:
-			(*cb->t_upcall)(cb, NR4MAXINFO) ;
-			break ;
+			(*cb->t_upcall)(cb, NR4MAXINFO);
+			break;
 #endif
 	}
 }
@@ -687,10 +708,9 @@ showlist(m,full)		/* is not currently tested.  Full is zero on connect */
 struct mbx *m; 		/* "full" can contain number of messages we want to */
 int full;				/* list. */
 {
-int i,new = 0,rtn = 0;
-extern char tmpbuf[];
-struct mhdr *mhdr;
-extern FILE *tmpfile();
+	int i,new = 0,rtn = 0;
+	struct mhdr *mhdr;
+	extern FILE *tmpfile();
 
 #ifdef LLCMD
 	if(full < 0 || full > m->msgs)
@@ -719,7 +739,7 @@ extern FILE *tmpfile();
 			return(0);
 		}
 
-/* prepare a temp file.  read_fd will do m->upload = m->upload */
+		/* prepare a temp file.  read_fd will do m->upload = m->upload */
 		if ((m->upload = tmpfile()) == NULLFILE)
 			return(-1);	/* No test for this currently */
 		mhdr = m->firsthdr;
@@ -733,7 +753,7 @@ extern FILE *tmpfile();
 #endif
 		for(i=new;i<m->msgs;i++,mhdr = mhdr->next)
 			if(!(mhdr->status & STATREAD) || full)
-				fprintf(m->upload,"%s%s%3d %-22s %s %4d %s\015",
+				fprintf(m->upload,"%s%s%3d %-22s %-16s%4d %s\015",
 				mhdr->status & STATREAD ? "R" : " ",
 				mhdr->status & STATKILL ? "K" : " ",mhdr->msgnr,
 					mhdr->from,mhdr->date,mhdr->size,mhdr->subj);
@@ -747,7 +767,7 @@ extern FILE *tmpfile();
 
 static void
 mbx_disc(m)
-struct mbx *m ;
+struct mbx *m;
 {
 	if(m->mboxwait.state == TIMER_EXPIRE)
 		genlog(m->name,"mbox timeout");
@@ -755,14 +775,14 @@ struct mbx *m ;
 		stop_timer(&m->mboxwait);
 		genlog(m->name,"mbox disconnect");
 	}
-	switch (m->type) {
-	  case MBX_AX25:
-		disc_ax25(m->cb.ax25_cb) ;
-		break ;
+	switch (m->type){
+		case MBX_AX25:
+			disc_ax25(m->cb.ax25_cb);
+			break;
 #ifdef NETROM
-	  case MBX_NETROM:
-	  	disc_nr4(m->cb.nr4_cb) ;
-		break ;
+		case MBX_NETROM:
+			disc_nr4(m->cb.nr4_cb);
+			break;
 #endif
 	}
 }
@@ -779,10 +799,9 @@ readany(m,f_name)
 struct mbx *m;
 char *f_name;
 {
-FILE *anyfile;
-extern char tmpbuf[];
+	FILE *anyfile;
 #ifdef UNIX
-struct stat statbuf;
+	struct stat statbuf;
 #endif
 
 #ifdef USERWATCH
@@ -808,163 +827,127 @@ struct stat statbuf;
 		return FALSE;
 }
 
-/* Incoming mailbox session via ax.25 */
+/* put a duplicated routine here and added tolower() k34 */
+void
+tidy_call(m,addrp)
+struct mbx *m;
+char *addrp;
+{
+	char *cp;
+
+	if((m->name = (char *)malloc(sizeof(char) * SIZE_NAME)) != NULLCHAR)
+		pax25(m->name,addrp);
+	if((cp = strchr(m->name,'-')) != NULLCHAR)
+		*cp = '\0';
+	cp = m->name;
+	while(*cp)
+		*cp++ = (char)tolower(*cp);	/* k34 */
+	m->lp = m->line;		/* point line pointer at buffer */
+}
 
 void
-mbx_incom(axp,cnt)
-register struct ax25_cb *axp ;
-int16 cnt ;
+mbx_incom_common(m,axp,cnt)
+struct mbx *m;
+struct ax25_cb *axp;
+int16 cnt;
 {
-	struct mbx *m;
-	struct mbuf *bp, *recv_ax25() ;
-	char *cp ;
-	extern char hostname[] ;
-	void ax_tx();
-#ifdef NETROM
-	void nr4_tx();
-#endif
+	struct mbuf *bp, *recv_ax25();
 #ifdef SID2
 	extern struct ax25_addr bbscall;
 	int addreq();
 #endif
 
-	if ((m = newmbx()) == NULLMBX) { /* m->msgs will be 0 */
-		disc_ax25(axp) ;	/* no memory! disc_ax25() will call lapbstate() */
-					/* which has axp->s_upcall still = NULLVFP ?? */
-		return ;
-	}
 
-	m->type = MBX_AX25 ;	/* this is an ax.25 mailbox session */
-	m->cb.ax25_cb = axp ;       /* free() used on name on exit */
-	if((m->name = (char *)malloc(sizeof(char) * 10)) != NULLCHAR)
-		pax25(m->name,&axp->addr.dest) ;
-	cp = strchr(m->name,'-') ;
-	if (cp != NULLCHAR)			/* get rid of SSID */
-		*cp = '\0' ;
-/* Think about this a bit - it is a place holder in the struct for now
-	m->parse = NULLVFP; 	see ax_parse()
-*/
-#ifdef UNIX
-	for(cp = m->name; *cp != '\0'; cp++)
-		*cp = (char)tolower(*cp);
-#endif
-	m->lp = m->line ;		/* point line pointer at buffer */
-	axp->r_upcall = mbx_rx ;
-	axp->s_upcall = mbx_state ;
-	axp->t_upcall = ax_tx;	/* used for file uploading - in ax25cmd.c */
-	axp->user = (char *)m ;
+	/* add an idle timer to the mailbox */
 
-	/* add an idle timer to the mbox */
-
-	m->mboxwait.start = 600050L / MSPTICK;	/* 10 minutes */
+	m->mboxwait.start = MBOXLIFE / MSPTICK;	/* 10 minutes */
 	m->mboxwait.func = (void(*)())mbx_disc;
 	m->mboxwait.arg = (char *)m;
 	start_timer(&m->mboxwait);
 
-	/* The following is necessary because we didn't know we had a
-	 * "real" ax25 connection until a data packet came in.  We
-	 * can't be spitting banners out at every station who connects,
-	 * since they might be a net/rom or IP station.  Sorry.
-	 *
-	 * If ax25 mbxcall is defined, we can respond right away to one
-	 * who connects to us using that call - K5JB
-	 */
+	/* don't need this test if no NETROM, but sure ugly to ifdef it out */
+	if(axp != NULLAX25){
 
+		/* The following is necessary because we didn't know we had a
+		 * "real" ax25 connection until a data packet came in.  We
+		 * can't be spitting banners out at every station who connects,
+		 * since they might be a net/rom or IP station.  Sorry.
+		 *
+		 * If ax25 mbxcall is defined, we can respond right away to one
+		 * who connects to us using that call - K5JB
+		 */
 #ifdef SID2	/* if call came with mboxcall, we don't gobble packet */
-	/* but if it came with our regular call, we do */
-	if(!addreq(&axp->addr.source,&bbscall)){
-		bp = recv_ax25(axp,cnt) ;		/* get the initial input */
-		free_p(bp) ;					/* and throw it away to avoid confusion */
-	}
+		/* but if it came with our regular call, we do */
+		if(!addreq(&axp->addr.source,&bbscall)){
+			bp = recv_ax25(axp,cnt);		/* get the initial input */
+			free_p(bp);					/* and throw it away to avoid confusion */
+		}
 #else
-	bp = recv_ax25(axp,cnt) ;
-	free_p(bp) ;
+		bp = recv_ax25(axp,cnt);
+		free_p(bp);
 #endif
-	/* Now say hi */
-
-	if ((bp = alloc_mbuf(strlen(hostname) + strlen(mbbanner) + 2)) == NULLBUF) {
-		disc_ax25(axp) ; /* mbx_state will fix stuff up. disc_ax25() calls */
-				/* lapbstate with arg DISCPENDING, which will call mbx_state() */
-		return ;
 	}
-
-	*bp->data = PID_NO_L3 ;	/* pid */
-	(void)sprintf(bp->data+1,mbbanner,hostname) ;
-	bp->cnt = strlen(bp->data+1) + 1 ;
-	send_ax25(axp,bp) ;					/* send greeting message and menu */
-	genlog(m->name,"mbox (ax25) connect");
-
-#ifdef CMSG
-	if(readany(m,cmsg) == FALSE)
-/*		mbx_msg(m,"No connect message\015");*/
+	/* Say hi */
+	(void)sprintf(tmpbuf,mbbanner,hostname);
+	mbx_msg(m,tmpbuf);
+#ifdef NETROM
+	if(axp == NULLAX25)
+		genlog(m->name,"N/R mbox connect");
+	else
 #endif
+		genlog(m->name,"AX.25 mbox connect");
 	mailfetch(m);
 	showlist(m,0);	/* the 0 is for a partial list - can return an error */
+}
+
+/* Incoming mailbox session via ax.25 */
+void
+mbx_incom(axp,cnt)
+register struct ax25_cb *axp;
+int16 cnt;
+{
+	struct mbx *m;
+	struct mbuf *recv_ax25();
+	void ax_tx();
+
+	if ((m = newmbx()) == NULLMBX){ /* m->msgs will be 0 */
+		disc_ax25(axp);	/* no memory! disc_ax25() will call lapbstate() */
+					/* which has axp->s_upcall still = NULLVFP ?? */
+		return;
+	}
+
+	m->type = MBX_AX25;	/* this is an ax.25 mailbox session */
+	m->cb.ax25_cb = axp;       /* free() used on name on exit */
+	tidy_call(m,&axp->addr.dest);
+	axp->r_upcall = mbx_rx;
+	axp->s_upcall = mbx_state;
+	axp->t_upcall = ax_tx;	/* used for file uploading - in ax25cmd.c */
+	axp->user = (char *)m;
+	mbx_incom_common(m,axp,cnt);
 }
 
 /* Incoming mailbox session via net/rom */
 #ifdef NETROM
 void
 mbx_nr4incom(cb)
-register struct nr4cb *cb ;
+register struct nr4cb *cb;
 {
 	struct mbx *m;
-	struct mbuf *bp ;
-	char *cp ;
-	extern char hostname[] ;
-	void mbx_nr4rx(), mbx_nr4state() ;
+	void mbx_nr4rx(), mbx_nr4state(), nr4_tx();
 
-	if ((m = newmbx()) == NULLMBX) {
-		disc_nr4(cb) ;	/* no memory! */
-		return ;
+	if ((m = newmbx()) == NULLMBX){
+		disc_nr4(cb);	/* no memory! */
+		return;
 	}
 
-	m->type = MBX_NETROM ;	/* mailbox session type is net/rom */
-	m->cb.nr4_cb = cb ;
-
-	if((m->name = (char *)malloc(sizeof(char) * 10)) != NULLCHAR)
-		pax25(m->name,&cb->user) ;
-	cp = strchr(m->name,'-') ;
-	if (cp != NULLCHAR)			/* get rid of SSID */
-		*cp = '\0' ;
-/* Think about this a bit - it is a place holder in the struct for now
-	m->parse = NULLVFP; 	see ax_parse()
-*/
-#ifdef UNIX
-	for(cp = m->name; *cp != '\0'; cp++)
-		*cp = (char)tolower(*cp);
-#endif
-	m->lp = m->line ;		/* point line pointer at buffer */
-	cb->r_upcall = mbx_nr4rx ;
-	cb->s_upcall = mbx_nr4state ;
+	m->type = MBX_NETROM;	/* mailbox session type is net/rom */
+	m->cb.nr4_cb = cb;
+	tidy_call(m,&cb->user);
+	cb->r_upcall = mbx_nr4rx;
+	cb->s_upcall = mbx_nr4state;
 	cb->t_upcall = nr4_tx;	/* in nr4cmd.c */
-	cb->puser = (char *)m ;
-
-	/* add an idle timer to the mailbox */
-
-	m->mboxwait.start = 600050L / MSPTICK;	/* 10 minutes */
-	m->mboxwait.func = (void(*)())mbx_disc;
-	m->mboxwait.arg = (char *)m;
-	start_timer(&m->mboxwait);
-
-	/* Say hi */
-
-	if ((bp = alloc_mbuf(strlen(hostname) + strlen(mbbanner) + 1)) == NULLBUF) {
-		disc_nr4(cb) ; /* mbx_nr4state will fix stuff up */
-		return ;
-	}
-
-	(void)sprintf(bp->data,mbbanner,hostname) ;
-	bp->cnt = strlen(bp->data) ;
-	send_nr4(cb,bp) ;					/* send greeting message and menu */
-	genlog(m->name,"mbox (nr) connect");
-
-#ifdef CMSG
-	if(readany(m,cmsg) == FALSE)
-/*		mbx_msg(m,"No connect message\015"); keep it quiet */
-#endif
-	mailfetch(m);
-	showlist(m,0);	/* The 0 is for a partial list - can return an error */
+	cb->puser = (char *)m;
+	mbx_incom_common(m,NULLAX25,0);	/* using 2nd arg as a flag here */
 }
 
 /* receive upcall for net/rom */
@@ -973,36 +956,35 @@ register struct nr4cb *cb ;
 
 void
 mbx_nr4rx(cb,cnt)
-struct nr4cb *cb ;
-int16 cnt ;
+struct nr4cb *cb;
+int16 cnt;
 {
-	struct mbuf *bp ;
+	struct mbuf *bp;
 	struct mbx *m;
 
-	m = (struct mbx *)cb->puser ;
+	m = (struct mbx *)cb->puser;
 	start_timer(&m->mboxwait);	/* reset idle timer */
 	if ((bp = recv_nr4(cb,cnt)) == NULLBUF)
-		return ;
+		return;
 	build_line(m,bp);
 }
 
 /* state upcall for net/rom */
 
 void
-mbx_nr4state(cb,old,new)
-struct nr4cb *cb ;
-int old, new ;
+mbx_nr4state(cb,unused,new)
+struct nr4cb *cb;
+int unused, new;
 {
-	struct mbx *m ;
-	void free_mbx() ;
+	struct mbx *m;
 
-	m = (struct mbx *)cb->puser ;
+	m = (struct mbx *)cb->puser;
 
-	if (new == NR4STDISC) {
+	if (new == NR4STDISC){
 		if(m->msgs)
 			cleanup(m);	/* leave mail file alone if we get here */
-		cb->puser = NULLCHAR ;
-		free_mbx(m) ;
+		cb->puser = NULLCHAR;
+		free_mbx(m);
 	}
 }
 #endif	/* NETROM */
@@ -1011,16 +993,15 @@ static void
 newmailfile(m)
 struct mbx *m;
 {
-FILE *mailfile, *bakfile;
-extern char tmpbuf[];
-char *outfile,*infile;
-struct mhdr *mhdr;
-int save = 0;
-char *errormsg = "newmailfile: No memory";
+	FILE *mailfile, *bakfile;
+	char *outfile,*infile;
+	struct mhdr *mhdr;
+	int save = 0;
+	char *errormsg = "newmailfile: No memory";
 #ifndef VERBOSE
-char *derrormsg = "newmailfile: Disk error";
+	char *derrormsg = "newmailfile: Disk error";
 #endif
-int i;
+	int i;
 
 	for(i=0,mhdr = m->firsthdr;i<m->msgs;i++,mhdr = mhdr->next){
 		if(mhdr->status & (STATKILL | STATNREAD)){
@@ -1030,8 +1011,7 @@ int i;
 	}
 	if(save){
 		save = 0; /* we'll reuse this to detect no messages to save */
-/* these errorexits will be replaced with some kind of recovery later */
-/* on second thought, why salvage a bad situation? */
+		/* No attempt to salvage a bad situation */
 		if((outfile = (char *)malloc(sizeof(char) * (strlen(mailspool) +
 			strlen(m->name) + 6))) == 0)
 			errorexit(m,errormsg);
@@ -1043,7 +1023,7 @@ int i;
 		}
 		sprintf(infile,"%s/%s.bak",mailspool,m->name);
 
-/* we'll rename name.txt to name.bak and take input from name.bak */
+		/* we'll rename name.txt to name.bak and take input from name.bak */
 
 		unlink(infile);	/* don't care about error */
 
@@ -1074,22 +1054,22 @@ int i;
 #else
   				errorexit(m,derrormsg);
 #endif
-/* this is very paranoid */
+			/* this is very paranoid */
 			if(fgets(tmpbuf,MBXLINE,bakfile) == NULLCHAR)
 #ifdef VERBOSE
 				errorexit(m,"backup file is empty");
 #else
   				errorexit(m,derrormsg);
 #endif
-	
 
-/* print that first "From " line */
-			fprintf(mailfile,"%s",&tmpbuf[0]);
+
+			/* print that first "From " line */
+			fprintf(mailfile,"%s",tmpbuf);
 			save = 1;
 			while(fgets(tmpbuf,MBXLINE,bakfile) != NULLCHAR){
 				if(strncmp(tmpbuf,"From ",5) == 0)
 					break;
-				fprintf(mailfile,"%s",&tmpbuf[0]);
+				fprintf(mailfile,"%s",tmpbuf);
 				if(mhdr->status & STATNREAD && strncmp(tmpbuf,"Subje",5) == 0)
 #if defined(UNIX) || defined(_OSK)
 					fprintf(mailfile,"Status: R\n");
@@ -1116,10 +1096,8 @@ queuemsg(mhdr,m)
 struct mhdr *mhdr;
 struct mbx *m;
 {
-/* read routine */
-FILE *txtfile, *tmp_file;
-char *txtname,*tmpname;
-extern char tmpbuf[];
+	FILE *txtfile, *tmp_file;
+	char *txtname,*tmpname;
 
 	if((txtname = (char *)malloc(sizeof(char) * (strlen(mailspool) +
 		strlen(m->name) + 6 ))) == 0)
@@ -1135,17 +1113,17 @@ extern char tmpbuf[];
 		return(NULLFILE);
 	}
 
-/* could have used tmpfile() but thought the $$$ file would be interesting */
+	/* could use tmpfile() but thought the $$$ file would be interesting */
 
 	sprintf(tmpname,"%s/%s.$$$",mailspool,m->name);
-/* In the following w+t puts \r\r\n in the file */
+	/* In the following w+t puts \r\r\n in the file */
 	if((tmp_file = fopen(tmpname,"w+")) == NULLFILE){
 		free(txtname);
 		free(tmpname);
 		return(NULLFILE);
 	}
 
-/* Position pointer and get that first "from" line out of the way */
+	/* Position pointer and get that first "from" line out of the way */
 	if(fseek(txtfile,mhdr->fileptr,SEEK_SET) != 0 ||
 			fgets(tmpbuf,MBXLINE,txtfile) == NULLCHAR){
 		fclose(txtfile);
@@ -1173,80 +1151,110 @@ extern char tmpbuf[];
 
 static int
 mbx_data(m)
-struct mbx *m ;
+struct mbx *m;
 {
-	time_t t, time() ;
-	char *ptime() ;
-	extern char hostname[] ;
+	time_t t, time();
+	char *ptime();
 	extern FILE *tmpfile();
-	extern long get_msgid() ;
+	extern long get_msgid();
 
+	/* note that get_msgid() can fail, but we can notify user later */
 	if ((m->tfile = tmpfile()) == NULLFILE)
 		return(-1);
 
-	time(&t) ;
-	fprintf(m->tfile,"Date: %s",ptime(&t)) ;
+	time(&t);
+	fprintf(m->tfile,"Date: %s",ptime(&t));
+	/* if we define NOPLAYBBS, BBS forwards don't get special treatment */
+#ifndef NOPLAYBBS
 	if (m->tomsgid)
-		fprintf(m->tfile, "Message-Id: <%s@%s>\n", m->tomsgid, hostname) ;
+		fprintf(m->tfile, "Message-Id: <%s@%s>\n", m->tomsgid, hostname);
 	else
-		fprintf(m->tfile,"Message-Id: <%ld@%s>\n",get_msgid(),hostname) ;
-	fprintf(m->tfile,"From: %s%%%s@%s\n",
-			m->tofrom ? m->tofrom : m->name, m->name, hostname) ;
-	fprintf(m->tfile,"To: %s\n",m->to) ;
-	fprintf(m->tfile,"Subject: %s\n",m->line) ;
-	if (m->stype != ' ')
-		fprintf(m->tfile,"AX.25(mbox)_Msg_Type: %c\n", m->stype) ;
-	fprintf(m->tfile,"\n") ;
+		fprintf(m->tfile,"Message-Id: <%ld@%s>\n",get_msgid(),hostname);
+#define FANCY_RETURN /* I don't know if we would ever use this or not */
+#ifdef FANCY_RETURN
+	fprintf(m->tfile,"From: %s%s%s@%s\nTo: %s\nSubject: %s\n",
+			m->tofrom ? m->tofrom : "", m->tofrom ? "%" : "",
+			m->name, hostname,m->to,m->line);
+#else
+	fprintf(m->tfile,"From: %s@%s\nTo: %s\nSubject: %s\n",
+			m->tofrom ? m->tofrom : m->name, hostname,m->to,m->line);
+#endif
+	/* S-Msgtype helps us distinguish such messages to avoid errors in using
+	 * "send reply".  stype will probably have ' ' most of time (s joe@host)
+	 * but may have 'E', for example if user does, send joe@host, no harm
+	 */
+	fprintf(m->tfile,"X-Msgtype: %s %c\n",
+			m->sid & MBX_SID ? "BBS" : "NET Mbox", m->stype);
+
+#else /* NOPLAYBBS is defined */
+	fprintf(m->tfile,"From: %s@%s\nTo: %s\nSubject: %s\n",
+			m->name, hostname,m->to,m->line);
+	fprintf(m->tfile,"X-Msgtype: NET Mbox\n");
+#endif
+
+	fprintf(m->tfile,"\n");
 
 	return(0);
 }
 
-static int	/* replacement send command parser.  Saved 608 bytes - K5JB */
-mbx_to(m)	/* "S" already OK, also type (T,B,P) recorded.  Comes here */
-struct mbx *m ;	/* with whole line entact.  Returns -1 on error */
+/* replacement send command parser.  Saved 608 bytes - K5JB */
+static int	/* "S" already OK, type (T,B,P,' '), if any recorded. */
+mbx_to(m)	/* Comes here with whole line entact.  Returns -1 on error */
+struct mbx *m;
 {
-char *cp1,*cp2;
-extern char tmpbuf[];
+	char *cp1,*cp2;
 
 	cp2 = cp1 = m->line;
-	if(*cp1 == '\0' || (cp1 = strchr(cp1,' ')) == NULLCHAR) /* find first space */
-		return(-1);                                      /* after "s" */
+	while(*cp1)
+		*cp1++ = (char)tolower(*cp1);	/* k34 */
+	cp1 = m->line;
+	if((cp1 = strchr(cp1,' ')) == NULLCHAR) /* find first space after 's' */
+		return(-1);
 
 	while(*cp1 != '\0'&& *cp1 == ' ')			/* any more? */
 		cp1++;
 								/* now should be at recipient */
-	while(*cp1){			/* remove all spaces from rest of line */
-		if(*cp1 != ' ')	/* and shuffle back into line */
-			*cp2++ = *cp1++;
-			else
-				cp1++;
-	}
-	*cp2 = *cp1;
-	cp1 = m->line;
-	if(!*cp1)
-		return(-1);
+	while(*cp1)			/* remove _all_ spaces from rest of line */
+		if(*cp1 == ' ')	/* move recipient to front of line */
+			cp1++;
+		else
+			*cp2++ = *cp1++; /* k34 */
+
+	*cp2 = '\0';	/* *cp2 = *cp1; would do same thing */
+
+	cp1 = m->line;	/* will test for null line in a moment */
 	cp2 = tmpbuf;
+	tmpbuf[0] = '\0';	/* k35 - missed this, would accept "S " */
 
 	while(*cp1){	/* get to, upto and include '@' */
-		*cp2++ = *cp1++;
-		if(*cp1 == '@' || *cp1 == '<' || *cp1 == '$'){
+#ifndef NOPLAYBBS
+		if(*cp1 == '@' || *cp1 == '<' || *cp1 == '$')
+#else
+		if(*cp1 == '@')
+#endif
 			break;
-		}
+		*cp2++ = *cp1++;	/* K34 */
 	}
-	if(tmpbuf[0] == '@')
-		return(-1); 	/* only had "@..." */
+	if(!tmpbuf[0] || tmpbuf[0] == '@')
+		return(-1); 	/* only had "@...", or send line incomplete */
+
 	switch(*cp1){
+#ifndef NOPLAYBBS
 		case '<':
 		case '$':
 			*cp2 = '\0';
 		break;
-		case '@': 				/* see what is after the '@' */
-			*cp2++ = '@';
-			if(!*(++cp1)) 			/* only had "tocall@" */
+#endif
+		case '@': 			/* see what is after the '@' */
+			*cp2++ = '@';	/* wasn't copied earlier */
+			if(!*(++cp1)) 	/* only had "tocall@" */
 				return(-1);
+
 			while(*cp1){	/* upto next delimiter */
+#ifndef NOPLAYBBS
 				if(*cp1 == '<' || *cp1 == '$')
 					break;
+#endif
 				*cp2++ = *cp1++;
 			}
 
@@ -1256,6 +1264,7 @@ extern char tmpbuf[];
 		return(-1);		/* no room for to address */
 	strcpy(m->to,tmpbuf);
 
+#ifndef NOPLAYBBS
 	if(*cp1 == '<'){
 		cp2 = tmpbuf;	/* reset target pointer */
 		if(!*(++cp1)) 			/* only had "<" */
@@ -1264,7 +1273,7 @@ extern char tmpbuf[];
 			*cp2++ = *cp1++;
 		*cp2 = '\0';
 		if (cp2 == tmpbuf || (m->tofrom = malloc(strlen(tmpbuf) + 1)) == NULLCHAR)
-			return(-1);		/* no tofrom or no room for to address */
+			return(-1);		/* no tofrom or no room for tofrom address */
 		strcpy(m->tofrom,tmpbuf);
 	}
 	if(*cp1 == '$'){
@@ -1274,21 +1283,21 @@ extern char tmpbuf[];
 		}
 		*cp2 = '\0';
 		if ((m->tomsgid = malloc(strlen(tmpbuf) + 1)) == NULLCHAR)
-			return(-1);		/* no room for to address */
+			return(-1);		/* no room for BID */
 		strcpy(m->tomsgid,tmpbuf);
 	}
+#endif
 	return(0);
 
 }
 
 static int
 mbx_line(m)       /* returns -1 if there is a disc to dump */
-struct mbx *m ;	/* receive buffers */
+struct mbx *m;		/* receive buffers */
 {
-int do_cmd(), do_subj(), do_data();
+	int do_cmd(), do_subj(), do_data();
 
 	switch(m->state){
-
 		case MBX_SEND:                /* user sent a character during download */
 			if(m->upload != NULLFILE){	/* t_upcall sets NULLFILE when finished */
 #if defined(_OSK) && !defined(_UCC)
@@ -1296,7 +1305,7 @@ int do_cmd(), do_subj(), do_data();
 #else
 #ifdef UNIX
 				if(pclose(m->upload) < 0)	/* only needed in case of a directory */
-#endif					
+#endif
 						/* read in Unix which uses a pipe */
 				fclose(m->upload);
 #endif
@@ -1321,8 +1330,8 @@ int do_cmd(), do_subj(), do_data();
 		case MBX_DATA:
 			return(do_data(m));
 
-/* m->state set to MBX_DISC by read_fd if cb->state != 0 -1 is needed to
- * dump queued buffers */
+		/* m->state set to MBX_DISC by read_fd if cb->state != 0 -1 is needed to
+		 * dump queued buffers */
 
 		case MBX_DISC:
 			return(-1);
@@ -1336,30 +1345,29 @@ do_cmd(m)
 struct mbx *m;
 {
 
-void ax_session(), mbx_disc();
 #ifdef NETROM
-void nr4_session();
+	void nr4_session();
 #endif
-/* Let's try using tmpbuf for this char fullfrom[80] ;*/
-extern char tmpbuf[];
+
 #ifdef	SHOWNODES
-register struct nrroute_tab *rp ;
-char buf[16] ;
-char *cp ;
+	register struct nrroute_tab *rp;
+	char buf[16];
 #endif
-char tempstr1[40];      /* suspect tmpbuf[] would be safe.  */
-int times, j, i = 0;    /* 40 is way much for tempstr1.  It only has filename */
-char tempstr2[40];	/* only used for filedir() */
-FILE *d_file;
-struct mhdr *mhdr;	/* temporary message header pointer */
-int atoi();
 
 #ifdef AX25_HEARD
-void free();
-char *pp;
-extern char *homedir;
-extern char *buildheard();
+	char *pp;
+	extern char *homedir;
+	extern char *buildheard();
 #endif
+
+	/* 40 is way much for tempstr1.  It only has filename */
+	char tempstr1[40];      /* suspect tmpbuf[] would be safe.  */
+	char tempstr2[40];	/* only used for filedir() */
+	int times, j, i = 0;
+	FILE *d_file;
+	struct mhdr *mhdr;	/* temporary message header pointer */
+	int atoi();
+	void ax_session(), mbx_disc();
 
 #define WHAT
 #ifdef WHAT
@@ -1370,16 +1378,21 @@ extern char *buildheard();
 	}
 #endif
 
-	switch (tolower(m->line[0])) {
+	/* roadmap: we do switch, then do_prompt, then return 0, unless we are
+	 * disconnecting or closing mailbox, then we return -1
+	 */
+	switch (tolower(m->line[0])){
 		case 'b':	/* bye - bye */
 			if(m->msgs){
 				newmailfile(m);
 				cleanup(m);
 			}
-			mbx_disc(m) ;
+			mbx_disc(m);
 			return(-1);	/* tell line processor to quit */
 		case 'c':	/* chat */
+#ifndef AX_MOTD
 			mbx_msg(m,"Messages not saved. If I don't respond, Disconnect, reconnect and send mail.\015");
+#endif
 			stop_timer(&m->mboxwait);
 			if(m->msgs){
 				newmailfile(m);
@@ -1387,20 +1400,20 @@ extern char *buildheard();
 			}
 			genlog(m->name,"went to chat");
 
-			switch (m->type) {
+			switch (m->type){
 				case MBX_AX25:
-					m->cb.ax25_cb->user = NULLCHAR ;
-					ax_session(m->cb.ax25_cb,0) ;	/* make it a chat session */
-					break ;		/* this hands cb->state off to ax_state which */
+					m->cb.ax25_cb->user = NULLCHAR;
+					ax_session(m->cb.ax25_cb,0);	/* make it a chat session */
+					break;		/* this hands cb->state off to ax_state which */
 									/* is benign with respect to struct mbx */
 #ifdef NETROM
 				case MBX_NETROM:
-					m->cb.nr4_cb->puser = NULLCHAR ;
-					nr4_session(m->cb.nr4_cb) ;
-					break ;
+					m->cb.nr4_cb->puser = NULLCHAR;
+					nr4_session(m->cb.nr4_cb);
+					break;
 #endif
 			}
-			free_mbx(m) ;
+			free_mbx(m);
 			return(-1);
 		case 'm':
 			sprintf(tmpbuf,"I have mail for: ");
@@ -1441,14 +1454,16 @@ extern char *buildheard();
 					return(0);
 				case 's':		/* ls command */
 					i = g_args(m);
+#ifndef CLOSEDOOR
 					if(m->line[i] == '-' && m->line[i+1] != '\0') /* trapdoor */
 						d_file = dir(&m->line[i+1],1);
-					else{
+					else
+#endif
+					{
 					/* in the following, we will hope that not more than
 					 * one user at a time uses tmpbuf
 					 */
 #ifdef UNIX
-
 						if(i){
 							/* Just in case we had a long line from a loose upload */
 							m->line[MBXLINE - strlen(public) - 2] = '\0';
@@ -1474,7 +1489,7 @@ extern char *buildheard();
 #ifdef SUBDIR
 						if(i){	/* First shorten line if necessary */
 							m->line[MBXLINE - strlen(public) - 6] = '\0';
-							sprintf(tmpbuf,&m->line[i]);
+							sprintf(tmpbuf,"%s",&m->line[i]);
 							for(j=0;j<strlen(tmpbuf);j++)	/* remove any .. */
 								if(tmpbuf[j] == '.' && tmpbuf[i+1] == '.'){
 									tmpbuf[j] = '\0';
@@ -1511,9 +1526,12 @@ extern char *buildheard();
 			if(!i)
 				mbx_msg(m,"No file specified.\015");
 			else{
+#ifndef CLOSEDOOR
 				if(m->line[i] == '-')          /* a little frivolity here */
 					j = readany(m,&m->line[i+1]); /* read any file, anywhere, */
-				else{                            /* if you know this */
+				else                            /* if you know this */
+#endif
+				{
 					sprintf(tmpbuf,"%s/%s",public,&m->line[i]);
 					sprintf(m->line,"%s",tmpbuf); /* readany() reuses tmpbuf */
 					j = readany(m,m->line);
@@ -1525,6 +1543,8 @@ extern char *buildheard();
 			break;
 
 		case 'h':
+			if(!(m->line[1] == '\0' || tolower(m->line[3]) == 'p')) /* k35 */
+				break; /* happens a lot, with "Hello" for example; send huh? */
 			if(readany(m,helpbox))
 				return(0);
 			mbx_msg(m,"No help available\015");
@@ -1579,90 +1599,55 @@ extern char *buildheard();
 				/* fatal -- maybe add recovery? */
 					errorexit(m,"queuemsg file fail");
 				read_fd(m,d_file);  /* this could be added to queuemsg */
-/* if new read we will have to add a line to new file */
+				/* if new read we will have to add a line to new file */
 				if(!mhdr->status & STATREAD)
 					mhdr->status |= (STATREAD | STATNREAD);
 				return(0);
 			}
 			break;
-#ifdef SHOWNODES           /* this needs work, if I use it at all */
-		case 'n':   /* show nodes */
-			column = 1 ;
-			sprintf(tmpbuf,"The following nodes were heard at %s\015",
-				hostname);
-			mbx_msg(m,tmpbuf);
-			for (i = 0 ; i < NRNUMCHAINS ; i++)
-				for (rp = nrroute_tab[i]; rp != NULLNRRTAB;
-						rp = rp->next) {
-					strcpy(buf,rp->alias) ;	/* remove trailing spaces */
-					if ((cp = strchr(buf,' ')) == NULLCHAR)
-						cp = &buf[strlen(buf)] ;
-					if (cp != buf)  /* don't include colon for null alias */
-						*cp++ = ':' ;
-					pax25(cp,&rp->call) ;
-					if (column == 1)
-						sprintf(tmpbuf,"%-16s  ",buf) ;
-					else {
-						sprintf(tempstr1,"%-16s  ",buf) ;
-						strcat(tmpbuf,tempstr1);
-					}
-					if (column++ == 4) {
-						strcat(tmpbuf,"\015");
-						mbx_msg(m,tmpbuf);	/* don't do it this way! */
-						column = 1 ;
-					}
-				}
+		case 's':
+		{
+			int badsend = 0;
 
-			if (column != 1)
-				mbx_msg(m,"\015");
-			break;
-#endif	/* SHOWNODES */
-		case 's': {
-			int badsubj = 0 ;
-
-/* Get S-command type (B,P,T, etc.) */
-
+			/* Get S-command type (B,P,T, etc.) */
 			if (m->line[1] == '\0')
-				m->stype = ' ' ;
+				m->stype = ' ';	/* used as a flag later */
 			else
-				m->stype = toupper(m->line[1]) ;
+				m->stype = toupper(m->line[1]);
 
-			if (mbx_to(m) == -1) {
+			if (mbx_to(m) == -1){
+#ifndef NOPLAYBBS
 				if (m->sid & MBX_SID)
-					mbx_msg(m,"NO\015") ;
-				else {
-					mbx_msg(m,
-						"S command syntax error - format is:\015") ;
-					mbx_msg(m,
-					  "  S name [@ host] [< from_addr] [$bulletin_id]\015") ;
-				}
-				badsubj++ ;
-			}
-			else if (validate_address(m->to) == 0)	 {
-				if (m->sid & MBX_SID)
-					mbx_msg(m, "NO\015") ;
+					mbx_msg(m,"NO\015");
 				else
-					mbx_msg(m, "Bad user or host name\015") ;
-				free(m->to) ;
-				m->to = NULLCHAR ;
-				if (m->tofrom) {
-					free(m->tofrom) ;
-					m->tofrom = NULLCHAR ;
+#endif
+					mbx_msg(m,"Oops! Use: s to, or s to@where\015");
+				badsend++;
+			}else{
+				strcpy(tmpbuf,m->to);	/* v_a() punches out the '@' k34 */
+				if (validate_address(tmpbuf) == 0){
+#ifndef NOPLAYBBS
+					if (m->sid & MBX_SID)
+						mbx_msg(m, "NO\015");
+					else
+#endif
+						mbx_msg(m, "Bad user or host name\015");
+					free_misc(m);
+					badsend++;
 				}
-				if (m->tomsgid) {
-					free(m->tomsgid) ;
-					m->tomsgid = NULLCHAR ;
-				}
-				badsubj++ ;
 			}
 
-			if (!badsubj){
-				m->state = MBX_SUBJ ;
-				mbx_msg(m,	(m->sid & MBX_SID) ? "OK\015" : "Subject:\015") ;
+			if (!badsend){
+				m->state = MBX_SUBJ;
+#ifndef NOPLAYBBS
+				mbx_msg(m,	(m->sid & MBX_SID) ? "OK\015" : "Subject:\015");
+#else
+				mbx_msg(m,"Subject:\015");
+#endif
 				return(0);
 			}
 			break;
-		}
+		}	/* encapsulates badsend */
 		case 'u':
 			domboxdisplay(m,1);	/* the 0 indicates local, 1 is remote */
 			break;
@@ -1670,69 +1655,66 @@ extern char *buildheard();
 			sprintf(tmpbuf,"This is version %s\015",versionf);
 			mbx_msg(m,tmpbuf);
 			break;
+#ifndef NOPLAYBBS
 		case '[':	/* This is a BBS - say "OK", not "Subject:" */
-		  {
-			int len = strlen(m->line) ;
-			if (m->line[len - 1] == ']') { /* must be an SID */
-				m->sid = MBX_SID ;
+		{
+			if (m->line[strlen(m->line) - 1] == ']'){ /* must be an SID */
+				m->sid = MBX_SID;
+#ifdef NOTNEEDED	/* declare int len=strlen(m->line) if you use this */
 				/* Now check to see if this is an RLI board. */
-				/* As usual, Hank does it a bit differently from */
-				/* the rest of the world. */
 				if (len >= 5)		/* [RLI] at a minimum */
 					if (strncmp(&m->line[1],"RLI",3) == 0)
-						m->sid |= MBX_SID_RLI ;
-
-				mbx_msg(m,">\015") ;
+						m->sid |= MBX_SID_RLI;
+#endif
+				mbx_msg(m,">\015");
+				return(0);
 			}
-		  }
-		  return(0);
-
-		case 'f':
-			if (m->line[1] == '>' && (m->sid & MBX_SID)) {
+			break; /* We'll do Huh? */
+		}
+		case 'f':	/* "F>" */
+			if (m->line[1] == '>' && (m->sid & MBX_SID)){
+#ifdef NOTNEEDED
 				/* RLI BBS' expect us to disconnect if we */
 				/* have no mail for them, which of course */
 				/* we don't, being rather haughty about our */
 				/* protocol superiority. */
-				if (m->sid & MBX_SID_RLI) {
-					mbx_disc(m) ;
+				if (m->sid & MBX_SID_RLI){
+					mbx_disc(m);
 					return(-1);
 				} else
-					mbx_msg(m,">\015") ;
+					mbx_msg(m,">\015");
 				return(0);
+#else
+					mbx_disc(m);	/* why hang around, just disconnect */
+					return(-1);
+#endif
 			}
+#endif	/* NOPLAYBBS */
 				/* Otherwise drop through to "huh?" */
 		default:
-			mbx_msg(m,"Huh?\015") ;
+			mbx_msg(m,"Huh?\015");
 	} /* switch */
 	do_prompt(m);	/* all breaks from switch come here.  When file sent, */
 	return(0);     /* with read_fd, prompt handled with timer daemon */
 }
 
-
 static int
 do_subj(m)
 struct mbx *m;
 {
-	if (mbx_data(m) == -1) {
-		mbx_msg(m,"Can't create temp file for mail\015") ;
+	if (mbx_data(m) == -1){
+		mbx_msg(m,sorry);
 		do_prompt(m);
-		free(m->to) ;
-		m->to = NULLCHAR ;
-		if (m->tofrom) {
-			free(m->tofrom) ;
-			m->tofrom = NULLCHAR ;
-		}
-		if (m->tomsgid) {
-			free(m->tomsgid) ;
-			m->tomsgid = NULLCHAR ;
-		}
-		m->state = MBX_CMD ;
+		free_misc(m);
+		m->state = MBX_CMD;
 		return(0);
 	}
-	m->state = MBX_DATA ;
+	m->state = MBX_DATA;
+#ifndef NOPLAYBBS
 	if ((m->sid & MBX_SID) == 0)
+#endif
 		mbx_msg(m,
-		  "Enter message.  Finish with /EX or ^Z in first column:\015") ;
+		  "Enter message.  Finish with /EX or ^Z in first column:\015");
 	return(0);
 }
 
@@ -1740,50 +1722,36 @@ static int
 do_data(m)
 struct mbx *m;
 {
-char *host ;
-extern char hostname[] ;
-extern char tmpbuf[];
+	char *host;
 
 	if (m->line[0] == 0x1a ||
 		strcmp(m->line, "/ex") == 0 ||
-		strcmp(m->line, "/EX") == 0) {
+		strcmp(m->line, "/EX") == 0){
 		if ((host = strchr(m->to,'@')) == NULLCHAR)
-			host = hostname ;		/* use our hostname */
+			host = hostname;		/* use our hostname */
 		else
-			host++ ;				/* use the host part of address */
+			host++;				/* use the host part of address */
 
 			/* make up full from name for work file */
-		(void)sprintf(tmpbuf,"%s@%s",m->name,hostname) ;
+		(void)sprintf(tmpbuf,"%s@%s",m->name,hostname);
 
-		fseek(m->tfile,0L,0) ;		/* reset to beginning */
+		fseek(m->tfile,0L,0);		/* reset to beginning */
 		if (queuejob((struct tcb *)0,m->tfile,host,m->to,tmpbuf) != 0)
-			mbx_msg(m,
-				"Couldn't queue message for delivery\015") ;
-
-		free(m->to) ;
-		m->to = NULLCHAR ;
-		if (m->tofrom) {
-			free(m->tofrom) ;
-			m->tofrom = NULLCHAR ;
-		}
-		if (m->tomsgid) {
-			free(m->tomsgid) ;
-			m->tomsgid = NULLCHAR ;
-		}
+			mbx_msg(m,sorry);
+		free_misc(m);
 #if defined(_OSK) && !defined(_UCC)
 		tmpclose(m->tfile);
 #else
-		fclose(m->tfile) ;
+		fclose(m->tfile);
 #endif
-		m->tfile = NULLFILE ;
-		m->state = MBX_CMD ;
+		m->tfile = NULLFILE;
+		m->state = MBX_CMD;
 		do_prompt(m);
 		return(0);
 	}
-/* not done yet! */
-	fprintf(m->tfile,"%s\n",m->line) ;
+	/* otherwise, ordinary line */
+	fprintf(m->tfile,"%s\n",m->line);
 	return(0);
 }
 #endif /* AXMBX */
 #endif /* AX25 */
-

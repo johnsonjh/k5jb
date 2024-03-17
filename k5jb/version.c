@@ -6,17 +6,23 @@
 #include "options.h"
 #include "config.h"
 
-char versionf[] = "K5JB.k33";	/* for FTP and the mbox's use */
+char versionf[] = "K5JB.k34c";	/* for FTP and the mbox's use */
 void
 version()
 {
-	printf("        This version is %s with options:\n        ",versionf);
+	char *margin = "                  ";
+
+	printf("%sThis version is %s with options:\n%s",margin,versionf,
+		margin);
 
 #ifdef AX25
 #ifdef SEGMENT
-	printf("AX.25/SEG");
+	printf("AX.25/Seg");
 #else
 	printf("AX.25");
+#endif
+#ifdef VCIP_SSID
+	printf(", AX.25/vcipcall");
 #endif
 #ifdef NETROM
 	printf(", Netrom");
@@ -24,23 +30,22 @@ version()
 #ifdef AXMBX
 	printf(", MBOX");
 #endif
-#else /* AX25 */
-	printf("SLIP");
-#endif
 
-#ifdef KPCPORT
-	printf(", KPC4");
+/* Twiddle things here for cosmetics. */
+
+#ifdef EKISSPORT
+	printf("\n%sEKISS",margin);
 #endif
 #ifdef MULPORT
 	printf(", Mulport");
 #endif
-
-#ifdef VCKT
-	printf(", VC");
-#endif
 #ifdef AX25_HEARD
 	printf(", Heard");
 #endif
+#else /* AX25 */
+	printf("SLIP");
+#endif /* AX25 */
+
 #ifdef COH386
 	printf(", Coherent");
 #else

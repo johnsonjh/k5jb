@@ -19,7 +19,7 @@
 
 char *getname();
 void mail_delete(),free(),log();
-int queuejob(),tprintf();
+int queuejob(),tprintf(),mlock();
 int validate_address();
 long get_msgid();
 struct list *addlist();
@@ -57,12 +57,13 @@ static char ourname[] = "250 %s, Share and Enjoy!\015\012";
 static char enter[] = "354 Enter mail, end with .\015\012";
 static char ioerr[] = "452 Temp file write error\015\012";
 static char mboxerr[] = "452 Mailbox write error\015\012";
-static char badcmd[] = "500 Command unrecognized\015\012";
+static char badcmd[] = "500 No speakee Zulu\015\012";
 static char syntax[] = "501 Syntax error\015\012";
 static char needrcpt[] = "503 Need RCPT (recipient)\015\012";
 static char unknown[] = "550 <%s> address unknown\015\012";
 
 static struct tcb *smtp_tcb;
+
 /* Start up SMTP receiver service */
 smtp1(argc,argv)
 int argc;
@@ -71,6 +72,8 @@ char *argv[];
 	struct socket lsocket;
 	void r_mail(),s_mail();
 	int atoi();
+	extern int dotimer();
+	static char *amount[] = { "","1800" };
 
 	lsocket.address = ip_addr;
 	if(argc < 2)
@@ -80,6 +83,7 @@ char *argv[];
 
 	smtp_tcb = open_tcp(&lsocket,NULLSOCK,
 		TCP_SERVER,0,r_mail,NULLVFP,s_mail,0,NULLCHAR);	/* K5JB */
+	dotimer(2,amount);	/* k34 */
 }
 
 /* Shutdown SMTP service (existing connections are allowed to finish) */
@@ -91,9 +95,9 @@ smtp0()
 
 /* SMTP connection state change upcall handler */
 static void
-s_mail(tcb,old,new)
+s_mail(tcb,unused,new)
 struct tcb *tcb;
-char old,new;
+char unused,new;
 {
 	struct mail *mp,*mail_create();
 
@@ -187,7 +191,7 @@ register struct mail *mp;
 			deliver(mp);
 #if (defined(_OSK) && !defined(_UCC))
 			tmpclose(mp->data);
-#else	
+#else
 			fclose(mp->data);
 #endif
 			mp->data = NULLFILE;
@@ -460,15 +464,28 @@ struct list *to;
 				if((fp = fopen(mailbox,"a+")) != NULLFILE)
 #endif
 				{
+				/* this newline stuff is to strip off surplus newlines that
+				 * are added by various mailing agents.  This _should_ work
+				 * as with _OS9 - K5JB
+				 */
+					int newlines = 0;	/* k35 */
 					time(&t);
 					fprintf(fp,"From %s %s",from,ctime(&t));
-					while((c = getc(data)) != EOF)
+					while((c = getc(data)) != EOF){
+						if(c == '\n'){
+							newlines++;
+							continue;
+						}
+						for(;newlines;newlines--)
+							if(putc('\n',fp) == EOF)
+								break;	/* next line will catch error */
 						if(putc(c,fp) == EOF)
 							break;
+					}
 					if(ferror(fp))
 						fail = 1;
-					else
-						fprintf(fp,"\n"); /* Leave a blank line between msgs */
+					else	/* Leave only one blank line between msgs */
+						fprintf(fp,"\n\n");
 					fclose(fp);
 					printf("New mail arrived for %s\n",ap->val);
 					fflush(stdout);
@@ -545,7 +562,7 @@ get_msgid()
 	long atol();
 
 	sprintf(sfilename,"%s/sequence.seq",mailqdir);
-	sfile = fopen(sfilename,"r");
+	sfile = fopen(sfilename,"r");	/* this can fail but we recover later */
 
 	/* if sequence file exists, get the value, otherwise set it */
 	if (sfile != NULLFILE) {
@@ -558,7 +575,10 @@ get_msgid()
 	}
 
 	/* increment sequence number, and write to sequence file */
-	sfile = fopen(sfilename,"w");
+	/* this was a tough bug to find.  If user has no directories set up
+	 * we want this to fail gracefully - K5JB */
+	if((sfile = fopen(sfilename,"w")) == NULLFILE)
+		return 0l;
 	fprintf(sfile,"%ld",++sequence);
 	fclose(sfile);
 	return sequence;
@@ -576,7 +596,6 @@ char *s;
 {
 	char *cp;
 	int32 addr;
-/* char address_type;	K5JB */
 	int32 mailroute();
 
 	/* if address has @ in it the check dest address */
@@ -606,13 +625,12 @@ char *s;
 	if ((cp = strchr(s,'%')) != NULLCHAR) {
 		*cp = '@';
 		cp++;
-	/* reroute based on host name following the % seperator */
+	/* reroute based on host name following the % separator */
 		if (mailroute(cp) == 0)
 			return BADADDR;
 		else
 			return DOMAIN;
 	}
-/*	address_type = LOCAL; value not used */
 
 #ifdef MSDOS    /* dos file name checks */
 	/* Check for characters illegal in MS-DOS file names */
@@ -638,7 +656,7 @@ char *host,*to,*from;
 
 	sprintf(prefix,"%ld",get_msgid());
 	log(tcb,"SMTP queue job %s To: %s From: %s",prefix,to,from);
-	mlock(mailqdir,prefix);
+	mlock(mailqdir,prefix);	/* this can fail, but we won't return yet */
 	sprintf(tmpstring,"%s/%s.txt",mailqdir,prefix);
 #ifdef MSDOS
 	if((fp = fopen(tmpstring,"wt")) == NULLFILE)
@@ -779,7 +797,6 @@ char *user;
 {
 	void rip();
 	FILE *fp;
-/*	register char *s,*p,*h;	K5JB */
 	register char *s,*p;
 	int inalias;
 	struct list *tp;
@@ -822,7 +839,6 @@ char *user;
 				*p++ = '\0';
 
 			/* find hostname */
-/*			if ((h = strchr(s,'@')) != NULLCHAR)	K5JB */
 			if (strchr(s,'@') != NULLCHAR)
 				tp = addlist(head,s,DOMAIN);
 			else

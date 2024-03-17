@@ -75,9 +75,9 @@ char	*argv[];
  *
  */
 void
-fing_state(tcb,old,new)
+fing_state(tcb,unused,new)
 struct tcb	*tcb;
-char old,		/* old state */
+char unused,		/* old state */
 	new;		/* new state */
 {
 	struct finger	*fing;
@@ -95,7 +95,7 @@ char old,		/* old state */
 		tcb->user = (char *)fing;	/* Upward pointer */
 		fing->tcb = tcb;		/* Downward pointer */
 		if (finger_notify)  {
-			printf("\007You're being fingered by %s!\n",
+			printf("You're being fingered by %s!\n",
 #ifdef SOKNAME
 				puname(&tcb->conn.remote));
 #else
@@ -152,9 +152,9 @@ char		*msg;		/* message to send */
  */
 
 void
-rcv_fing(tcb, ccnt)
+rcv_fing(tcb, unused)
 register struct tcb	*tcb;
-int16			ccnt;
+int16 unused;
 {
 	FILE		*fuser;
 	void filedir(),sndmsg();

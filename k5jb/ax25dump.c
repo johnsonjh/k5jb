@@ -21,25 +21,60 @@ int ntohax25(),pax25(),arp_dump(),ip_dump();	/* latter 3 should have been a void
 void netrom_dump();
 
 /* Dump an AX.25 packet header */
-/* make this void if we mess with trace.c.  Also do main.c */
-ax25_dump(bpp,check)
+void
+ax25_dump(bpp,unused)
 struct mbuf **bpp;
-int check;	/* Not used */
+int unused;
 {
 	char *decode_type();
 	char tmp[20];
-	char control,pid;
+	unsigned char control,pid;
 	int16 type,ftype();
 	struct ax25 hdr;
 	struct ax25_addr *hp;
+#ifndef NO_INFO_CMD
+	extern int info_only;
+	extern char axtrhdr[];
+#endif
 
-	fprintf(trfp,"AX25: ");
 	/* Extract the address header */
 	if(ntohax25(&hdr,bpp) < 0){
 		/* Something wrong with the header */
-		fprintf(trfp," bad header!\n");
+#ifndef NO_INFO_CMD
+		fprintf(trfp,"%sAX25: bad header!\n",axtrhdr);
+#else
+		fprintf(trfp,"AX25: bad header!\n");
+#endif
 		return;
 	}
+#ifndef NO_INFO_CMD
+#ifdef CRAP
+	if(!pullup(bpp,&control,1) == 1 &&
+		(!((type = ftype(control)) == UI || type == I) && info_only)){
+		axtrhdr[0] = '\0';	/* flag to not print anything further */
+		return;
+	}
+#endif
+
+	if(pullup(bpp,&control,1) != 1){
+		axtrhdr[0] = '\0';
+		return;
+	}
+	if(!((type = ftype(control)) == UI || type == I))
+		if(info_only){
+			axtrhdr[0] = '\0';	/* flag to not print anything further */
+			return;
+		}
+
+	fprintf(trfp,"%sAX25: ",axtrhdr);
+#else
+	if(pullup(bpp,&control,1) != 1){
+		fprintf(trfp,"\n");
+		return;
+	}
+	type = ftype(control);
+#endif
+
 	pax25(tmp,&hdr.source);
 	fprintf(trfp,"%s",tmp);
 	pax25(tmp,&hdr.dest);
@@ -52,14 +87,8 @@ int check;	/* Not used */
 			fprintf(trfp," %s%s",tmp,(hp->ssid & REPEATED) ? "*":"");
 		}
 	}
-	if(pullup(bpp,&control,1) != 1){
-		fprintf(trfp,"\n");	/* was missing - K5JB */
-		return;
-	}
-
-	fprintf(trfp," ");	/* was putchar() - K5JB  */
-	type = ftype(control);
-	fprintf(trfp,"%s",decode_type(type));
+	/* First bug I fixed!  Space here was send with putchar() - K5JB */
+	fprintf(trfp," %s",decode_type(type));
 	/* Dump poll/final bit */
 	if(control & PF){
 		switch(hdr.cmdrsp){
@@ -196,13 +225,16 @@ struct mbuf **bpp;
 	pullup(bpp,&x,1);
 	fprintf(trfp," ttl %u\n",(unsigned)uchar(x));
 
+	i = 0; /* reuse this as a flag */
+
 	/* Read first five bytes of "transport" header */
 	pullup(bpp,thdr,5);
 	switch(thdr[4] & 0xf){
 	case 0:	/* network PID extension */
-		if (thdr[0] == (PID_IP & 0x0f) && thdr[1] == (PID_IP & 0x0f))
+		if(thdr[0] == (PID_IP & 0x0f) && thdr[1] == (PID_IP & 0x0f)){
+			i = 1;	/* suppress an extra linefeed */
 			ip_dump(bpp,1) ;
-		else
+		}else
 			fprintf(trfp,"         protocol family %x, proto %x",
 					uchar(thdr[0]), uchar(thdr[1])) ;
 		break ;
@@ -234,10 +266,9 @@ struct mbuf **bpp;
 			(unsigned)uchar(thdr[0]),(unsigned)uchar(thdr[1]));
 		break;
 	case 5:	/* Information (data) */
-		fprintf(trfp,"         info: ckt %u/%u",
-			(unsigned)uchar(thdr[0]),(unsigned)uchar(thdr[1]));
-		fprintf(trfp," txseq %u rxseq %u",(unsigned)uchar(thdr[2]),
-			(unsigned)uchar(thdr[3]));
+		fprintf(trfp,"         info: ckt %u/%u txseq %u rxseq %u",
+			(unsigned)uchar(thdr[0]),(unsigned)uchar(thdr[1]),
+			(unsigned)uchar(thdr[2]),(unsigned)uchar(thdr[3]));
 		break;
 	case 6:	/* Information acknowledgement */
 		fprintf(trfp,"         info ack: ckt %u/%u rxseq %u",
@@ -248,11 +279,9 @@ struct mbuf **bpp;
 		fprintf(trfp,"         unknown transport type %d", thdr[4] & 0x0f) ;
 		break;
 	}
-	if(thdr[4] & 0x80)
-		fprintf(trfp," CHOKE");
-	if(thdr[4] & 0x40)
-		fprintf(trfp," NAK");
-	fprintf(trfp,"\n");
+	if(!i)
+		fprintf(trfp,"%s\n",	thdr[4] & 0x80 ? " CHOKE" :
+			thdr[4] & 0x40 ? " NAK" : "");
 }
 char *
 decode_type(type)

@@ -144,37 +144,36 @@ struct socket *s;
 	void rip();
 
 	if(issok){	/* it may be turned off by sokname command */
-	strncpy(buf,inet_ntoa(s->address),16);
-	i = strlen(buf);
-	if ((sfile = fopen(hosts,"r")) == NULLFILE)
-		return NULLCHAR;
+		strncpy(buf,inet_ntoa(s->address),16);
+		i = strlen(buf);
+		if ((sfile = fopen(hosts,"r")) == NULLFILE)
+			return psocket(s);
 
-	while (!feof(sfile)){
-		fgets(hostent,LINELEN,sfile);
+		while (!feof(sfile)){
+			fgets(hostent,LINELEN,sfile);
 
-		if(hostent[0] == '#' || !isdigit(hostent[0]))
-			continue;	/* Comment or invalid line */
-		if(strncmp(buf,hostent,i) != 0)	/* this requires IP address be */
-			continue;			/* left justified in file */
-		fclose(sfile);
-		rip(hostent);
-		cp = hostent;
-		for(i = 0,cp = strtok(cp," \t");cp != NULLCHAR && i < POSITION;i++){
-			cpt = cp;
-			cp = strtok(NULLCHAR," \t");
+			if(hostent[0] == '#' || !isdigit(hostent[0]))
+				continue;	/* Comment or invalid line */
+			if(strncmp(buf,hostent,i) != 0)	/* this requires IP address be */
+				continue;			/* left justified in file */
+			fclose(sfile);
+			rip(hostent);
+			cp = hostent;
+			for(i = 0,cp = strtok(cp," \t");cp != NULLCHAR && i < POSITION;i++){
+				cpt = cp;
+				cp = strtok(NULLCHAR," \t");
+			}
+			if(cp == NULLCHAR)
+				cp = cpt;
+			cp[15] = '\0';	/* in case cp was gross - size restricted for */
+			sprintf(buf,"%s:%s", cp, tcp_port(s->port)); /* screen cosmetics */
+			return buf;		/* in tcpcmd.c, port is max of 8 chars */
 		}
-		if(cp == NULLCHAR)
-			cp = cpt;
-		cp[15] = '\0';	/* in case cp was gross - size restricted for */
-		sprintf(buf,"%s:%s", cp, tcp_port(s->port)); /* screen cosmetics */
-		return buf;		/* in tcpcmd.c, port is max of 8 chars */
-	}
 
-	/* No address found */
-	fclose(sfile);
+		/* No address found */
+		fclose(sfile);
 	}
-	cp = psocket(s);	/* punt, never heard of em - or sokname may be off */
-	return cp;
+	return psocket(s);	/* punt, never heard of em - or sokname may be off */
 }
 #endif
 

@@ -34,6 +34,7 @@ struct ax25 {
 #define	UNKNOWN		0
 #define	COMMAND		1
 #define	RESPONSE	2
+#define	C_NOPOLL	3
 
 #define	PID_IP		0xcc	/* ARPA Internet Protocol */
 #define	PID_ARP		0xcd	/* ARPA Address Resolution Protocol */

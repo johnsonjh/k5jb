@@ -1,6 +1,7 @@
 /* IP-related user commands */
 #include <stdio.h>
 #include "options.h"	/* added for SERIALTEST */
+#include "config.h"	/* for VCIP_SSID */
 #include "global.h"
 #include "mbuf.h"
 #include "internet.h"
@@ -10,14 +11,26 @@
 #include "ip.h"
 #include "cmdparse.h"
 
+#ifdef RTIMER
+int doiprtime();
+long atol();
+#endif
+
 int doipaddr(),doipstat(),dottl(),atoi();
 extern char badhost[];
 struct cmds ipcmds[] = {
 	"address",	doipaddr,	0,	NULLCHAR,	NULLCHAR,
+#ifdef RTIMER
+	"rtimer",	doiprtime,	0, NULLCHAR,	NULLCHAR,
+#endif
 	"status",	doipstat,	0,	NULLCHAR,	NULLCHAR,
 	"ttl",		dottl,		0,	NULLCHAR,	NULLCHAR,
 	NULLCHAR,	NULLFP,		0,
-		"ip subcommands: address status ttl",	NULLCHAR,
+#ifdef RTIMER
+		"ip subcommands: address status rtimer ttl",	NULLCHAR
+#else
+		"ip subcommands: address status ttl",	NULLCHAR
+#endif
 };
 doip(argc,argv)
 int argc;
@@ -25,21 +38,37 @@ char *argv[];
 {
 	return subcmd(ipcmds,argc,argv);
 }
+
+#ifdef RTIMER
+int
+doiprtime(argc,argv)
+int argc;
+char *argv[];
+{
+	extern int32 rtime;
+	if(argc < 2)
+		printf("IP reassem timer: %lu sec\n",(rtime * MSPTICK)/1000L);
+	else
+		rtime = (1000L * atol(argv[1])) / MSPTICK;
+}
+#endif
+
 int
 doipaddr(argc,argv)
 int argc;
 char *argv[];
 {
 	char *inet_ntoa();
+	extern int32 gateway;
 	int32 n;
 
 	if(argc < 2) {
 		printf("%s\n",inet_ntoa(ip_addr));
 	} else if((n = resolve(argv[1])) == 0){
 		printf(badhost,argv[1]);
-		return 1;
+		return -1;
 	} else
-		ip_addr = n;
+		gateway = ip_addr = n;	/* k34 */
 	return 0;
 }
 int
@@ -57,7 +86,11 @@ char *argv[];			/* should have been unsigned char - K5JB */
 int doadd(),dodrop();
 static struct cmds rtcmds[] = {
 	"add", doadd, 3,
+#ifdef VCIP_SSID
+	"route add <dest addr>[/<bits>] <if name> [gateway|*] [metric]",
+#else
 	"route add <dest addr>[/<bits>] <if name> [gateway] [metric]",
+#endif
 	"Add failed",
 
 	"drop", dodrop, 2,
@@ -66,7 +99,7 @@ static struct cmds rtcmds[] = {
 
 	NULLCHAR, NULLFP, 0,
 	"route subcommands: add, drop",
-	NULLCHAR, 
+	NULLCHAR
 };
 
 /* Display and/or manipulate routing table */
@@ -94,6 +127,7 @@ char *argv[];
 	unsigned bits;
 	char *bitp;
 	int metric;
+	void rt_add();
 
 	if(strcmp(argv[1],"default") == 0){
 		dest = 0;
@@ -101,7 +135,7 @@ char *argv[];
 	} else {
 		if((dest = resolve(argv[1])) == 0){
 			printf(badhost,argv[1]);
-			return 1;
+			return -1;
 		}
 
 		/* If IP address is followed by an optional slash and
@@ -120,12 +154,14 @@ char *argv[];
 	}
 	if(ifp == NULLIF){
 		printf("Interface \"%s\" unknown\n",argv[2]);
-		return 1;
+		return -1;
 	}
 	if(argc > 3){
-		if((gateway = resolve(argv[3])) == 0){
+		if(argv[3][0] == '*')
+			gateway = 0;
+		else if((gateway = resolve(argv[3])) == 0){
 			printf(badhost,argv[3]);
-			return 1;
+			return -1;
 		}
 	} else {
 		gateway = 0;
@@ -165,15 +201,15 @@ char *argv[];
 
 		if((n = resolve(argv[1])) == 0){
 			printf(badhost,argv[1]);
-			return 1;
+			return -1;
 		}
 	}
 	return rt_drop(n,bits);
 }
 
-/* Dump IP routing table
- * Dest              Length    Interface    Gateway          Metric
- * 192.001.002.003   32        sl0          192.002.003.004       4
+/* Dump IP routing table -- Tightened this up a bit - K5JB
+ * Dest             Len. Iface   Gateway          Metric
+ * 192.001.002.003  32   sl0     192.002.003.004  4
  */
 int
 dumproute()
@@ -181,27 +217,19 @@ dumproute()
 	register unsigned int i,bits;
 	register struct route *rp;
 
-	printf("Dest              Length    Interface    Gateway          Metric\n");
+	printf("Dest             Len. Iface   Gateway          Metric\n");
 	if(r_default.interface != NULLIF){
-		printf("default           0         %-13s",
-		 r_default.interface->name);
-		if(r_default.gateway != 0)
-			printf("%-17s",inet_ntoa(r_default.gateway));
-		else
-			printf("%-17s","");
-		printf("%6u\n",r_default.metric);
+		printf("default%12d   %-8s%-17s%6u\n",0, r_default.interface->name,
+			r_default.gateway != 0 ? inet_ntoa(r_default.gateway) : "",
+			r_default.metric);
 	}
 	for(bits=1;bits<=32;bits++){
 		for(i=0;i<NROUTE;i++){
 			for(rp = routes[bits-1][i];rp != NULLROUTE;rp = rp->next){
-				printf("%-18s",inet_ntoa(rp->target));
-				printf("%-10u",bits);
-				printf("%-13s",rp->interface->name);
-				if(rp->gateway != 0)
-					printf("%-17s",inet_ntoa(rp->gateway));
-				else
-					printf("%-17s","");
-				printf("%6u\n",rp->metric);
+				printf("%-17s%2u   %-8s",inet_ntoa(rp->target),bits,
+						rp->interface->name);
+				printf("%-17s%6u\n",
+					rp->gateway != 0 ? inet_ntoa(rp->gateway) :"",rp->metric);
 			}
 		}
 	}
@@ -210,7 +238,6 @@ dumproute()
 
 int16 freeps;	/* can be removed after test, see various ax_recv() calls */
 
-extern int16 sliphiwater;	/* maybe remove after test */
 #if defined(MSDOS) && defined(SERIALTEST)
 int16 serial_err;
 int32 tot_rframes;
@@ -227,11 +254,16 @@ char *argv[];
 	register struct reasm *rp;
 	register struct frag *fp;
 	char *inet_ntoa();
+#ifdef SHOWBALKS /* outlived its usefulness */
 	extern int16 maxslipq,slipbalks;	/* in slip.c */
+	extern int16 sliphiwater;	/* maybe remove after test */
+#endif
 
 	if(argc > 1 && strcmp(argv[1],"clear") == 0){
+#ifdef SHOWBALKS
 		slipbalks = 0;
 		sliphiwater = 0;
+#endif
 		freeps = 0;
 #if defined(SERIALTEST) && defined(MSDOS)
 		serial_err = 0;
@@ -239,6 +271,7 @@ char *argv[];
 #endif
 		return 0;
 	}
+#ifdef SHOWBALKS
 #if defined(SERIALTEST) && defined(MSDOS)
 	printf(
 	"SLIP: TX balks %u, (hi water %u/%u); Bad KISS hdrs: %u, RX ORuns: %u/%lu\n",
@@ -247,18 +280,25 @@ char *argv[];
 	printf("SLIP: TX slip balks %u, (hi water %u/%u); Bad KISS hdrs: %u\n",
 		slipbalks,sliphiwater,maxslipq,freeps);
 #endif
-	printf("IP: total %ld, runt %u, len err %u, vers err %u,",
-		ip_stats.total,ip_stats.runt,ip_stats.length,ip_stats.version);
-	printf(" chksum err %u, badproto %u\n",
+#else	/* eliminate the TX balk report */
+#if defined(SERIALTEST) && defined(MSDOS)
+	printf("Bad KISS hdrs: %u, RX ORuns: %u/%lu\n",freeps,serial_err,
+		tot_rframes);
+#else
+	printf("Bad KISS hdrs: %u\n",freeps);
+#endif
+#endif
+	printf("IP: total %ld, runt %u, len err %u, vers err %u, chksum err %u, badproto %u\n",
+		ip_stats.total,ip_stats.runt,ip_stats.length,ip_stats.version,
 		ip_stats.checksum,ip_stats.badproto);
 
 	if(reasmq != NULLREASM)
 		printf("Reassembly fragments:\n");
 	for(rp = reasmq;rp != NULLREASM;rp = rp->next){
-		printf("src %s,",inet_ntoa(rp->source));
-		printf(" dest %s,",inet_ntoa(rp->dest));
-		printf(" id %u, pctl %u, time %lu, len %u\n",
-			rp->id,uchar(rp->protocol),rp->timer.count,rp->length);
+		printf("src %s, ",inet_ntoa(rp->source));
+		printf("dest %s, id %u, pctl %u, time %lu, len %u\n",
+			inet_ntoa(rp->dest),rp->id,uchar(rp->protocol),
+			rp->timer.count,rp->length);
 		for(fp = rp->fraglist;fp != NULLFRAG;fp = fp->next){
 			printf(" offset %u, last %u\n",fp->offset,fp->last);
 		}

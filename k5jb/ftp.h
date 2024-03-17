@@ -16,6 +16,7 @@ struct ftp {
 #define STARTUP_STATE	3	/* Starting up autologin */
 #define USER_STATE	4	/* Waiting for the user name */
 #define PASS_STATE	5	/* Waiting for the password */
+#define SETUP_STATE	6	/* added to handle NOS surprise */
 
 	char type;		/* Transfer type */
 #define	IMAGE_TYPE	0

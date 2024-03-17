@@ -1,6 +1,7 @@
 /* Lower half of IP, consisting of gateway routines
  * Includes routing and options processing code
  */
+#include "config.h"
 #include "global.h"
 #include "mbuf.h"
 #include "internet.h"
@@ -55,7 +56,9 @@ char rxbroadcast;	/* True if packet had link broadcast address */
 	struct mbuf *tbp;
 	int ntohip(),icmp_output();
 	int16 cksum();
-
+#ifdef VCIP_SSID
+	int16 mtu;
+#endif
 	ip_stats.total++;
 	if(len_mbuf(bp) < IPLEN){
 		/* The packet is shorter than a legal IP header */
@@ -222,7 +225,13 @@ no_opt:
 	throughput = ip.tos & THRUPUT;
 	reliability = ip.tos & RELIABILITY;
 
-	if(ip.length <= iface->mtu){
+#ifdef VCIP_SSID	/* let's use metric for something at last */
+	mtu = rp->metric ? rp->metric : iface->mtu;
+	if(ip.length <= mtu)
+#else
+	if(ip.length <= iface->mtu)
+#endif
+	{
 		/* Datagram smaller than interface MTU; put header
 		 * back on and send normally
 		 */
@@ -251,13 +260,22 @@ no_opt:
 		 * options that aren't supposed to be copied on fragmentation
 		 */
 		ip.fl_offs = offset >> 3;
-		if(length + ip_len <= iface->mtu){
+#ifdef VCIP_SSID
+		if(length + ip_len <= mtu)
+#else
+		if(length + ip_len <= iface->mtu)
+#endif
+		{
 			/* Last fragment; send all that remains */
 			fragsize = length;
 			ip.fl_offs |= mf_flag;	/* Pass original MF flag */
 		} else {
 			/* More to come, so send multiple of 8 bytes */
+#ifdef VCIP_SSID
+			fragsize = (mtu - ip_len) & 0xfff8;
+#else
 			fragsize = (iface->mtu - ip_len) & 0xfff8;
+#endif
 			ip.fl_offs |= MF;
 		}
 		ip.length = fragsize + ip_len;
@@ -289,7 +307,10 @@ no_opt:
 struct rt_cache rt_cache;
 
 /* Add an entry to the IP routing table. Returns 0 on success, -1 on failure */
-int
+/* don't care much if it fails.  All tests are done by only function that
+ * calls this
+ */
+void
 rt_add(target,bits,gateway,metric,interface)
 int32 target;		/* Target IP address prefix */
 unsigned int bits;	/* Size of target address prefix in bits (0-32) */
@@ -300,9 +321,6 @@ struct interface *interface;
 	struct route *rp,**hp,*rt_lookup();
 	int16 hash_ip(),i;
 	int32 mask;
-
-	if(interface == NULLIF)
-		return -1;
 
 	rt_cache.target = 0;	/* Flush cache */
 
@@ -330,7 +348,7 @@ struct interface *interface;
 		 * entry and put it in.
 		 */
 		if((rp = (struct route *)malloc(sizeof(struct route))) == NULLROUTE)
-			return -1;	/* No space */
+			return; /* keep 'em guessing */
 		/* Insert at head of table */
 		rp->prev = NULLROUTE;
 		hp = &routes[bits-1][hash_ip(target)];
@@ -343,8 +361,6 @@ struct interface *interface;
 	rp->gateway = gateway;
 	rp->metric = metric;
 	rp->interface = interface;
-
-	return 0;
 }
 
 /* Remove an entry from the IP routing table. Returns 0 on success, -1
@@ -413,6 +429,7 @@ register int32 addr;
 #ifndef	GWONLY
 /* Given an IP address, return the MTU of the local interface used to
  * reach that destination. This is used by TCP to avoid local fragmentation
+ * It is only called by proc_syn() in tcpin.c - K5JB
  */
 int16
 ip_mtu(addr)
@@ -421,21 +438,28 @@ int32 addr;
 	register struct route *rp;
 	struct route *rt_lookup();
 	struct interface *iface;
+#ifdef AX25
 	extern int16 paclen;
+#endif
 	rp = rt_lookup(addr);
 	if(rp == NULLROUTE || rp->interface == NULLIF)
 		return 0;
 
 	iface = rp->interface;
-#ifdef FORWARD
+#ifdef FORWARD	/* probably never use this */
 	if(iface->forw != NULLIF)
 		return iface->forw->mtu;
 	else
 #endif
+		/* let's use metric for something at last */
+#if defined(VCIP_SSID) || !defined(AX25)	
+		return rp->metric ? rp->metric : iface->mtu;
+#else
 		if(iface->flags == CONNECT_MODE)	/* revised to deal with ax25 segmentation */
 			return iface->mtu;		/* in datagram mode we don't want mtu - K5JB */
 		else
 			return iface->mtu < paclen ? iface->mtu : paclen;
+#endif
 }
 #endif
 /* Look up target in hash table, matching the entry having the largest number

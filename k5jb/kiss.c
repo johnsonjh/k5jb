@@ -1,3 +1,4 @@
+#include "options.h"
 #include "config.h"
 #ifdef AX25
 #include "global.h"
@@ -5,13 +6,14 @@
 #include "iface.h"
 #include "kiss.h"
 #include "trace.h"
-#include "options.h"
 #include <stdio.h>
 #include <string.h>
 
 #if defined(MSDOS) && defined(SERIALTEST)
 #include "8250.h"
 #endif
+
+#ifndef EKISSPORT
 /* Send raw data packet on KISS TNC */
 void
 kiss_raw(interface,data)
@@ -75,6 +77,7 @@ struct mbuf *bp;
 		freeps++;	/* remove after test - K5JB */
 	}
 }
+#endif /* EKISSPORT
 
 /* Perform device control on KISS TNC by sending control messages */
 kiss_ioctl(interface,argc,argv)
@@ -107,6 +110,11 @@ char *argv[];
 	if (!strncmp(interface->name,"kp", 2) &&
 		interface->name[strlen(interface->name) - 1] == 'b')
 			*cp |= 0x10;
+#endif
+#ifdef EKISSPORT	/* watch out for sign extensions here if we start using */
+						/* upper parts of this number */
+	if(interface->kissport)
+		*cp |= interface->kissport << 4;
 #endif
 	for(i = 1,cp++;i < argc;)
 		*cp++ = (char)atoi(argv[i++]);

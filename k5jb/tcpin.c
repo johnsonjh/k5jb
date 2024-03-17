@@ -13,6 +13,9 @@
 #include "ip.h"
 
 struct tcp_stat tcp_stat;
+int ntohtcp(),seq_within(),seq_ge(),seq_gt(),seq_lt(),start_timer(),
+	stop_timer();
+static int trim();
 
 /* This function is called from IP with the IP header in machine byte order,
  * along with a mbuf chain pointing to the TCP header.
@@ -36,7 +39,9 @@ char rxbroadcast;	/* Incoming broadcast - discard if true */
 	struct pseudo_header ph;	/* Pseudo-header for checksumming */
 	int hdrlen;			/* Length of TCP header */
 	int16 cksum();
-
+#ifdef TIMEZOMBIE
+	int32 time();
+#endif
 	if(bp == NULLBUF)
 		return;
 
@@ -72,7 +77,7 @@ char rxbroadcast;	/* Incoming broadcast - discard if true */
 	conn.local.port = seg.dest;
 	conn.remote.address = source;
 	conn.remote.port = seg.source;
-	
+
 	if((tcb = lookup_tcb(&conn)) == NULLTCB){
 		struct tcb *ntcb;
 		void link_tcb();
@@ -106,10 +111,12 @@ char rxbroadcast;	/* Incoming broadcast - discard if true */
 		/* Stuff the foreign socket into the TCB */
 		tcb->conn.remote.address = source;
 		tcb->conn.remote.port = seg.source;
-
 		/* NOW put on right hash chain */
 		link_tcb(tcb);
 	}
+#ifdef TIMEZOMBIE
+	time(&tcb->lastheard);
+#endif
 	/* Do unsynchronized-state processing (p. 65-68) */
 	switch(tcb->state){
 	case CLOSED:
@@ -132,7 +139,7 @@ char rxbroadcast;	/* Incoming broadcast - discard if true */
 			tcp_stat.conin++;
 			proc_syn(tcb,tos,&seg);
 			send_syn(tcb);
-			setstate(tcb,SYN_RECEIVED);		
+			setstate(tcb,SYN_RECEIVED);
 			if(length != 0 || (seg.flags & FIN)) {
 				break;		/* Continue processing if there's more */
 			}
@@ -287,12 +294,11 @@ char rxbroadcast;	/* Incoming broadcast - discard if true */
 				/* Our FIN is acknowledged, close connection */
 				close_self(tcb,NORMAL);
 				return;
-			}			
-/* I think this is wrong, and can cause permanent ACK-ACK loops.  dmf.
-		case TIME_WAIT:
-			tcb->flags |= FORCE;
+			}
+			break;
+		case TIME_WAIT:	/* k34 */
 			start_timer(&tcb->timer);
-*/
+			break;
 		}
 
 		/* (URGent bit processing skipped here) */
@@ -310,24 +316,14 @@ char rxbroadcast;	/* Incoming broadcast - discard if true */
 				tcb->rcv.nxt += length;
 				tcb->rcv.wnd -= length;
 				tcb->flags |= FORCE;
+				if(tcb->r_upcall)	/* k34 */
+					(*tcb->r_upcall)(tcb,tcb->rcvcnt);
 				break;
 			default:
 				/* Ignore segment text */
 				free_p(bp);
 				break;
 			}
-		}
-		/* If the user has set up a r_upcall function and there's
-		 * data to be read, notify him.
-		 *
-		 * This is done before sending an acknowledgement,
-		 * to give the user a chance to piggyback some reply data.
-		 * It's also done before processing FIN so that the state
-		 * change upcall will occur after the user has had a chance
-		 * to read the last of the incoming data.
-		 */
-		if(tcb->r_upcall && tcb->rcvcnt != 0){
-			(*tcb->r_upcall)(tcb,tcb->rcvcnt);
 		}
 		/* process FIN bit (p 75) */
 		if(seg.flags & FIN){
@@ -364,6 +360,9 @@ char rxbroadcast;	/* Incoming broadcast - discard if true */
 				start_timer(&tcb->timer);
 				break;
 			}
+			/* Call the client again so he can see EOF - k34 */
+			if(tcb->r_upcall)
+				(*tcb->r_upcall)(tcb,tcb->rcvcnt);
 		}
 		/* Scan the resequencing queue, looking for a segment we can handle,
 		 * and freeing all those that are now obsolete.
@@ -381,6 +380,7 @@ gotone:	;
 }
 
 /* Process an incoming ICMP response */
+void
 tcp_icmp(source,dest,type,code,bpp)
 int32 source;			/* Original IP datagram source (i.e. us) */
 int32 dest;			/* Original IP datagram dest (i.e., them) */
@@ -528,6 +528,11 @@ register struct tcp *seg;
 		 */
 		if(tcb->snd.wnd == 0 && seg->wnd != 0)
 			tcb->snd.ptr = tcb->snd.una;
+		/* snd.wnd should be an indicator of the other guy's receive window.
+		 * be careful that we don't make the error that was in session.c.
+		 * This was used until error found:
+		tcb->snd.wnd = seg->wnd < tcb->window ? seg->wnd : tcb->window;
+		*/
 		tcb->snd.wnd = seg->wnd;
 		tcb->snd.wl1 = seg->seq;
 		tcb->snd.wl2 = seg->ack;
@@ -569,34 +574,31 @@ register struct tcp *seg;
 	}
 	/* Round trip time estimation */
 	if(run_timer(&tcb->rtt_timer) && seq_ge(seg->ack,tcb->rttseq)){
+		int32 rtt;	/* measured round trip time */
+		int32 abserr;	/* abs(rtt - srtt) */
 		/* A timed sequence number has been acked */
 		stop_timer(&tcb->rtt_timer);
-		if(!(tcb->flags & RETRAN)){
-			int32 rtt;	/* measured round trip time */
-			int32 abserr;	/* abs(rtt - srtt) */
 
-			/* This packet was sent only once and now
-			 * it's been acked, so process the round trip time
-			 */
-			rtt = tcb->rtt_timer.start - tcb->rtt_timer.count;
-			rtt *= MSPTICK;		/* milliseconds */
+		/* This packet's been acked, so process the round trip time */
 
-			/* If this ACKs our SYN, this is the first ACK
-			 * we've received; base our entire SRTT estimate
-			 * on it. Otherwise average it in with the prior
-			 * history, also computing mean deviation.
-			 */
-			if(rtt > tcb->srtt &&
-			 (tcb->state == SYN_SENT || tcb->state == SYN_RECEIVED)){
-				tcb->srtt = rtt;
-			} else {
-				abserr = (rtt > tcb->srtt) ? rtt - tcb->srtt : tcb->srtt - rtt;
-				tcb->srtt = ((AGAIN-1)*tcb->srtt + rtt) / AGAIN;
-				tcb->mdev = ((DGAIN-1)*tcb->mdev + abserr) / DGAIN;
-			}
-			/* Reset the backoff level */
-			tcb->backoff = 0;
+		rtt = tcb->rtt_timer.start - tcb->rtt_timer.count;
+		rtt *= MSPTICK;		/* milliseconds */
+
+		/* If this ACKs our SYN, this is the first ACK
+		 * we've received; base our entire SRTT estimate
+		 * on it. Otherwise average it in with the prior
+		 * history, also computing mean deviation.
+		 */
+		if(rtt > tcb->srtt &&
+		 (tcb->state == SYN_SENT || tcb->state == SYN_RECEIVED)){
+			tcb->srtt = rtt;
+		} else {
+			abserr = (rtt > tcb->srtt) ? rtt - tcb->srtt : tcb->srtt - rtt;
+			tcb->srtt = ((AGAIN-1)*tcb->srtt + rtt) / AGAIN;
+			tcb->mdev = ((DGAIN-1)*tcb->mdev + abserr) / DGAIN;
 		}
+		/* Reset the backoff level */
+		tcb->backoff = 0;
 	}
 	/* If we're waiting for an ack of our SYN, note it and adjust count */
 	if(!(tcb->flags & SYNACK)){
@@ -678,7 +680,9 @@ struct tcp *seg;
 		tcb->tos = tos;
 	tcb->rcv.nxt = seg->seq + 1;	/* p 68 */
 	tcb->snd.wl1 = tcb->irs = seg->seq;
+	/* See caution note in update(), above - K5JB k34 */
 	tcb->snd.wnd = seg->wnd;
+
 	if(seg->mss != 0)
 		tcb->mss = seg->mss;
 	/* Check the MTU of the interface we'll use to reach this guy
@@ -688,6 +692,12 @@ struct tcp *seg;
 		/* Allow space for the TCP and IP headers */
 		mtu -= TCPLEN + IPLEN;
 		tcb->cwind = tcb->mss = min(mtu,tcb->mss);
+#ifdef THINKING
+		/* also an excellent time to bump the irtt. Set route metric to mtu */
+		/* default of iface.  Would need similar trick on outgoing syns */
+		tcb->timer.start *= 4;	/* arbitrary numbers for testing - k34 */
+		tcp->srtt *= 4;
+#endif
 	}
 }
 

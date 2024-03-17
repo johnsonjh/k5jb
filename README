@@ -1,277 +1,90 @@
-            Version k31 to k33 incremental update -- Nov 8, 1993
+Preface:  When I uploaded k5jb.k34c.tar.Z, I included the wrong copy of
+telunix.c, the one I use on my 3B2.  Rather than upload a replacement
+I will upload k5jb.telu.lzh, which contains ALL the versions of
+telunix.c that I have played with, including a note.  It is archived
+with lharc.  Sorry for the inconvenience.  Joe, K5JB
 
-                             K5JB NET Update
+                                unix.note
 
-Unix, Coherent, and OS9/OSK users will need the files contained in the
-k31 NET release.  The files contained in the k31-33 kit replace some of
-the files in the k31 NET release.
+When Bob, N0QBJ, provided the changes necessary to compile version k34
+on OS9/68K I incorporated them into my current files.  Since there have
+been numerous file changes since the k34 upload, I am uploading a new
+source code kit, k5jb.k34c.tar.Z.  Most of the changes were cosmetic but
+two programming errors were fixed.  This .tar.Z replaces k5jb.k34.tar.Z.
+None of the other files have changed sufficiently for replacement.  This
+text is contained in k5jb.k34c.txt, and as a preface to note.unix,
+contained in the source code kit.
 
-An MS-DOS kit is being released simultaneously with this release and
-will be available in the TAPR library.  It contains the complete kit of
-files for MS-DOS.
-
-This file contains information about changes made between version k31 and 
-k33 of the K5JB distribution of KA9Q NET (TCP/IP) for MS-DOS and Unix.  
-This information will be incorporated into the release documentation after 
-certain changes are proven and others under consideration are completed.
-
-There are two major changes to and a couple of error corrections in NET 
-with this release.  One change is addition of an AX.25 segmentation scheme 
-introduced by NOS.  The other is correction of lapb transmit queuing 
-design oversight that caused many unnecessary frames to be transmitted in 
-connected mode.  The error corrections were an omission of a transmit 
-upcall when a telnet session is received, and in the PC version, an error 
-in interpreting the PC's internal clock.
-
-                            AX.25 Segmentation
-
-The reason for AX.25 segmentation is to permit sending a stream of AX.25 
-frames containing IP frames, with the IP and TCP header contained in only 
-the first frame of the stream, thus avoiding repetition of these 40 bytes 
-in each AX.25 frame.  Frames broken up by segmentation are identified by a 
-PID byte of 0x08 instead of IP PID of 0xCC in each AX.25 Information 
-frame.  There was previously an AX.25 "fragmentation" scheme in NET, but 
-as far as I know it never worked.  It used two bits in a modified PID to 
-signify whether a frame was first, middle, or last of a set of fragments.
-
-First some terminology.
-
-TCP mss is maximum segment size for TCP, not to be confused with AX.25 
-link layer segmentation discussed here.  Its value is global for all 
-interfaces.
-
-Send mss is a value that is negotiated during TCP session setup.  Each 
-station has an independent send mss.
-
-Interface mtu is maximum transmission unit, set at attach time, but 
-changeable later (with this version).  It controls IP level fragmentation 
-and is a factor in establishing the send mss for a TCP session.
-
-AX.25 Paclen (ax25 paclen) establishes the maximum packet length in both 
-the AX.25 virtual circuit (connected mode) and datagram (unconnected 
-mode).  It is global to all interfaces.  Note that I chose to control 
-datagram size differently than is done in NOS.  (Footnote 1)
-
-Segmentation is only used in the AX.25 connected mode (virtual circuit).  
-It is not used on Net/ROM circuits.
-
-Interface mode (e.g. mode ax0 v) is either virtual or datagram.  Each 
-interface has its own mode.
-
-TCP session setup proceeds as follows:
-
-Each station's tcp send mss is established during tcp session synchroniz- 
-ation (SYN).  The originating station proposes an mss equal to its tcp 
-mss.  The destination examines its own setup and if necessary reduces its 
-send mss value thus:  It finds the smaller of either 1. its interface mtu if 
-transmitting in connected mode, or 2. its interface mtu or its paclen, 
-whichever is smaller, if transmitting in datagram mode.  It then reduces 
-that value by 40 to prevent unnecessary IP fragmentation.  It then uses 
-this value, or the mss proposed by the other station, whichever is smaller, 
-to be its send mss for the balance of the session.  (Footnote 2)
-
-In Summary, each station's send mss is the smaller of:
-
-   1. The other station's tcp mss,
-   2. If transmitting in vc mode, its interface mtu minus 40, or if in 
-      datagram mode, its paclen or its mtu, whichever is smaller,
-      minus 40.
-
-If the negotiated send mss is greater than the transmitting station's 
-paclen minus 40, it will transmit AX.25 segments.
-
-If you don't want to mess with AX.25 segmentation, in your attach command 
-set your interface mtu to the same size as planned ax25 paclen and set 
-your tcp mss to your planned ax25 paclen minus 40.  For example, if your 
-paclen is to be 256, set the mtu at attach time to 256 and accept the 
-defaults for the rest.  (Except for tcp mss.  Set it to 216 in your 
-autoexec.net. Tcp mss default is 512 and I never got around to changing it.
-(Footnote 3)
-
-If you want to set up a particular AX.25 segmentation scheme, to prevent 
-generating final runt packet segments, calculate interface mtu by using 
-the formula, N * (paclen - 2) - 1, where N, the desired number of AX.25 
-segments per IP frame, is greater than 1.  (The segmentation method 
-adopted creates paclen - 1 size data chunks).  For this to be coordinated, 
-the other station would need to use a tcp mss that is at least as large as 
-your interface mtu minus 40, and a paclen at least as large as yours.  (In 
-other words, same numbers as yours should work fine, but other numbers can 
-work too.)
-
-Stated another way:
-If you set your tcp mss to a value that is no more than the other 
-station's paclen minus 40, (e.g. tcp mss = 216, other station's paclen = 
-256) he will not send AX.25 segments to you.  If you set your station's 
-interface mtu no greater than your paclen (e.g. 256 for both) your station 
-won't transmit AX.25 segments.
-
-These numbers will not prevent your station from having to receive and 
-queue segmented AX.25 frames if, like in my case, it is acting as a switch 
-between two other stations that have negotiated tcp send mss that causes 
-AX.25 segmentation.
-
-Segmentation is not used in the datagram mode, Nor is it used with Net/ROM.
-
-In conjunction with this segmentation addition, I modified one command and 
-added another to NET.  They are:
-
-param <interface> <data field> | mtu [<value>]
-
-This command, in addition to sending control data to a KISS TNC (or 
-speed information to a SLIP line), can be used to examine or change an 
-interface's mtu after the program is running.  The command, param 
-<interface> <data field> sends the data field to a KISS TNC or speed 
-information to a slip link as previously.  Param <interface> mtu returns 
-the mtu value, and adding a value to the command changes the mtu to the 
-new value.  (Mistyping and sending some first letter other than "m" for 
-the "mtu" argument will cause spurious data to be sent to the KISS TNC, 
-but it shouldn't hurt anything.)  There are no constraints on this number, 
-except no zero permitted; it assumes you know what you are doing.
-
-ax25 segment [on | off]
-
-Without arguments this command returns state of receive segmentation.  
-Segmentation can be disabled with the "off" argument.  The only reason you 
-may want to do this if someone appears with unrealistic numbers and begins 
-sapping all your memory queuing receive frames for him.  You can control 
-this with your parameters if you are the receiving station but if you are 
-switching packets to another destination you have no control over tcp mss 
-being used.
-
-                AX.25 and LAPB - Go Faster by Going Slower
-
-There has always been a problem with the way NET did Link Access Protocol, 
-Balanced (LAPB) but since I mostly use datagram mode I had not cared much.  
-While testing the segmentation scheme I became quite concerned about the 
-pathological behavior I observed.  The problem is that NET was not 
-designed to accommodate data that is sent over a serial port to a KISS 
-TNC, and then queued in that TNC until it is sent.  With the timing 
-involved, transmit frames were queued and sent out the computer's serial 
-port before receive frames were examined for the next send values from the 
-other station.  The result was guaranteed sending of queued frames after 
-RR frames were received that should have canceled them.  There was a 
-method for dequeueing obsolete frames, but once sent to the serial port it 
-was too late.
-
-The scheme I adopted is based on the T2 timer (sometimes called resptime) 
-and simply puts the LAPB output handler on a deferred queue so frames will 
-be sent from the computer to the KISS TNC a short delay after queuing.  
-Final numbers haven't been established but I have been using a one second 
-(actually 990 ms) delay which seems to be plenty of time for receive 
-acknowledgments or polls to be examined and acknowledged frames dequeued.  
-The results are like slowing down to below stumble speed be able to speed 
-up.  Without the retries the throughput improves considerably.
-
-                           Uploading in Telnet
-
-There was an omission lurking in NET that took me forever to notice and 
-only minutes to correct.  I have had a couple of unexplained crashes over 
-the last few years, and I finally recognized what caused it.  If a station 
-initiates a telnet session, it can upload a file to its correspondent with 
-no problem.  But, if the telnet session was initiated from the other 
-station there was no mechanism attached to the session for uploading a 
-file.  If under these conditions the connected to attempted an upload NET 
-simply laid down.  This has been corrected.
-
-                           The PC Clock, Fixed
-
-While searching for a suspicious flurry of radio activity I discovered it 
-was happening at midnight.  The internal timer was spinning to make up 
-time when the PC's stored minute value was reset to zero at midnight.  
-Fixed it.
-
-                             AX Heard Command
-
-I never compile this option and use it, so W6SWE had to point out to me 
-that I did a poor job when I did this one.  When an information frame was 
-heard whose source was already in the heard list it only updated the time 
-and added a flag to the type of protocol table.  I added a test to see if 
-either source or destination calls inclusive were in the table and if not, 
-added them.  See someone really does tell me what needs fixing in NET.
-
-                          Notes to programmers:
-
-Preprocessor directives that are introduced with this version are, SEGMENT, 
-SEG_CMD, PARAM_MTU, and CUTE_FTP.  (In MS-DOS version there is also a 
-manifest constant, TICK_SKIP and pp directive, REPORT_SKIP.)  They control 
-what parts of code are compiled.  You can grep for these preprocessor 
-directives to see what they control.  If SEGMENT is not defined, some of 
-the attach commands will prevent setting interface mtu to a value larger 
-than the paclen in effect. 
-
-CUTE_FTP was done when I considered taking out the echo/noecho during the 
-assisted FTP login process.  Some NOS versions were throwing me surprises
-and I considered taking this part of the code out until I re-read RFC 959
-and discovered NOS was right and NET was wrong.
-
-In the MS-DOS version, in pc.c, TICK_SKIP is defined as 64.  This was 
-experimentally chosen.  (A tick is roughly 55ms -- 18 ticks per second.)  
-The midnight anomaly results in a tick skip of something like 65365 on my 
-machine so it is well over the normally chosen value of TICK_SKIP.  Tick 
-skips are unimportant as far as timekeeping is concerned because NET does 
-nothing based on absolute time.  Unnecessary clock spinup will drive the 
-AX.25 timers crazy though and should be avoided.  My machine exceeds 64 
-occasionally with some file operations, and while listing some 
-exceptionally long screens, like the routes screen.  Typically I will see 
-skip values of 90 to 120, maybe two or three times a day, on a 10 MHz 286 
-running DV, and a BBS running in another DV window.  If I do a DV cut and 
-paste from the NET screen, NET is suspended and upon resumption there is a 
-tick skip.  If you want to watch when NET skips ticks on your machine, 
-define REPORT_SKIP in your options.h file.
-
-(The following are approximate values depending on full configuration.)  
-In terms of cost, SEGMEMT costs 530 bytes; SEG_CMD costs 150 bytes; 
-PARAM_MTU costs 100, or so, bytes; and, CUTE_FTP costs 254 bytes.  Since I 
-folded some duplicate code together in lapb, the size of version k33 is 
-actually about 426 bytes smaller than version k31.  (k32 was released in 
-dribbles and drabs with all kinds of bugs while I was fixing the LAPB 
-problem.)
+Version k34 was uploaded to ucsd.edu as a complete kit.  Previous files
+were irrlevant.  Now, the complete kit --  with new files marked with
+(*) -- consists of:
 
 
-Enjoy!  Joe, K5JB
+k5jb.k34c.txt   -- This file (*)
+k5jb.k34upd.usr -- File for users.  Contains recent changes.
+k5jb.k34c.tar.Z -- Source code for Unix KA9Q NET (*)
+k5jb.dock34.tar.Z -- Complete user documentation for same.
+k5jb.bmk34.tar.Z  -- Source code for BM v.3.3.1m, mailer.  Updated a little.
+k5jb.samp.tar.Z -- Optional, Sample startup files for beginners.
 
-Footnotes:
+(These files on ucsd.edu are either in /hamradio/packet/tcpip/incoming, or in
+/hamradio/packet/tcpip/k5jb.)
 
-1. I'm sorry that paclen (AX.25 packet length), tcp mss (maximum segment 
-size), and interface mtu (maximum transmission unit), aren't better 
-coordinated in NET.  It makes it much more complicated than it needs to 
-be, and in some cases makes setting correct packet sizes very awkward.  I 
-am working on better coordination; in the interim, standard values are 
-used as defaults if simple setup is used.  These notes are more for my 
-benefit than yours.  Interface mtu is, of course variable by interface.  
-The tcp mss and ax25 paclen are global to all interfaces.  Having both of 
-these global causes me all kind of headaches.  I expect that I may try 
-adding paclen and tcp mss to the interface structure so they can be 
-independently twiddled.  Note that, unlike NOS, UI datagram size will be 
-no bigger than paclen.  To tie it only to interface mtu causes real 
-problems if you want to use I frame segmentation and UI datagrams on the 
-same port.
+                        Brief description of Unix NET
 
-For more discussion of these values, see PA0GRI's NOS documentation, near 
-the end.
+NET is designed as an MS-DOS application, so does not make full use of Unix's
+multi-tasking ability but runs quite well in Unix.  You can use it in a Unix
+windowing environment (or in shell layers), or you can shell out and leave
+NET running in the background.  If you choose to use shell layers you must
+prevent blocking on input if you make the window session inactive.  See the
+doc on how to do this.
 
-2.  Note that the actual packet data size is governed by other things 
-also.  The send window grows and shrinks, based on performance.  AX.25 
-segmentation, if it is to occur, starts after the first few transactions 
-has established sufficiently large window.
+If you are unfamiliar with NET (the TCP/IP suite, written by Phil Karn, KA9Q,
+and preceding his current project, NOS), you need to break out the files in
+k5jb.dock33.tar.Z and browse them.  k5jb.k31.tar.Z contains a file,
+source.note, which has modification information.
 
-During a session, while doing its work, the IP router will compare 
-outgoing datagram size to the interface mtu (if connected on AX.25) or the 
-paclen (If not connected on AX.25) and fragment the packet at the IP level 
-if necessary.)
+                          Brief description of kit
 
-3.  Netrom interface presents some special problems. When netrom is 
-attached its mtu will be set to paclen minus 20, but greater than 43 and 
-less than 237.  This number will cause send mtu to take on a sane value if 
-another station initiates a connection to NET, but outgoing connections 
-over netrom will have a proposed send mss a little bit too large (216 
-bytes) which will be trimmed only if the destination station does it 
-because of its netrom interface mtu (hopefully 236) which would reduce the 
-send mss to 196.  The NRS interface mode used for serial communication 
-with a TNC using Net/ROM has also been constrained at attach time to 
-paclen - 20.  Incidentally, tell your NOS buddies to not attempt AX.25 
-segmentation with Net/ROM transport with NOS.  It won't work.  (See nr3.c 
-in NOS where the segmentation PID replaces the Net/ROM PID and screws the 
-works up.) 
+More detail on files contained in this set:
 
-End of k5jb.k31-33.txt
+k5jb.k34c.tar.Z
+Contains files needed to compile NET under various System V, Release 3
+versions of Unix (I use AT&T); under Coherent, version 4.0.1; and under
+OS9-68K.  This file also contains source.note, a collection of revision notes,
+an os9osk.note, and unix.note for information specific to Unix, Coherent and
+OS9-68K that I not yet included in the main documentation.  (This .txt file is
+also the preface to unix.note.)  W5GFE compiled NET and BM under SCO Unix
+(80386) Sys V, release 3, both with the native compiler and with GNU.  Others
+report compiling it under various versions of Unix, but were not specific on
+versions used.
+
+k5jb.bmk34.tar.Z
+Contains source for Bdale's Mailer (BM).  Works with same environmental
+variables as K5JB version of NET.  Has been sanitized to prevent memory
+violations.  Version in this kit is 3.3.1m, modified to deal with some
+non-RFC-822 compliant mailers (like ELM), and to correct some errors in
+file reading.
+
+k5jb.k34upd.usr
+Contains changes made to NET.  Written for the user.  Some of the
+changes affect composition of startup.net.
+
+k5jb.dock34.tar.Z
+Contains NET and BM user's documentation.  Targeted for MS-DOS users, but
+contains essential Unix information.
+
+k5jb.samp.tar.Z
+Contains a rough set of sample configuration files for setup.  I didn't
+make any particular effort to cover all instances so you must look at
+chapter0 and decide if you want to go on from there.
+
+Coherent users have no need to shell out or use the Ctrl-\ (quit) switch on
+NET if they are using virtual terminals.  NET runs fine when its window is
+not active.  In fact, using the quit signal removes one of the two places
+where the CPU is released to do other tasks.  If you start NET with no
+serial ports attached (like if you have no startup.net file), and issue
+a quit signal to ignore keyboard input, NET will become a CPU hog,
+consuming an enormous amount of the machine's resources.
+
+(End of k5jb.k34c.txt)

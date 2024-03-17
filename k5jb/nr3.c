@@ -34,12 +34,14 @@ struct nrnbr_tab *nrnbr_tab[NRNUMCHAINS] ;
 struct nrroute_tab *nrroute_tab[NRNUMCHAINS] ;
 struct nrnf_tab *nrnf_tab[NRNUMCHAINS] ;
 unsigned nr_nfmode = NRNF_NOFILTER ;
-unsigned char nr_ttl = 64 ;
+unsigned char nr_ttl = 16;	/* made default more realistic - K5JB */
 unsigned obso_init = 6 ;
 unsigned obso_minbc = 5 ;
 unsigned nr_maxroutes = 5 ;
 unsigned nr_autofloor = 1 ;
+#ifdef NR_VERBOSE
 unsigned nr_verbose = 0 ;
+#endif
 struct interface *nr_interface ;
 
 /* send a NET/ROM layer 3 datagram */
@@ -184,9 +186,9 @@ struct ax25_cb *iaxp ;		/* incoming ax25 control block */
 		/* Add (possibly) a zero-quality recorded route via */
 		/* the neighbor from which this packet was received */
 		/* Note that this doesn't work with digipeated neighbors, */
-		/* at this point. */
+		/* at this point. (made it a 10 quality - K5JB)*/
 
-		(void) nr_routeadd("      ",&n3hdr.source,ifnum,0,
+		(void) nr_routeadd("      ",&n3hdr.source,ifnum,10,
 									(char *)&from,0,1) ;
 	}
 
@@ -287,13 +289,16 @@ void
 nr_bcnodes(ifno)
 unsigned ifno ;
 {
-	struct mbuf *hbp, *dbp, *savehdr ;
+#ifdef NR_VERBOSE	/* we want to act like a netrom switch? */
+	struct mbuf *dbp, *savehdr ;
 	struct nrroute_tab *rp ;
 	struct nrnbr_tab *np ;
 	struct nr_bind * bp ;
 	struct nr3dest nrdest ;
 	int i, didsend = 0, numdest = 0 ;
 	register char *cp ;
+#endif
+	struct mbuf *hbp;
 	struct interface *axif = nrifaces[ifno].interface ;
 	struct nr_bind *find_best() ;
 
@@ -309,16 +314,22 @@ unsigned ifno ;
 	*hbp->data = NR3NODESIG ;
 	memcpy(hbp->data+1,nrifaces[ifno].alias,ALEN) ;
 
+	/* MOST people -- K5JB */
 	/* Some people don't want to advertise any routes; they
 	 * just want to be a terminal node.  In that case we just
 	 * want to send our call and alias and be done with it.
 	 */
 
+#ifndef NR_VERBOSE
+	(*axif->output)(axif, (char *)&nr_nodebc, axif->hwaddr, PID_NETROM,hbp);	
+	return ;	/* send it */
+#else
 	if (!nr_verbose) {
 		(*axif->output)(axif, (char *)&nr_nodebc, axif->hwaddr, PID_NETROM,
 				 		hbp) ;	/* send it */
 		return ;
 	}
+
 
 	/* make a copy of the header in case we need to send more than */
 	/* one packet */
@@ -397,7 +408,7 @@ unsigned ifno ;
 			}
 		}
 	}
-			
+
 	/* If we have a partly filled packet left over, or we never */
 	/* sent one at all, we broadcast: */
 	if (!didsend || numdest > 0)
@@ -405,8 +416,8 @@ unsigned ifno ;
 		PID_NETROM, hbp) ;
 
 	free_p(savehdr) ;	/* free the header copy */
+#endif /* NR_VERBOSE */
 }
-
 
 /* initialize fake arp entry for netrom */
 void

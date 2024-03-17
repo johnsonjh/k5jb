@@ -1,3 +1,16 @@
+/* SEPARATE_QUIT was originally a patch to deal with Wampes, which has
+ * a bad receive line parser.  It results in one extra packet being sent per
+ * smtp send session, but it does reduce code size 96 bytes so it may be
+ * worth the small performance penalty to just leave it active in standard
+ * distribution.  K5JB
+ * But, not wanting the performance penalty....
+ * This experimental version has a smtp t wampes command.  wampes is default
+ * off, and smtp works pretty much like previous net.  When wampes is on,
+ * QUIT sent only after a "250 Sent" is received, and then connection closed.
+ * It also has simplified eom handling which on short messages will cause
+ * an extra packet containging eom to be sent.  Definately a low performance
+ * smtp.
+ */
 /*
  *	Client routines for Simple Mail Transfer Protocol ala RFC821
  *	A.D. Barksdale Garbee II, aka Bdale, N3EUA
@@ -37,10 +50,12 @@
 #define TRUE 1
 #endif
 
+int wampes = 0;
+
 extern int16 lport;			/* local port placeholder */
 extern int32 resolve();
 static struct timer smtpcli_t;
-int start_timer();	/* should be void, but ain't */
+int start_timer(),stop_timer();	/* should be void, but ain't */
 int router_queue();
 int32 gateway;
 void free(),log();
@@ -51,14 +66,14 @@ int dosmtptrace();
 #endif
 
 int16	smtpmaxcli  = MAXSESSIONS;	/* the max client connections allowed */
-int16	smtpsessions = 0;		/* number of client connections
-					* currently open */
+int16	smtpsessions = 0;		/* number of client connections currently open */
 int16	smtpmode = 0;
 
 static struct smtp_cb *cli_session[MAXSESSIONS]; /* queue of client sessions  */
 
 static char quitcmd[] = "QUIT\015\012";
 static char eom[] = "\015\012.\015\012";
+char range[] = "Out of range"; /* k34 used elsewhere */
 
 int smtptick(),dogateway(),dosmtpmaxcli(),mlock(),dotimer(),nextjob();
 int setsmtpmode(),sendwindow();
@@ -69,16 +84,16 @@ struct smtp_job *setupjob();
 
 struct cmds smtpcmds[] = {
 	"gateway",	dogateway,	0,	NULLCHAR,	NULLCHAR,
-	"mode",		setsmtpmode,	0,	NULLCHAR,	NULLCHAR,
 	"kick",		smtptick,	0,	NULLCHAR,	NULLCHAR,
-	"maxclients",	dosmtpmaxcli,	0,	NULLCHAR,	NULLCHAR,
+	"maxclients",	dosmtpmaxcli,	0,	NULLCHAR, range,	/* in global.h */
+	"mode",		setsmtpmode,	0,	NULLCHAR, "smtp mode [queue | route]",
 	"timer",	dotimer,	0,	NULLCHAR,	NULLCHAR,
 #ifdef SMTPTRACE
 	"trace",	dosmtptrace,	0,	NULLCHAR,	NULLCHAR,
 #endif
-	NULLCHAR,	NULLFP,		0,	
-	"subcommands: gateway kick maxclients timer trace",
-		NULLCHAR,
+	NULLCHAR,	NULLFP,		0,
+	"subcommands: gateway kick maxclients mode timer trace",
+		NULLCHAR
 };
 
 dosmtp(argc,argv)
@@ -99,8 +114,8 @@ char *argv[];
 		printf("%d\n",smtpmaxcli);
 	else {
 		x = atoi(argv[1]);
-		if (x > MAXSESSIONS)
-			printf("max clients must be <= %d\n",MAXSESSIONS);
+		if (x > MAXSESSIONS)	/* simplified, k34 */
+			return -1;
 		else
 			smtpmaxcli = x;
 	}
@@ -124,12 +139,12 @@ char *argv[];
 			smtpmode &= ~QUEUE;
 			break;
 		default:
-			printf("Usage: smtp mode [queue | route]\n");
-			break;
+			return -1;
 		}
 	}
 	return 0;
 }
+
 static int
 dogateway(argc,argv)
 int argc;
@@ -164,7 +179,7 @@ char *argv[];
 #endif
 
 /* Set outbound spool poll interval */
-static int
+int	/* made global so smtpserv.c could see it on startup k34 */
 dotimer(argc,argv)
 int argc;
 char *argv[];
@@ -173,11 +188,17 @@ char *argv[];
 	long atol();	/* K5JB */
 
 	if(argc < 2){
-		printf("%lu/%lu\n",
+		printf("%lu/%lu %s\n",
 		(smtpcli_t.start - smtpcli_t.count)/(1000/MSPTICK),
-		smtpcli_t.start/(1000/MSPTICK));
+		smtpcli_t.start/(1000/MSPTICK),wampes ? "W" : "");
 		return 0;
 	}
+	if(argv[1][0] == 'w'){	/* undocumented command to deal with Wampes */
+		wampes = !wampes;
+		return 0;
+	}
+	stop_timer(&smtpcli_t);	/* k34 */
+	smtpcli_t.count = 0;	/* k34 */
 	smtpcli_t.func = (void (*)())smtptick;/* what to call on timeout */
 	smtpcli_t.arg = NULLCHAR;		/* dummy value */
 	smtpcli_t.start = atol(argv[1])*(1000/MSPTICK);	/* set timer duration */
@@ -193,7 +214,9 @@ smtptick()
 {
 	register struct smtp_cb *cb;
 	struct smtp_job *jp;
+#ifdef SMTPTRACE
 	struct list *ap;
+#endif
 	char	tmpstring[LINELEN], wfilename[13], prefix[9];
 	char	from[LINELEN], to[LINELEN];
 	char *cp, *cp1;
@@ -210,7 +233,7 @@ smtptick()
 	for(filedir(mailqueue,0,wfilename);wfilename[0] != '\0';
 		filedir(mailqueue,1,wfilename)){
 
-		/* save the prefix of the file name which it job id */
+		/* save the prefix of the file name which is job id */
 		cp = wfilename;
 		cp1 = prefix;
 		while (*cp && *cp != '.')
@@ -424,10 +447,10 @@ register struct smtp_cb *cb;
 		}
 		break;
 	case CLI_SEND_STATE:
-		if (reply == '3') {
+		if (reply == '3'){	/* e.g. 354 Enter mail... */
 			cb->state = CLI_UNLK_STATE;
 		} else {
-			/* change cts to transmit upcall queueing more data */
+			/* negate cts to inhibit transmit upcall from sending data */
 			cb->cts = 0;
 			quit(cb);
 		}
@@ -437,7 +460,7 @@ register struct smtp_cb *cb;
 		if (reply == '2' || reply == '5') {
 			if (reply == '5')
 				logerr(cb);
-			/* close and unlink the textfile */
+			/* Must have been "250 Sent" so close and unlink the textfile */
 			if(cb->tfile != NULLFILE) {
 				fclose(cb->tfile);
 				cb->tfile = NULLFILE;
@@ -452,9 +475,14 @@ register struct smtp_cb *cb;
 		if (nextjob(cb)) {
 			cb->state = CLI_MAIL_STATE;
 			sendit(cb,"MAIL FROM:<%s>\015\012",cb->jobq->from);
-		} else 
-			/* the quit sent already in smtp_cts */
+		} else{
+			/* if !wampes, quit command appended to prev pkt in sendwindow() */
 			cb->state = CLI_QUIT_STATE;
+			if(wampes)
+				quit(cb);	/* Will set state to QUIT, send it and close tcp k34 */
+			else
+				cb->state = CLI_QUIT_STATE;
+		}
 		break;
 	case CLI_IDLE_STATE:	/* used after a RSET and more mail to send */
 		if (reply != '2')
@@ -463,13 +491,13 @@ register struct smtp_cb *cb;
 			cb->state = CLI_MAIL_STATE;
 			sendit(cb,"MAIL FROM:<%s>\015\012",cb->jobq->from);
 		}
-		break;			
-	case CLI_QUIT_STATE:
+		break;
+	case CLI_QUIT_STATE:	/* "221 Closing" will be ignored */
 		break;
 	}
 }
 
-/* abort the currrent job.
+/* abort the current job.
  * If more work exists set up the next job if
  * not then shut down.
 */
@@ -484,11 +512,11 @@ register struct smtp_cb *cb;
 	if (nextjob(cb)) {
 		sendit(cb,"RSET\015\012");
 		cb->state = CLI_IDLE_STATE;
-	} else 
+	} else
 		quit(cb);
 }
 
-/* close down link after a failure */
+/* close down link after completion or a failure */
 static void
 quit(cb)
 struct smtp_cb *cb;
@@ -538,7 +566,7 @@ int16 cnt;
 }
 
 /* smtp transmitter ready upcall routine.  twiddles cts flag */
-static 
+static
 void
 smtp_cts(tcb,cnt)
 struct tcb *tcb;
@@ -575,7 +603,7 @@ int16 cnt;
 	register struct mbuf *bp;
 	char *cp;
 	int c;
-#if (UNIX || MAC || AMIGA || ATARI_ST || _OSK)
+#if (UNIX || _OSK)
 	static int savedch = FALSE;    /* added k29 - this mod costs ?? bytes when
 									applied to the Unix version */
 #endif
@@ -591,7 +619,7 @@ int16 cnt;
 	 * have a chronic queue of (window - 1).  If necessary to handle
 	 * ill formed MS-DOS text files, just remove the #ifs -- K5JB k29
 	 */
-#if (UNIX || MAC || AMIGA || ATARI_ST || _OSK)
+#if (UNIX || _OSK)
 	if(savedch){    /* unlikely case */
 		*cp++ = '\015';
 		*cp++ = '\012';
@@ -604,9 +632,9 @@ int16 cnt;
 		switch((char)c){
 			case '\032': /* Ctrl-Z */
 				break;
-#if (UNIX || MAC || AMIGA || ATARI_ST || _OSK)
+#if (UNIX || _OSK)
 #ifdef _OSK
-			case '\012':	/* OS9/OSK and maybe MAC use \r as an EOL char */
+			case '\012':	/* OS9/OSK uses \r as an EOL char */
 				break;
 			case '\015':
 				c = '\012';
@@ -633,46 +661,34 @@ int16 cnt;
 		}	/* switch */
 	}	/* while */
 	append(&bpl,bp);
-	if (c == EOF) {	/* EOF seen */
+	send_tcp(cb->tcb,bpl);	/* note that we aren't closing tcp yet */
+	if (c == EOF){	/* EOF seen */
 		fclose(cb->tfile);
 		cb->tfile = NULLFILE;
-		/* send the end of data character. */
-		if (cnt < sizeof(eom) - 1) {
-			bp = qdata(eom,5);
-			append(&bpl,bp);
-			cnt = 0;	/* dont let anyone else in */
-		} else {
-			memcpy(&bp->data[bp->cnt],eom,sizeof(eom) - 1);
-			bp->cnt += sizeof(eom) - 1;
-			cnt -= sizeof(eom) - 1;
-		}
-		/* send the quit in this packet if last job */
-		if (cb->jobq->next == NULLJOB) {
-			if (cnt < sizeof(quitcmd) - 1) {
-				bp = qdata(quitcmd,sizeof(quitcmd) - 1);
-				append(&bpl,bp);
-			} else {
-				memcpy(&bp->data[bp->cnt],
-				quitcmd,sizeof(quitcmd) - 1);
-				bp->cnt += sizeof(quitcmd) - 1;
+
+		/* on mail that takes more than one frame, eom will be appended to it */
+      /* else it will be prepended to the QUIT if !wampes */
+		/* no extra line is added here -- watch out for protocol problems */
+		sendit(cb,cp[-1] == '\012' ? &eom[2] : eom);
+
+		if(!wampes)
+			/* send the quit in this packet if last job */
+			if (cb->jobq->next == NULLJOB){
+				sendit(cb,quitcmd);
+				close_tcp(cb->tcb);  /* close up connection */
 			}
-		}
-		send_tcp(cb->tcb,bpl);
-		if (cb->jobq->next == NULLJOB)
-			close_tcp(cb->tcb);	/* close up connection */
-		return EOF;
-	} else {	/* not eof */
-		send_tcp(cb->tcb,bpl);
+
+		return EOF;	/* If wampes, close_tcp closed with quit() */
+	} else	/* not eof */
 		return 0;
-	}
 }
 
 /* smtp state change upcall routine. */
 static
 void
-smtp_state(tcb,old,new)
+smtp_state(tcb,unused,new)
 register struct tcb *tcb;
-char old,new;
+char unused,new;
 {
 	register struct smtp_cb *cb;
 	extern char *tcpstates[];
@@ -732,17 +748,12 @@ char *dir,*id;
 	int fd;
 	/* Try to create the lock file in an atomic operation */
 	sprintf(lockname,"%s/%s.lck",dir,id);
-#if	(ATARI_ST && !LATTICE)
-	if(!access(lockname,0) || (fd = creat(lockname, 0666)) == -1)
-		return -1;
-#else
 #ifdef	_OSK
 	if ((fd = create(lockname,2,3))==-1)
 		return -1;
 #else
 	if((fd = open(lockname, O_WRONLY|O_EXCL|O_CREAT,0600)) == -1)
 		return -1;
-#endif
 #endif
 	close(fd);
 	return 0;

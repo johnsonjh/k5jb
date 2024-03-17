@@ -1,9 +1,10 @@
 /* TCP implementation. Follows RFC 793 as closely as possible */
 
+#define TIMEZOMBIE		/* An aging report */
 #define	DEF_WND	2048	/* Default receiver window */
 #define	NTCB	19	/* # TCB hash table headers */
 #define	DEF_MSS	512	/* Default maximum segment size */
-#define	DEF_RTT	5000	/* Initial guess at round trip time (5 sec) */
+#define	DEF_RTT	10000	/* Initial guess at round trip time (10 sec) */
 #define	MSL2	30	/* Guess at two maximum-segment lifetimes */
 /* Round trip timing parameters */
 #define	AGAIN	8	/* Average RTT gain = 1/8 */
@@ -132,7 +133,9 @@ struct tcb {
 	int32 rttseq;		/* Sequence number being timed */
 	int32 srtt;		/* Smoothed round trip time, milliseconds */
 	int32 mdev;		/* Mean deviation, milliseconds */
-
+#ifdef TIMEZOMBIE
+	int32 lastheard;
+#endif
 	char *user;		/* User parameter (e.g., for mapping to an
 				 * application control block
 				 */

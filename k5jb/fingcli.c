@@ -6,13 +6,14 @@
  *	Copyright 1988 by Michael T. Horne, All Rights Reserved.
  *	Permission granted for non-commercial use and copying, provided
  *	that this notice is retained.
- *
+ * I'll retain it, but I cleaned it up - K5JB
  */
 
 #include <stdio.h>
 #include "config.h"	/*K5JB*/
 
 #ifdef _FINGER
+#include <string.h>
 #include "global.h"
 #include "mbuf.h"
 #include "timer.h"
@@ -29,8 +30,8 @@
 #include "session.h"
 #include "nr4.h"
 
-extern char	badhost[],
-		hostname[];
+extern char	badhost[],hostname[];
+int free_finger();
 
 /*
  *
@@ -43,20 +44,19 @@ dofinger(argc,argv)
 int	argc;
 char	*argv[];
 {
-	void		f_state(),
-			fingcli_rcv();
-	char		*inet_ntoa();
-	int32		resolve();
+	void f_state(),fingcli_rcv();
+	char *inet_ntoa();
+	int32 resolve();
 	struct session	*s;
 	struct tcb	*tcb;
-	struct socket	lsocket,
-			fsocket;
-	struct finger	*finger,
-					*alloc_finger();
-	char		*host;
+	struct socket	lsocket,fsocket;
+	struct finger	*finger,*alloc_finger();
+	char *host;
+	int go();
+	char *usage = "usage: finger [user | user@host | @host]\n";
 
-	if (argc < 2) {
-		printf("usage: %s [user | user@host | @host]\n", argv[0]);
+	if (argc < 2){
+		printf("%s",usage);
 		return(1);
 	}
 
@@ -65,7 +65,7 @@ char	*argv[];
 
 /*
  *	Extract user/host information.  It can be of the form:
- *	
+ *
  *	finger user,			# finger local user
  *	finger user@host,		# finger remote user
  *	finger @host			# finger host (give system status)
@@ -74,37 +74,27 @@ char	*argv[];
 	if ((finger = alloc_finger()) == NULLFING)
 		return(1);
 
-	if ((host = index(argv[1], '@')) == NULLCHAR) {
+	if ((host = strchr(argv[1], '@')) == NULLCHAR) {
 		fsocket.address = ip_addr;	/* no host, use local */
-		if ((finger->user = (char *)malloc(strlen(argv[1]) + 3)) == NULLCHAR) {
-			free_finger(finger);
-			return(1);
-		}
-		strcpy(finger->user, argv[1]);
-		strcat(finger->user, "\015\012");
-	}
-	else {
+		host = hostname;		/* use local host name */
+	}else{
 		*host++ = '\0';		/* null terminate user name */
 		if (*host == '\0') {	/* must specify host */
-			printf("%s: no host specified\n", argv[0]);
-			printf("usage: %s [user | user@host | @host]\n",
-				argv[0]);
+			printf("finger: no host specified\n%s",usage);
 			free_finger(finger);
 			return(1);
 		}
 		if ((fsocket.address = resolve(host)) == 0) {
-			printf("%s: ", argv[0]);
 			printf(badhost, host);
 			free_finger(finger);
 			return(1);
 		}
-		if ((finger->user = (char *)malloc(strlen(argv[1])+3))==NULLCHAR) {
-			free_finger(finger);
-			return 1;
-		}
-		strcpy(finger->user, argv[1]);
-		strcat(finger->user, "\015\012");
 	}
+	if ((finger->user = (char *)malloc(strlen(argv[1]) + 3)) == NULLCHAR){
+		free_finger(finger);
+		return(1);
+	}
+	sprintf(finger->user,"%s\015\012",argv[1]);
 
 	fsocket.port = FINGER_PORT;		/* use finger wnp */
 
@@ -118,8 +108,6 @@ char	*argv[];
 	s->cb.finger = finger;
 	finger->session = s;
 
-	if (!host)				/* if no host specified */
-		host = hostname;		/* use local host name */
 	if ((s->name = (char *)malloc(strlen(host)+1)) != NULLCHAR)
 		strcpy(s->name, host);
 
@@ -131,6 +119,7 @@ char	*argv[];
 
 	finger->tcb = tcb;
 	tcb->user = (char *)finger;
+	/* with finger, we will make an exception and stay in CMD_MODE */
 	go();
 	return 0;
 }
@@ -157,7 +146,7 @@ int
 free_finger(finger)
 struct finger *finger;
 {
-	void free();
+	void free(),freesession();
 	if (finger != NULLFING) {
 		if (finger->session != NULLSESSION)
 			freesession(finger->session);
@@ -183,15 +172,17 @@ int16			cnt;
 	}
 
 	/* Hold output if we're not the current session */
+#ifdef notdef /* need to remove the mode with change to cmdmode() k34 */
 	if (mode != CONV_MODE || current == NULLSESSION
 		|| current->type != FINGER)
+		return;
+#endif
+	if (current == NULLSESSION || current->type != FINGER)
 		return;
 
 	/*
 	 *	We process the incoming data stream and make sure it
 	 *	meets our requirments.  A check is made for control-Zs
-	 *	since these characters lock up DoubleDos when sent to
-	 *	the console (don't you just love it...).
 	 */
 
 	if (recv_tcp(tcb, &bp, cnt) > 0)
@@ -203,11 +194,14 @@ int16			cnt;
 					case '\032':	/* NO ^Z's! */
 						break;
 					case '\015':
+#ifdef notdef /* what the hell are we doing with fputc()? */
 #ifdef _OSK
 						fputc('\015', stdout);
 #else
 						fputc('\012', stdout);
 #endif
+#endif
+						printf("\n");
 						break;
 					default:
 						fputc(*buf, stdout);
@@ -222,9 +216,9 @@ int16			cnt;
 
 /* State change upcall routine */
 void
-f_state(tcb,old,new)
+f_state(tcb,unused,new)
 register struct tcb	*tcb;
-char			old,		/* old state */
+char unused,		/* old state */
 			new;		/* new state */
 {
 	struct finger	*finger;
@@ -234,13 +228,14 @@ char			old,		/* old state */
 	extern char	*unreach[];
 	extern char	*exceed[];
 	struct mbuf	*bp;
+	int cmdmode();
 
 	finger = (struct finger *)tcb->user;
 
 	if(current != NULLSESSION && current->type == FINGER)
 		notify = 1;
 
-	switch(new){
+	switch(new){	/* some of this is a dupe of telnet.c state handler */
 
 	case CLOSE_WAIT:
 		if(notify)

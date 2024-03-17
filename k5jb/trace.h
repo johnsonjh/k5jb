@@ -4,16 +4,12 @@
  * this table by the driver at attach time
  */
 
-#undef TIMEMARK	/* define to time stamp traced packets */
-
-extern int (*tracef[])();
+extern void (*tracef[])();
 
 #define	TRACE_AX25	0
 #define	TRACE_ETHER	1
 #define	TRACE_IP	2
-#define TRACE_APPLETALK 3
-#define	TRACE_SLFP	4
-#define	NTRACE		5
+#define	NTRACE		3
 
 #define	TRACE_SENT	0
 #define	TRACE_RECV	1

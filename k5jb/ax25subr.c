@@ -37,6 +37,13 @@
 
 struct ax25_cb *ax25_cb[NHASH];
 
+#ifndef AX_VERS_DEFAULT
+#define AX_VERS_DEFAULT V1
+#endif
+
+/* the following can be changed after start with the ax25 vers command */
+char ouraxvers = AX_VERS_DEFAULT;
+
 /* Default AX.25 parameters */
 int16 t1init = 10000 / MSPTICK;	/* FRACK of 10 seconds */
 int16 t2init = 1000 / MSPTICK;	/* 1 sec acknowledgment delay */
@@ -176,7 +183,7 @@ struct ax25_addr *addr;
 	axp->maxframe = maxframe;
 	axp->window = axwindow;
 	axp->paclen = paclen;
-	axp->proto = V2;	/* Default, can be changed by other end */
+	axp->proto = ouraxvers;	/* Default, can be changed by other end */
 	axp->pthresh = pthresh;
 	axp->n2 = n2;
 	axp->t1.start = t1init;

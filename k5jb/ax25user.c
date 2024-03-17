@@ -31,8 +31,10 @@ char *user;			/* User linkage area */
 	ASSIGN(axp->addr,*addr);
 	if(addr->ndigis != 0){
 		axp->t1.start *= (addr->ndigis + 1);
+/* why would we want to scale these?
 		axp->t2.start *= (addr->ndigis + 1);
 		axp->t3.start *= (addr->ndigis + 1);
+*/
 	}
 	axp->window = window;
 	axp->r_upcall = r_upcall;
@@ -77,9 +79,9 @@ struct mbuf *bp;
 
 /* Receive incoming data on an AX.25 connection */
 struct mbuf *
-recv_ax25(axp,cnt)
+recv_ax25(axp,unused)
 register struct ax25_cb *axp;
-int16 cnt;
+int16 unused;
 {
 	struct mbuf *bp;
 
@@ -91,7 +93,7 @@ int16 cnt;
 
 	/* If this has un-busied us, send a RR to reopen the window */
 	if(len_mbuf(bp) >= axp->window)
-		sendctl(axp,RESPONSE,RR);
+		sendctl(axp,RESPONSE,RR);	/* note that this didn't have PF */
 	return bp;
 }
 
@@ -114,7 +116,7 @@ struct ax25_cb *axp;
 	case FRAMEREJECT:
 		free_q(&axp->txq);
 		axp->retries = 0;
-		sendctl(axp,COMMAND,DISC|PF);
+		sendctl(axp,COMMAND,DISC);
 		stop_timer(&axp->t3);
 		start_timer(&axp->t1);
 		lapbstate(axp,DISCPENDING);

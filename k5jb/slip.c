@@ -8,8 +8,8 @@
 #include "ax25.h"
 #include "slip.h"
 #include "asy.h"
-#include "config.h"
 #include "options.h"	/* In case SERIALTEST has changed */
+#include "config.h"
 #ifdef TRACE
 #include "trace.h"
 #endif

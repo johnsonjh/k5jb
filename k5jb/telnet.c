@@ -1,18 +1,7 @@
 #include <stdio.h>
 #include "config.h"
 #ifdef _TELNET
-#ifdef UNIX
-#include "unixopt.h"
-#ifdef W5GFE
-/* W5GFE added next two includes */
-#include <curses.h>
-#include <term.h>
-/* W5GFE modified this code to allow an incoming telnet session
-   to present in reversed video.  It was this or else add
-   windows to provide a split screen.  This looked more "portable".
-*/
-#endif	/* W5GFE */
-#endif	/* UNIX */
+#include <string.h>
 #include "global.h"
 #include "mbuf.h"
 #include "timer.h"
@@ -34,6 +23,9 @@ extern char nospace[];
 extern char badhost[];
 int refuse_echo = 0;
 int unix_line_mode = 0;    /* if true turn <cr> to <nl> when in line mode */
+
+int atoi(),go(),cmdmode();
+void cooked(),raw(),free_telnet(),freesession();
 
 #ifdef	DEBUG
 char *t_options[] = {
@@ -57,7 +49,7 @@ char *argv[];
 	char *inet_ntoa();
 	int32 resolve();
 	int send_tel();
-        int unix_send_tel();
+   int unix_send_tel();
 	struct session *s;
 	struct telnet *tn;
 	struct tcb *tcb;
@@ -109,7 +101,7 @@ char *argv[];
 }
 
 /* Process typed characters */
-int
+static int /* return value ignored */
 unix_send_tel(buf,n)
 char *buf;
 int16 n;
@@ -130,78 +122,34 @@ char *buf;
 int16 n;
 {
 	struct mbuf *bp,*qdata();
+	void text_write();	/* in session.c */
+
 	if(current == NULLSESSION || current->cb.telnet == NULLTN
 	 || current->cb.telnet->tcb == NULLTCB)
 		return;
 	/* If we're doing our own echoing and recording is enabled, record it */
 	if(!current->cb.telnet->remote[TN_ECHO] && current->record != NULLFILE)
-		fwrite(buf,1,n,current->record);
+		text_write(buf,n,current->record);
 	bp = qdata(buf,n);
 	send_tcp(current->cb.telnet->tcb,bp);
 }
 
 /* Process incoming TELNET characters */
-int
+void
 tel_input(tn,bp)
 register struct telnet *tn;
 struct mbuf *bp;
 {
 	char c;
 	void doopt(),dontopt(),willopt(),wontopt(),answer();
-	FILE *record;
-	char *memchr();
+	int term_recv();
 
 	/* Optimization for very common special case -- no special chars */
 	if(tn->state == TS_DATA){
-		while(bp != NULLBUF && memchr(bp->data,IAC,bp->cnt) == NULLCHAR){
-			if((record = tn->session->record) != NULLFILE)
-				fwrite(bp->data,1,bp->cnt,record);
-
-	/* On two of the three systems I tried this on, inverse video
-	 * persisting through a newline caused the line following an incoming
-	 * line to also be inverse video so I re-arranged this - K5JB
-	 */
-
-#ifdef W5GFE
-			while(bp->cnt-- != 0){
-				vidattr(A_STANDOUT);
-#ifdef STOOPID
-				putchar('\b');  /* some terminals output
-					   a space when they switch
-					   to STANDOUT mode ---
-					   they are STOOPID! -- W5GFE */
-#endif
-				/* following permits doing finger, etc. with telnet */
-				if(*bp->data == '\012'){
-					bp->data++;
-					continue;
-				}
-				putchar(*bp->data);
-				if(*bp->data == '\015'){
-					vidattr(A_NORMAL);
-					putchar('\n');
-				}
-				bp->data++;
-			}
-			vidattr(A_NORMAL);
-#else /* W5GFE */
-			while(bp->cnt-- != 0){
-				/* following permits doing finger, etc. with telnet */
-				if(*bp->data == '\012'){
-					bp->data++;
-					continue;
-				}
-				putchar(*bp->data);
-#ifndef	_OSK
-				if(*bp->data == '\015')
-					putchar('\n');
-#endif
-				bp->data++;
-			}
-#endif /* W5GFE */
-			bp = free_mbuf(bp);
-		}
+		if(!term_recv(bp,tn->session->record,1));
+		return;
 	}
+	/* got here if TS_DATA if there was an IAC in the buf */
 	while(pullup(&bp,&c,1) == 1){
 		switch(tn->state){
 		case TS_DATA:
@@ -211,8 +159,8 @@ struct mbuf *bp;
 				if(!tn->remote[TN_TRANSMIT_BINARY])
 					c &= 0x7f;
 				putchar(c);
-				if((record = tn->session->record) != NULLFILE)
-					putc(c,record);
+				if(tn->session->record != NULLFILE)
+					putc(c,tn->session->record);
 			}
 			break;
 		case TS_IAC:
@@ -266,7 +214,6 @@ int16 cnt;
 {
 	struct mbuf *bp;
 	struct telnet *tn;
-	FILE *record;
 #ifdef	FLOW
 	extern int ttyflow;
 #endif
@@ -285,10 +232,8 @@ int16 cnt;
 	if(recv_tcp(tcb,&bp,cnt) > 0)
 		tel_input(tn,bp);
 
-	fflush(stdout);
-	if((record = tn->session->record) != NULLFILE)
-		fflush(record);
 }
+
 /* Handle transmit upcalls. Used only for file uploading */
 void
 tn_tx(tcb,cnt)
@@ -324,9 +269,9 @@ int16 cnt;
 
 /* State change upcall routine */
 void
-t_state(tcb,old,new)
+t_state(tcb,unused,new)
 register struct tcb *tcb;
-char old,new;
+char unused,new;
 {
 	struct telnet *tn;
 	char notify = 0;
@@ -334,6 +279,9 @@ char old,new;
 	extern char *reasons[];
 	extern char *unreach[];
 	extern char *exceed[];
+#ifdef HOLD
+	extern int noprompt;
+#endif
 
 	/* Can't add a check for unknown connection here, it would loop
 	 * on a close upcall! We're just careful later on.
@@ -353,6 +301,10 @@ char old,new;
 		close_tcp(tcb);
 		break;
 	case CLOSED:	/* court adjourned */
+#ifdef HOLD
+		if(tcb->reason == RESET)
+			noprompt = 1;	/* k35 */
+#endif
 		if(notify){
 			printf("%s (%s",tcpstates[new],reasons[tcb->reason]);
 			if(tcb->reason == NETWORK){
@@ -366,7 +318,6 @@ char old,new;
 				}
 			}
 			printf(")\n");
-			cmdmode();
 		}
 		del_tcp(tcb);
 		if(tn != NULLTN)
@@ -377,10 +328,31 @@ char old,new;
 			printf("%s\n",tcpstates[new]);
 		break;
 	}
+#ifdef DEBUG
+printf("new: %s mode: %s\n",tcpstates[new],current->cb.telnet == tn ? "CURRENT" : "NOTCURRENT");
+fflush(stdout);
+#endif
+#ifdef OLD
+	if(notify && !(new == SYN_SENT || new == ESTABLISHED ||
+			new == FINWAIT1 || new == CLOSE_WAIT || new == LAST_ACK))
+		cmdmode();	/* mostly doing this for the prompts k35 */
+#else
+	if(notify)
+		switch(new){
+			case SYN_SENT:
+			case ESTABLISHED:
+/*			case FINWAIT1: */
+			case CLOSE_WAIT:
+			case LAST_ACK:
+				break;
+			default:
+				cmdmode();	/* mostly doing this for the prompts k35 */
+		}
+#endif
 	fflush(stdout);
 }
 /* Delete telnet structure */
-static
+static void
 free_telnet(tn)
 struct telnet *tn;
 {
