@@ -49,3 +49,5 @@ were some characters pushed back on stream; added skip over leading command
 spaces, fixed where screen banner scrolled away if BM started with a long
 message list.  made version n2
 
+10/95 Modified the "Hit any key to continue" to permit advancing one line
+at a time if the C/R key was used.

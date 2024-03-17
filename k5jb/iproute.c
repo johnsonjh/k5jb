@@ -496,7 +496,7 @@ struct mbuf *data;
 	struct mbuf *bp;
 	register char *cp;
 	int16 checksum,cksum();
-	void *memcpy();
+	char *memcpy();
 
 	hdr_len = IPLEN + ip->optlen;
 	if((bp = pushdown(data,hdr_len)) == NULLBUF){
@@ -516,7 +516,7 @@ struct mbuf *data;
 	cp = put32(cp,ip->source);
 	cp = put32(cp,ip->dest);
 	if(ip->optlen != 0)
-		memcpy(cp,ip->options,ip->optlen);
+		(void)memcpy(cp,ip->options,ip->optlen);
 
 	/* Compute checksum and insert into header */
 	checksum = cksum(NULLHEADER,bp,hdr_len);

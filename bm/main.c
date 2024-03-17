@@ -165,12 +165,14 @@ char	*username = NULLCHAR;		/* name of this user from rc file */
 char	*fullname = NULLCHAR;		/* fullname of this user from rc file */
 char	*replyto = NULLCHAR;		/* address for reply-to header */
 char	*maildir = NULLCHAR;		/* defined mail directory */
+char	*maildir_o = NULLCHAR;	/* Original mail directory */
 char	*mqueue = NULLCHAR;		/* defined mqueue outbound directory */
 char	*savebox = NULLCHAR;		/* name of the mbox text file */
 char	*record = NULLCHAR;		/* record  outbound mail in this file */
 char	*folder = NULLCHAR;		/* directory for saveing read mail */
 char	*editor = NULLCHAR;		/* user's favorite text editor */
 char	notename[9];			/* name of current notesfile */
+char	*notename_op;	/* pointer to the original notename */
 char	notefile[SLINELEN];		/* full pathname of mail text file */
 char	*mfilename = notefile;	/* pointer to current mbox or mail file -f */
 int	current;			/* the current message number */
@@ -199,6 +201,24 @@ char *runcom;	/* .rc file K5JB 3.3.1n */
 #ifdef OPTALIAS
 char *alias;	/* 3.3.1n */
 #endif
+
+int
+check_maildir(cp)	/* added n3 */
+char *cp;
+{
+#ifdef _OSK
+	if((md=opendir(cp))!=NULL)
+		closedir(md);
+	else
+#else
+	if(access(cp,0))
+#endif
+	{
+		printf(noaccess,cp);
+		return -1;
+	}
+	return 0;
+}
 
 main(argc,argv)
 int argc;
@@ -233,6 +253,7 @@ char *argv[];
 			break;
 		case 'u':
 			strncpy(notename,optarg,8);
+			notename_op = savestr(notename);
 			break;
 		case 'r':	/* K5JB 3.3.1n */
 			runcom = optarg;
@@ -249,8 +270,10 @@ char *argv[];
 	}
 	loadconfig();
 
-	if(!*notename)
+	if(!*notename){
 		strncpy(notename,username,8);
+		notename_op = savestr(notename);
+	}
 
 	if (qflag == 0 && isatty(fileno(stdin))) {
 		/* announce ourselves */
@@ -271,17 +294,8 @@ char *argv[];
 	nmsgs = 0;
 
 	/* check for important directories */
-#ifdef _OSK
-	if((md=opendir(maildir))!=NULL)
-		closedir(md);
-	else
-#else
-	if(access(maildir,0))
-#endif
-	{
-		printf(noaccess,maildir);
+	if(check_maildir(maildir))
 		exit(1);
-	}
 #ifdef	_OSK
 	if((md=opendir(mqueue))!=NULL)
 		closedir(md);
@@ -441,7 +455,7 @@ loadconfig()
 			editor = savestr(p);
 			break;
 		case SMTP:
-			maildir = savestr(p);
+			maildir_o = maildir = savestr(p);
 			break;
 		case NAME:
 			fullname = savestr(p);
@@ -486,7 +500,7 @@ loadconfig()
 		p = spool;
 	if(maildir == NULLCHAR){
 		sprintf(rcline, "%s/%s", p,mailspool);
-		maildir = savestr(rcline);
+		maildir_o = maildir = savestr(rcline);
 	}
 	if(mqueue == NULLCHAR){
 		sprintf(rcline,"%s/%s",p,mailqdir);
@@ -959,42 +973,78 @@ char *argv[];
 		ret = closenotes();
 		if (!fflag)
 			rmlock(maildir,notename);
-			if (ret != 0)
+		if (ret != 0)
+			exit(1);
+		/* argv is going away so we gotta do this differently, and incidentally
+		 * complete the job (ver.n3) - K5JB
+		 */
+		if (strpbrk(argv[0],"/\\.") != NULLCHAR) {
+			char *cp,*cp2,*larg;
+			if((larg = (char *)malloc(strlen(argv[0]) + 1)) == NULLCHAR)
 				exit(1);
-			if (strpbrk(argv[0],"/\\") != NULLCHAR) {
-				fflag = 1;
-				mfilename = argv[0];
-			} else {
-				fflag = 0;
-				mfilename = notefile;
-				strncpy(notename,argv[0],8);
-#ifdef notdef
-				notename[8] = '\0';
-#endif
+			sprintf(larg,"%s",argv[0]);
+			for(cp = larg;*cp;cp++)	/* normalize the argument, permit dot also */
+				if(*cp == '\\' || *cp == '/' || *cp == '.')
+					*cp = '/';	/* MSDOS doesn't care but Unix does */
+			if(*larg == '/'){	/* leading / restores startup settings */
+				if(maildir != maildir_o){
+					free(maildir);
+					maildir = maildir_o;	/* restore original maildir */
+				}
+				sprintf(notename,"%s",notename_op);	/* restore original notename */
 				sprintf(notefile,"%s/%s.txt",maildir,notename);
+			}else{
+				if((cp = (char *)malloc(strlen(maildir) + strlen(larg) + 2)) == NULLCHAR)
+					exit(1);
+				/* assume argv[0] is "k5jb/cray" format. maildir had no trailing / */
+				sprintf(cp,"%s/%s",maildir,larg);
+				cp2 = strrchr(cp,'/');
+				*cp2 = '\0';	/* remove the "/cray" */
+				if(check_maildir(cp)){
+					free(cp);
+					free(larg);
+					return;
+				}	/* we will use cp in a bit for maildir */
+				if(larg[strlen(larg) - 1] == '/')	/* "k5jb/" used */
+					sprintf(notefile,"%s/%s%s.txt",maildir,larg,notename);
+				else
+					sprintf(notefile,"%s/%s.txt",maildir,larg);
+				if(maildir != maildir_o)
+					free(maildir);
+				maildir = cp;
+				cp = strrchr(larg,'/');
+				if(*++cp)	/* n k5jb/ will get us to the subdirectory, no notename change */
+					strncpy(notename,cp,8);
 			}
-			if (!fflag && lockit()) {
-				mfile = NULLFILE;
-				printf("Mail file is busy\n");
-				return;
-			}
-			ret = initnotes();
-			if (!fflag)
-				rmlock(maildir,notename);
-			if (ret != 0)
-				exit(1);
-			listnotes();
-
-		} else {  /* he wants to see what notefiles there are */
-			sprintf(buf,"%s/*.txt",maildir,notename);
-			filedir(buf,0,line);
-			while(line[0] != '\0') {
-				cp = strchr(line,'.');
-				*cp = '\0';
-				printf("notesfile -> %s\n",line);
-				filedir(buf,1,line);
-			}
+			free(larg);
+		} else {	/* no /, \, or dot */
+			fflag = 0;
+			strncpy(notename,argv[0],8);
+			sprintf(notefile,"%s/%s.txt",maildir,notename);
 		}
+		mfilename = notefile;
+		if (!fflag && lockit()) {
+			mfile = NULLFILE;
+			printf("Mail file is busy\n");
+			return;
+		}
+		ret = initnotes();
+		if (!fflag)
+			rmlock(maildir,notename);
+		if (ret != 0)
+			exit(1);
+		listnotes();
+
+	} else {  /* he wants to see what notefiles there are */
+		sprintf(buf,"%s/*.txt",maildir,notename);
+		filedir(buf,0,line);
+		while(line[0] != '\0') {
+			cp = strchr(line,'.');
+			*cp = '\0';
+			printf("notesfile -> %s\n",line);
+			filedir(buf,1,line);
+		}
+	}
 }
 
 void

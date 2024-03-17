@@ -1,9 +1,27 @@
 
-                    k5jb.k36.txt and preface to unix.note
+                    k5jb.k37.txt and preface to unix.note
 
-Version k36 may not be uploaded anywhere if there is no interest in it.
-The only changes from the last upload, which was an incremental upload
-for k35c on Jan 6, 95, were: 1. Some twiddling with telserv,  2.
+There may no longer be any interest in the old NET program for Unix and
+MS-DOS, but I am still running it (along with JNOS) and making occasional
+changes to it.
+
+This version contains only a couple of minor changes from k36, but is
+uploaded because of the poor judgement I used in uploading .lha archives.
+I use .lha archives for portability and convenience but overlooked the fact
+that most Unix people don't have it.  One change in k37 is addition of a
+deadlock breaker in the lapb layer which can happen if the other station
+returns RNR and we miss the RR signalling that it is unbusy.  Now we more
+closely follow the AX.25 specification by polling.  I bent the rules and
+let it poll even if we are running version 1 protocol, but haven't found
+any bad side effects from doing it.  BM has a minor modification that
+permits displaying one additional line instead of the full screen at the
+"Hit any key..." prompt.
+
+The .tar.Z files uploaded with this kit were done with plain, old tar,
+and plain old compress.  These should be the lowest commen denominator.
+
+The only changes in k36 from the previous upload, which was an incremental
+upload for k35c on Jan 6, 95, were: 1. Some twiddling with telserv,  2.
 revision of the way we discard spurious I frames & modification to VCIP_SSID
 to retain vax25 in arp add command, and 3. some modifications to packet
 driver which would only affect MS-DOS version.  There was a minor fix
@@ -17,14 +35,15 @@ ax25 mycall again after setting ax25 mboxcall and I frames to mycall
 will spawn a mailbox.  The following were notes used when k35 was
 posted.
 
-Version k35 was uploaded to ftp.ucsd.edu as a complete kit.  Previous files
-are irrlevant.  The complete kit consists of:
+Version k37 was uploaded to ftp.ucsd.edu as a complete source code kit.
+Most of the previous files are irrlevant.  A complete kit of useful files
+would consist of:
 
-k5jb.k35.txt   -- This file
-k5jb.k35upd.usr -- File for users.  Contains recent changes.
-k5jb.k35.tar.Z -- Source code for Unix KA9Q NET
-k5jb.k35doc.tar.Z -- Complete user documentation for same.
-k5jb.k35bm.tar.Z  -- Source code for BM v.3.3.1n, mailer.  Updated a little.
+k5jb.k37.txt   -- This file
+k5jb.k35upd.usr -- File for users.  Contains most recent changes.
+k5jb.k37.tar.Z -- Source code for Unix KA9Q NET
+k5jb.k35doc.tar.Z -- Relevant user documentation for same.
+k5jb.k37bm.tar.Z  -- Source code for BM v.3.3.1n4, mailer.  Updated a little.
 k5jb.samp.tar.Z -- Optional, Sample startup files for beginners.
 
 (These files on ftp.ucsd.edu are either in /hamradio/packet/tcpip/incoming,
@@ -41,25 +60,23 @@ doc on how to do this.
 
 If you are unfamiliar with NET (the TCP/IP suite, written by Phil Karn, KA9Q, 
 and preceding his current project, NOS), you need to break out the files in 
-k5jb.k35doc.tar.Z and browse them.  k5jb.k35.tar.Z contains a file,
-source.note, which has modification information.
+k5jb.k35doc.tar.Z and browse them.  k5jb.k37.tar.Z contains a file,
+note.unix, which has modification information.
+
+(End of k5jb.k37.txt)
 
                           Brief description of kit
 
 More detail on files contained in this set:
 
-k5jb.k35.tar.Z
+k5jb.k37.tar.Z
 Contains files needed to compile NET under various System V, Release 3 
 versions of Unix (I use AT&T); under Coherent, and under OS9-68K.  This file
-also contains source.note, a collection of revision notes, an os9osk.note,
-and unix.note for information specific to Unix, Coherent and OS9-68K that I
-not yet included in the main documentation.  (This .txt file is also the
-preface to unix.note.)  W5GFE compiled NET and BM under SCO Unix (80386)
-Sys V, release 3, both with the native compiler and with GNU.  Others report
-compiling it under various versions of Unix, but were not specific on
-versions used.
+also contains note.unix, a collection of revision notes, and note.os9 for
+information specific to Unix, Coherent and OS9-68K that I not yet included
+in the main documentation.
 
-k5jb.k35bm.tar.Z
+k5jb.k37bm.tar.Z
 Contains source for Bdale's Mailer (BM).  Works with same environmental 
 variables as K5JB version of NET.  Has been sanitized to prevent memory 
 violations.  Version in this kit is 3.3.1n, modified to deal with some
@@ -92,10 +109,6 @@ completion of some functions by the time version 4.0.1 was released.  Block-
 ing reads with timed releases, finer time granualarity, and normal creation
 of temporary files makes this the Coherent version almost the same as the
 regular Unix version of NET.
-
-(End of k5jb.k35.txt)
-
-                       File: unix.note, Revised 8/4/94
 
      Unix Supplement to K5JB manual for kit of KA9Q NET (pre NOS TCP/IP)
 
@@ -132,7 +145,8 @@ dependency directly or use mkdepcoh for a wholesale update.  (Direct
 mkdepcoh's output to a temporary file, and perhaps pipe through sort before 
 pasting into Makefile.)  See the note in Makefile regarding spurious files, 
 like "enet.h" that must be deleted.  If you miss them, your compiler will
-find them for you.
+find them for you.  In unixopt.h, be sure and make suitable changes if
+you are running Coherent, particularly the later versions.
 
 To compile bm with Coherent, you need to edit the file makefile.unx (in 
 k5jb.bm.tar.Z) to include the #define COH386.
@@ -184,6 +198,8 @@ driver kit.  I'm really sorry about that, but things like that just happen.
 My tests of NET in Coherent consist of running it a few hours on the air
 whenever I make changes, and testing all the things that I changed.  I
 have never had it behave badly.
+
+(I understand Coherent is no longer available.  Too bad.)
 
                                    Telunix
 
@@ -258,14 +274,11 @@ the code.  See his note, note.os9 in the kit.
                              Most recent changes
 
                      Source Code Notes for the Programmer
-                                 Aug 4, 1994
+                                 Oct 1995
 
 Since the complete set of source notes is getting lengthy, I will only be 
 including the tail end of my notes.  If someone wants a blow-by-blow account 
 of the changes since April 1989 they can contact me for my notes.
-
-The last TAPR release was my k29.  These notes reflect changes made since that 
-time.
 
 6/26/93 k30 - Corrected error in smtpcli.c where atoi() was used instead of 
 atol() for smtp timer value.  Note that there are a lot of inconsistent usages 
@@ -447,6 +460,11 @@ reading system clock ticks, and making temporary files.  Makefile.coh
 and unixopt.h have places to define whether the newer Coherent is to be
 used.  (This version is a honey on a 486/66.  Really makes my old AT&T
 3B2 look like a plug.)
+
+Changes since K35 have been few and I lack enthusiasm to make detailed notes.
+A rewrite capability like used in NOS has been added.  In the MS-DOS version
+I revised the packet driver stub so I could use a software pipe between NOS
+and my NET.  Some minor AX.25 twiddling done, and that's all I can think of.
 
 73 es Enjoy!
 

@@ -8,6 +8,8 @@
  * cutsies anyway - K5JB
  * Fixed some file reading errors 1/94 and cleaned up some more while
  * adding Ctrl-Z filter in 6/94 - K5JB
+ * Added recognition of C/R for haktc to make it advance one line, added
+ * some possible OSK support with octals, corrected typecasting. v.1.n4
  */
 
 #include <stdio.h>
@@ -125,10 +127,13 @@ haktc(percent)
 int percent;
 {
 	int c;
-	printf("- q to quit, any other key for more ");
+	char *blank_line =
+	"\r                                                               \r";
+
+	printf("- q to quit, C/R for next line, any other key for more ");
 	if(percent)
 		printf("(%d%%) - ",percent);
-		else
+	else
 		printf("- ");
 #ifdef UNIX
 	fflush(stdout);
@@ -136,13 +141,17 @@ int percent;
 #ifdef MSDOS
 	while(!kbhit())
 	;
-	c = (char)getch();
+	c = getch();	/* v.1.n4 */
 #else
 	/* getch() will wait until a character is hit */
-	c = (char)getch();
+	c = getch();	/* v.1.n4 */
 #endif
+	if(c == '\012' || c == '\015'){	/* v.1.n4 */
+		printf(blank_line);
+		return -2;
+	}
 	/* getch will not  echo whatever key was hit, so */
-	printf("%c\n", c == '\r' || c == '\n' ? '\0' : c);
+	printf("%c\n", c);	/* v.1.n4 */
 	if( c == EOF || c == 'q')
 		return(-1);
 #ifdef CLEAR
@@ -250,7 +259,7 @@ FILE *ifile ;
 				if (fgets(line,LINELEN,ifile) == NULLCHAR || feof(ifile))
 #endif
 					break;
-				if (*line == '\n') { /* done header part */
+				if (*line == '\n') { /* done header part (Problem with OS9?) */
 					cmsg->size++;
 					putc(*line, mfile);
 					break;
@@ -316,7 +325,7 @@ listnotes()
 		while(size > 0){
 			if(fgets(tstring,sizeof(tstring),mfile) == NULLCHAR)
 				break;
-			if (*tstring == '\n')	/* end of header */
+			if (*tstring == '\n')	/* end of header (Problem for OS9?) */
 				break;
 			size -= strlen(tstring);
 			rip(tstring);
@@ -390,9 +399,13 @@ listnotes()
 		    i, smtp_from, smtp_date,
 		    cmsg->size, smtp_subject);
 		if ((++lines % (MAXROWS - 1)) == 0) {
-			if(haktc(0) == -1)
+			int hrtn;
+			if((hrtn = haktc(0)) == -1)
 				break;
-			lines = 0;
+			if(hrtn == -2)	/* v.1.h4 */
+				lines--;	/* show one more line */
+			else
+				lines = 0;
 		}
 	}
 }
@@ -426,7 +439,7 @@ int noheader;
 			if(fgets(tstring,sizeof(tstring),mfile) == NULLCHAR)
 				break;
 			size -= strlen(tstring);
-			if (*tstring == '\n')
+			if (*tstring == '\n')	/* problem for OS9? */
 				break;
 		}
 	}
@@ -486,7 +499,7 @@ int msg;
 	while (size > 0) {
 		if(fgets(tstring,sizeof(tstring),mfile) == NULLCHAR);
 		size -= strlen(tstring);
-		if (*tstring == '\n') 	/* end of header */
+		if (*tstring == '\n') 	/* end of header (problem for OS9?) */
 			break;
 		rip(tstring);
 		if ((*to == '\0' && htype(tstring) == FROM)
@@ -580,7 +593,7 @@ closenotes()
 			if(fgets(line,LINELEN,mfile) == NULLCHAR)
 				break;
 			size -= strlen(line);
-			if (*line == '\n') {
+			if (*line == '\n') {	/* problem for OS9? */
 				if ((cmsg->status & READ) != 0)
 					fprintf(nfile,"Status: R\n");
 				fprintf(nfile,"\n");
@@ -836,7 +849,7 @@ int msg;
 					break;
 				while (col < cnt)
 					buf[col++] = ' ';
-			} else
+			} else	/* problem for OS9? */
 				if (c == '\n')	/* at col 79 we'll tolerate a \n, but... */
 					break;
 				else
@@ -856,9 +869,13 @@ int msg;
 #endif
 		col = 0;
 		if ((++lines == (MAXROWS-1))) {
-			if(haktc((tsize-size)*100/tsize) == -1)
+			int hrtn;	/* v.1.n4 */
+			if((hrtn = haktc((tsize-size)*100/tsize)) == -1)
 				break;
-			lines = 0;
+			if(hrtn == -2)
+				lines--;
+			else
+				lines = 0;
 		}
 	}
 }

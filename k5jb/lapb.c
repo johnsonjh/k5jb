@@ -197,7 +197,8 @@ struct mbuf *bp;		/* Rest of frame, starting with ctl */
 						inv_rex(axp);
 					else{
 						start_timer(&axp->t3);
-						lapbstate(axp,CONNECTED);
+						if(type != RNR)	/* k37 */
+							lapbstate(axp,CONNECTED);
 						if(!run_timer(&axp->t4))
 							start_timer(&axp->t4);
 					}
@@ -334,6 +335,9 @@ char n;
 		free_p(bp);
 		axp->unack--;
 		acked++;
+#ifdef notdef /* don't think we need this */
+		if(!axp->remotebusy)	/* k37 */
+#endif
 		axp->retries = 0;
 		oldest = (oldest + 1) & MMASK;
 	}

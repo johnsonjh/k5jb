@@ -1,7 +1,7 @@
 #include "config.h"
 /* version control information */
 #ifdef SETVBUF
-char version[]  = "Bdale's Mailer v3.3.1n2 950303vb";
+char version[]  = "Bdale's Mailer v3.3.1n4 951017vb";
 #else
-char version[]  = " Bdale's Mailer v3.3.1n2 950303";
+char version[]  = " Bdale's Mailer v3.3.1n4 951017";
 #endif

@@ -105,9 +105,17 @@ struct ax25_cb *axp;
 	 */
 	if(axp == NULLAX25
 	 || (axp->state != RECOVERY && axp->state != CONNECTED)
-	 || axp->remotebusy)
+#ifdef notdef	/* k37 */
+	 || axp->remotebusy
+#endif
+	)
 		return;
 
+	if(axp->remotebusy){	/* start polling until RNRs stop, or we retry out k37 */
+		if(!run_timer(&axp->t1))
+			start_timer(&axp->t1);
+		return;
+	}
 	/* Dig into the send queue for the first unsent frame */
 	bp = axp->txq;
 	for(i = 0; i < axp->unack; i++){
@@ -202,9 +210,14 @@ register struct ax25_cb *axp;
 	char ctl;
 	struct mbuf *bp;
 
+#ifdef notdef /* old method */
 	/* this correction does what I think author intended - K5JB */
 	if(axp->txq != NULLBUF && !axp->remotebusy &&
-			(axp->proto == V1 || len_mbuf(axp->txq) < axp->pthresh) ){
+			(axp->proto == V1 || len_mbuf(axp->txq) < axp->pthresh) ){}
+#endif
+	/* Changed with k37 */
+	if(axp->txq != NULLBUF && !axp->remotebusy &&
+			(len_mbuf(axp->txq) < axp->pthresh || axp->proto == V1)){
 		/* Retransmit oldest unacked I-frame */
 		dup_p(&bp,axp->txq,0,len_mbuf(axp->txq));
 		ctl = I | (((axp->vs - axp->unack) & MMASK) << 1) | (axp->vr << 5);

@@ -17,8 +17,8 @@
 /* For packet driver, define PACKET.  This packet driver has only be tested
  * with the G8BPQ scheme, and to some extent with Ethernet packet driver.
  * Should work with Baycom.  Adds 2552 bytes */
-#undef	PACKET
-#undef	PACKET_POLL /* Use polled receive on pipe packet driver */
+#define	PACKET	/* with k37, start including these two */
+#define	PACKET_POLL /* Use polled receive on pipe packet driver */
 #define SERIALTEST /* SERIALTEST only applies to MS-DOS; counts rx overruns */
 			/* on serial port.  Costs 178 bytes */
 
@@ -61,6 +61,7 @@
 #define	SEG_CMD	/* ax25 segment command */
 #define	REWRITE	/* rewrite.net file for smtp server */
 #define	REWRITECMD	/* rewrite command for testing rewrite.net */
+#undef	FORWARD	/* Enable sending received frames to monitor program +432 */
 
 #if defined(DRSI) || defined(MDKISSPORT) || defined(COMBIOS) || defined(PACKET)
 #define AX25

@@ -11,7 +11,7 @@
 #include "options.h"
 #include "config.h"
 
-char versionf[28] = "K5JB.k36";	/* for FTP and the mbox's use */
+char versionf[28] = "K5JB.k37";	/* for FTP and the mbox's use */
 
 void
 version()

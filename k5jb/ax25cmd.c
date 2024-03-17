@@ -349,7 +349,9 @@ char *argv[];
  * (I guess that applys to the other parameters too)
  */
 #define MIN_T1_TIMER 5000	/* milliseconds -- even this is kinda short */
+#ifndef MIN_T2_TIMER
 #define MIN_T2_TIMER 1000
+#endif
 
 /* Set retransmission timer */
 static
@@ -375,14 +377,13 @@ int argc;
 char *argv[];
 {
 	extern int16 t2init;
+	int16 tmpt2;
 
-	if(argc == 1) {
+	if(argc == 1)
 		printf("T2 %lu ms\n",(long)t2init * MSPTICK);
-	} else {
-		if((t2init = atol(argv[1])) < MIN_T2_TIMER)
-			t2init = MIN_T2_TIMER;
-		t2init /= MSPTICK;
-	}
+	else
+		if((tmpt2 = atol(argv[1])) >= MIN_T2_TIMER)
+			t2init = tmpt2 / MSPTICK;
 }
 
 /* Set idle timer */

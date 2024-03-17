@@ -1,4 +1,3 @@
-
 /*
  * just about everything except "MSDOS" is defined here, or in options.h.
  * and config.inc.  Makefile only has minimum to make it agree with compiler
@@ -90,7 +89,7 @@
 #endif
 
 #ifdef AX25
-#undef VCIP_SSID	/* add the ax25 vcipcall command - takes 384 bytes */
+#undef VCIP_SSID	/* add the ax25 vcipcall command - takes 384 bytes. obsolete with k36 */
 #define	AX_MOTD		/* an AX.25 or Netrom motd for connectee 84 bytes */
 #endif
 

@@ -1,14 +1,27 @@
 
-                    k5jb.k36.txt and preface to unix.note
+                    k5jb.k37.txt and preface to unix.note
 
 There may no longer be any interest in the old NET program for Unix and
 MS-DOS, but I am still running it (along with JNOS) and making occasional
-changes to it.  The k36 set of files will include this file and two LHA
-files.  The LHA files are done under Unix, and contain complete source
-code kits for NET and BM.  I hope you have lha on your Unix computer.
+changes to it.
 
-The only changes from the last upload, which was an incremental upload
-for k35c on Jan 6, 95, were: 1. Some twiddling with telserv,  2.
+This version contains only a couple of minor changes from k36, but is
+uploaded because of the poor judgement I used in uploading .lha archives.
+I use .lha archives for portability and convenience but overlooked the fact
+that most Unix people don't have it.  One change in k37 is addition of a
+deadlock breaker in the lapb layer which can happen if the other station
+returns RNR and we miss the RR signalling that it is unbusy.  Now we more
+closely follow the AX.25 specification by polling.  I bent the rules and
+let it poll even if we are running version 1 protocol, but haven't found
+any bad side effects from doing it.  BM has a minor modification that
+permits displaying one additional line instead of the full screen at the
+"Hit any key..." prompt.
+
+The .tar.Z files uploaded with this kit were done with plain, old tar,
+and plain old compress.  These should be the lowest commen denominator.
+
+The only changes in k36 from the previous upload, which was an incremental
+upload for k35c on Jan 6, 95, were: 1. Some twiddling with telserv,  2.
 revision of the way we discard spurious I frames & modification to VCIP_SSID
 to retain vax25 in arp add command, and 3. some modifications to packet
 driver which would only affect MS-DOS version.  There was a minor fix
@@ -22,14 +35,15 @@ ax25 mycall again after setting ax25 mboxcall and I frames to mycall
 will spawn a mailbox.  The following were notes used when k35 was
 posted.
 
-Version k35 was uploaded to ftp.ucsd.edu as a complete kit.  Previous files
-are irrlevant.  The complete kit consisted of:
+Version k37 was uploaded to ftp.ucsd.edu as a complete source code kit.
+Most of the previous files are irrlevant.  A complete kit of useful files
+would consist of:
 
-k5jb.k35.txt   -- Similar to this file
-k5jb.k35upd.usr -- File for users.  Contains recent changes.
-k5jb.k35.tar.Z -- Source code for Unix KA9Q NET
-k5jb.k35doc.tar.Z -- Complete user documentation for same.
-k5jb.k35bm.tar.Z  -- Source code for BM v.3.3.1n, mailer.  Updated a little.
+k5jb.k37.txt   -- This file
+k5jb.k35upd.usr -- File for users.  Contains most recent changes.
+k5jb.k37.tar.Z -- Source code for Unix KA9Q NET
+k5jb.k35doc.tar.Z -- Relevant user documentation for same.
+k5jb.k37bm.tar.Z  -- Source code for BM v.3.3.1n4, mailer.  Updated a little.
 k5jb.samp.tar.Z -- Optional, Sample startup files for beginners.
 
 (These files on ftp.ucsd.edu are either in /hamradio/packet/tcpip/incoming,
@@ -46,8 +60,8 @@ doc on how to do this.
 
 If you are unfamiliar with NET (the TCP/IP suite, written by Phil Karn, KA9Q, 
 and preceding his current project, NOS), you need to break out the files in 
-k5jb.k35doc.tar.Z and browse them.  k5jb.k35.tar.Z contains a file,
-source.note, which has modification information.
+k5jb.k35doc.tar.Z and browse them.  k5jb.k37.tar.Z contains a file,
+unix.note, which has modification information.
 
 (Rest of previous note deleted)
 

@@ -1012,7 +1012,7 @@ char *argv[];
 #ifndef NOCOOKIE
 	extern char CMARK[];
 	char *vp = CMARK;
-	static char *cookie = "!_ (DY\\";
+	static char *cookie = "!_ (DY]";
 	while(*cookie){
 		if(!*vp)
 			exit(1);
