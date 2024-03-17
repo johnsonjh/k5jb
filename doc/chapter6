@@ -21,7 +21,7 @@ read instead of AUTOEXEC.NET.
 6.2.  Console Mode
 
 The console may be in one of two modes: command mode and converse mode.  
-In command mode, the prompt "net>" is displayed and any of the commands 
+In command mode, the prompt "NET>" is displayed and any of the commands 
 described in the next section may be entered.  In converse mode, keyboard 
 input is processed according to the "current session", which may be either 
 a Telnet, FTP, or AX.25 connection.  In a telnet or AX.25 session, key- 
@@ -106,7 +106,7 @@ available.
 
 6.3.3.  !
 
-An alias for the "shell" command (if compiled in).  See shell.
+An alias for the "shell" command (Not normally in MS-DOS).  See shell.
 
 6.3.4.  #
 
@@ -122,18 +122,23 @@ Ethernet, AX.25), subnet address and time to expiration is shown.  If the
 link address is currently unknown, the number of IP datagrams awaiting 
 resolution is also shown.
 
-6.3.5.1.  arp add <hostid> ether|ax25|netrom <ether addr|callsign>
+6.3.5.1.  arp add <hostid> ether|ax25|netrom|vax25 <ether addr|callsign>
 
 The add subcommand allows manual addition of address resolution entries 
 into the table.  This is useful for "hard-wiring" digipeater paths, and 
 other paths that are not directly resolvable.  Optional digipeater calls 
 are added to the end of this line.
 
-6.3.5.2.  arp drop <hostid> ether|ax25|netrom
+With version k34, the hardware type "vax25" has all the attributes of 
+"ax25" except that virtual circuit will be used to reach the destination.  
+This scheme avoids dedicating a port to virtual circuit operation.  (See 
+the mode command.)
+
+6.3.5.2.  arp drop <hostid> ether|ax25|netrom|vax25
 
 The drop subcommand allows removal of entries from the table.
 
-6.3.5.3.  arp publish <hostid> ether|ax25|netrom <ether addr|callsign>
+6.3.5.3.  arp publish <hostid> ether|ax25|netrom|vax25 <ether addr|callsign>
 
 The publish subcommand allows you to respond to arp queries for some other 
 host.  This is commonly referred to as "proxy arp", and is considered a 
@@ -146,7 +151,7 @@ know the second machine isn't really on the air.  Use arp publish with
 caution.
 
 6.3.6.  attach <hwtype> <I/O addr> <vector> <mode> <label> <bufsize> <mtu>
-     <speed>"
+     <speed> [<port>]
 
 Configure and attach a hardware interface to the system.  <hw type> 
 represents the kind of I/O device that is being attached.  The following 
@@ -155,7 +160,6 @@ types are some that are (somewhat) supported:
      asy Standard PC asynchronous interface using the National 8250
      combios (Undergoing test and development)
      drsi DRSI PC*PA PC Packet adapter
-     kpc4 Kantronics KPC-4 and KAM dual port TNCs.
      netrom  (See 6.3.29.)
      packet FTP, Inc., compatible Packet Driver Interface 
      3c500 3Com 3C500 or 3C501 Ethernet interface 
@@ -163,8 +167,8 @@ types are some that are (somewhat) supported:
      eagle Eagle Computer card (Zilog 8530) 
      pc100 PAC-COMM PC-100 (Zilog 8530)
 
-Drsi and kpc4 hwtypes have different syntax from asy.  See examples below.  
-The hapn, eagle and pc100 interfaces were not completed.  Driver code is 
+Drsi hwtype has different syntax from asy.  See examples below.  The hapn, 
+eagle and pc100 interfaces are probably non-functional.  Driver code is 
 not included in this package but is available from K5JB.
 
 The drsi interface works fine, thank you!
@@ -197,7 +201,8 @@ Ethernet controllers and to AX.25 addresses on "asy" lines operating in
 "ax25" mode.
 
 <label> gives the name by which the interface will be known to the various 
-commands, such as "connect", "route" and "trace".
+commands, such as "connect", "route" and "trace".  label will be modified 
+by the attach command with certain asy and drsi types.  See below.
 
 For asynchronous ports, <bufsize> specifies the size of the ring buffer in 
 bytes to be statically allocated to the receiver; incoming bursts larger 
@@ -210,28 +215,30 @@ is ignored in the Unix version.
 
 <mtu> is the Maximum Transmission Unit size, in bytes.  Datagrams larger 
 than this limit will be fragmented at the IP layer into smaller pieces.  
-For AX.25 UI frames, this limits the size of the information field.  For 
-AX.25 I frames, however, the ax25 paclen parameter is also relevant.  If 
-the datagram or fragment is still larger than paclen, it is also 
-fragmented at the AX.25 level (as opposed to the IP level) before 
-transmission.  (See the "ax25 paclen" command for further information).
+For AX.25 UI frames, mtu (or ax25 paclen, whichever is smaller) limits the 
+size of the information field.  For AX.25 I frames, mtu, in conjunction 
+with paclen controls AX.25 segmentation.  (See Chapter 5. and see the 
+"ax25 paclen" command for further information).
 
 <speed> is needed only for an "asy" line; the controller will be 
 initialized to the given speed.
 
+[<port>] is an optional argument used with the optional multidrop KISS 
+driver.  See below.
+
 Some examples follow.  The first is one to attach the PC asynch interface
 normally known as "com1" (the first controller) to operate with a KISS TNC 
-at 9600 baud, calling it "ax0".  A 1024 byte receiver ring buffer is 
-allocated.  Outgoing packets larger than 256 bytes are fragmented.  Note 
-that to run a typical TNC at over 4800 bps requires modifying it with high 
-speed serial port components.
+at 9600 baud, calling it "ax0".  A 1024 byte receiver ring buffer is al- 
+located.  The mtu is set to a standard value that corresponds to an ax25 
+paclen of 256.  Note that to run a typical TNC at over 4800 bps requires 
+modifying it with high speed serial port components.
 
  attach asy 0x3f8 4 ax25 ax0 1024 256 9600
 
-This example is to use the PC asynch card "com2" to operate in point-to-
+This example is to use the PC asynch card "com2" to operate in point-to- 
 point slip mode at 9600 baud, calling it "sl0".  A 1024 byte receiver ring 
-buffer is allocated.  Outgoing packets larger than 256 bytes are 
-fragmented.
+buffer is allocated.  The mtu is set to a standard value that corresponds 
+to an ax25 paclen of 256.
 
  attach asy 0x2f8 3 slip sl0 1024 256 9600
 
@@ -254,45 +261,59 @@ and the second as dr0b.
 
 See 2.2.4. for full explanation of the DRSI driver.
 
-If you are using the KPC-4, or KAM and if your net.exe was compiled with 
-KPCPORT compiler directive defined in options.h, you will be able to use 
-two radio ports while using only one serial port on the computer.  The 
-"attach kpc4" command has a slightly different syntax.
+If you are using a KISS TNC that supports multiple ports (e.g. KPC-4, or 
+KAM) and if your NET.EXE was compiled with MDKISSPORT compiler directive 
+defined in options.h, you will be able to use multiple radio ports while 
+using only one serial port on the computer.  The maximum value of ports is 
+16, but has only been tested with two.  The "attach asy" command in this 
+case has a slightly different syntax.
 
- attach kpc4 <I/O addr> <vector> <label> <bufsize> <mtu> <speed>
+ attach asy <I/O addr> <vector> ax25|slip <label> <bufsize> <mtu> <speed> 
+    <port>
 
-Note that the mode argument is missing since only ax25 mode is available.
+Note that the port argument has been added to the end.
 
 An example of using it in MS-DOS, using com1, 2k receive buffer, 256 byte 
-max packet size, at 4800 bps on the serial port, would be:
+max packet size, at 4800 bps on the serial port, and using two logical 
+ports on the TNC would be:
 
- attach kpc4 0x3f8 4 kp0 2048 256 4800
+ attach asy 0x3f8 4 ax25 ax0 2048 256 4800 2
+
+(You can call it 2M, UHF, etc. instead of ax0, if you prefer.  Before the 
+port number (0, 1, ...) is appended, the name will be shortened to three 
+characters if it is too long.)
 
 The Unix version of the command, using /dev/tty14 at 4800 bps would be:
 
- attach kpc4 0 /dev/tty14 kp0 0 256 4800
+ attach asy 0 /dev/tty14 ax25 ax0 0 256 4800 2
 
-(As in the drsi driver, subsequent commands will need reference to the 
-first port as kp0a and the second as kp0b.)  Additional kpc4 drivers may 
-be attached to other serial ports by using labels such as kp1, kp2, etc.
+(Subsequent commands will need reference to the first port as ax00 and the 
+second as ax01.)  Additional asy drivers may be attached to other serial 
+ports by using labels such as ax1, ax2, etc.
 
-See 2.2.5. for a full explanation of the kpc4 driver and its operation.
+See 2.2.5. for a full explanation of the multidrop KISS driver and its 
+operation.
 
 Ethernet is not normally included in net.exe.  You have to compile it by 
-enabling the necessary defines in config.h.  To attach a 3Com Ethernet 
-controller using the standard 3Com address and vector (i.e., as it comes 
-out of the box) to use ARPA-standard encapsulation.  The receive queue is 
-limited to 5 packets, and outgoing packets larger than 1500 bytes will be 
-fragmented:
+enabling the necessary defines in config.h.  The 3Com Ethernet controller 
+is probably obsolete but you would attach it using the standard 3Com add-
+ress and vector (i.e., as it comes out of the box) to use ARPA-standard 
+encapsulation.  The receive queue is limited to 5 packets, and outgoing 
+packets larger than 1500 bytes will be fragmented:
 
  attach 3c500 0x300 3 arpa ec0 5 1500
 
-6.3.6.1.  G8BPQ and NET
+Higher chance of Ethernet success might be to use the Packet Driver, as is 
+used for G8BPQ connection.
 
-If you have version k20 or later, net with PACKET defined and compiled into
-the executable, the FTP, Inc. packet driver will work with G8BPQ code.
-I don't normally include it in the distribution net.exe.)  The attach line
-in autoexec.net would looks something like:
+6.3.6.1.  Ethernet, G8BPQ and NET
+
+If you have version k20 or later, net with PACKET defined and compiled 
+into the executable, the FTP, Inc. packet driver will work with G8BPQ 
+code, and probably will work with Ethernet.  One user has reported success 
+with the packet driver and Ethernet.  I don't normally include it in the 
+distribution net.exe.)  The attach line in autoexec.net would looks some-
+thing like:
 
  attach packet 0x61 ax0 5 256
  attach packet 0x62 ax1 5 256
@@ -312,11 +333,16 @@ TYPE=ASYNC for the async port connected to the KISS TNC and the second one
 was TYPE= INTERNAL for the connection between the packet driver and the 
 BPQ code.  My experiments with BPQ were limited so you will have to find 
 what you can in the BPQ doc (whew!).  If you want a version with PACKET 
-defined, contact me (K5JB) and I will provide it along with the 
-configuration and startup files that worked for me.  (The COMBIOS scheme 
-described by G8BPQ doesn't work with net.exe because it doesn't have 
-COMBIOS interface included, or didn't until I started experimenting with 
-it.)
+defined, contact me (K5JB) and I will provide it along with the configur-
+ation and startup files that worked for me.  The COMBIOS scheme described 
+by G8BPQ doesn't work with net.exe because net doesn't (normally) have 
+COMBIOS interface included.
+
+6.3.6.2.  axmotd [<message> | - ]
+
+Displays or changes the message sent to AX.25 mailbox users after they 
+issue the "chat" command.  Contains a default which can be changed with 
+this command, or deleted by using a single hyphen (-) instead of message.
 
 6.3.7.  ax25
 
@@ -328,11 +354,11 @@ will be repeated.
 6.3.7.1.1  ax25 heard [on|off|clear]
 
 If compiled with the directive AX25_HEARD defined, this command is 
-available to list the (currently 19) most recent heard source stations 
-sending info frames.  Likewise, a "jheard" would also be available to 
-AX.25 mailbox users.  Each displayed line shows the interface name, time, 
-aggregate of Layer 3 protocols used by that source call and the callsign 
-string from the most recent header.  Creates file, heard.hlp. 
+available to list the (currently 19) most recent heard stations sending 
+info frames.  Likewise, a "jheard" would also be available to AX.25 mail-
+box users.  Each displayed line shows the interface name, time, aggregate 
+of Layer 3 protocols used by that source call and the callsign string from 
+the most recent header.  Creates file, heard.hlp. 
 
 6.3.7.2.  ax25 maxframe [<val]>]
 
@@ -356,62 +382,94 @@ set mboxcall to the same as mycall if you are going to use Net/ROM.
 
 6.3.7.5.  ax25 paclen [<val>]
 
-Limits the size of I-fields on new AX.25 connections.  Note that if IP 
-datagrams or fragments larger than this are transmitted, they will be 
-transparently fragmented at the AX.25 level, sent as a series of I frames, 
-and reassembled back into a complete IP datagram or fragment at the other 
-end of the link.  This parameter should be less than (or equal to) the MTU 
-of the associated interface.  Default is 256.
+Limits the size of I-fields on new AX.25 connections and size of UI infor- 
+mation fields in datagram mode.  Note that if IP datagrams or fragments 
+larger than this are assembled, they may be segmented at the AX.25 level, 
+sent as a series of I frames, and reassembled back into a complete IP 
+datagram or fragment at the other end of the link.  This parameter should 
+be equal to or greater than the MTU of the associated interface unless you 
+want to do AX.25 segmentation.  Default is 256.  See Chapter 5 for AX.25 
+segmentation information.
 
 6.3.7.6.  ax25 pthresh [<val>]
 
 Sets the threshold packet size beyond which the packet will be re-sent 
 rather than send a Poll when the retry time has expired without an ack.  
-Only set this to zero if you are using NET/ROM.  Default is 128.
+Only takes effect when using AX.25 Version 2.  In AX.25 Version 1 polls 
+are not sent. Default pthresh is 128.
 
-6.3.7.7.  ax25 reset <axcb>
+6.3.7.7.  ax25 reset <axcb#>
 
-Deletes the AX.25 connection control block at the specified address.  Axcb 
-is the address in memory of a control block.  On a Unix machine it is 
-necessary to type all 8 hex numbers.  On an MS-DOS machine, the last 4 
-will do.  Get this number with the ax25 stat command.  (In C, the 
-operator, &, is "address of").
+Deletes the AX.25 connection control block associated with a connection.  
+Axcb# is control block number obtained with the ax25 stat command.  This 
+number changes dynamically so obtain it just prior to doing the reset.
 
 6.3.7.8.  ax25 retry [<val>]
 
 Limits the number of successive unsuccessful retransmission attempts on 
 new AX.25 connections.  If this limit is exceeded, link re-establishment 
 is attempted.  If this fails "retry" times, then the connection is 
-abandoned and all queued data is deleted.  Default is 10.
+abandoned and all queued data is deleted.  Default is 10, max 16, min 1.
 
-6.3.7.9.  ax25 status [<axcb>]
+6.3.7.8.1  ax25 segment [on | off]
+
+Without arguments this command returns state of receive segmentation.  
+Segmentation can be disabled with the "off" argument.  The only reason you 
+may want to do this if someone appears with unrealistic numbers and begins 
+sapping all your memory queueing receive frames for him.  You can control 
+this with your parameters if you are the receiving station but if you are 
+switching packets to another destination you have no control over tcp mss 
+being used.
+
+6.3.7.9.  ax25 status [<axcb#>]
 
 Without an argument, displays a one-line summary of each AX.25 control 
-block.  If the address of a particular control block is specified, the 
-contents of that control block are dumped in more detail.  Note that the 
-send queue units are frames, while the receive queue units are bytes.
+block.  Each line is numbered with the current <axcb#> that can be used by 
+other commands.  If this <axcb#> is specified, the contents of that 
+control block are dumped in more detail.  Note that the send queue units 
+are frames, while the receive queue units are bytes.
 
-6.3.7.10.  ax25 t1|t2|t3|T4 [<val>]
+6.3.7.10.  ax25 t1|t2|t3|t4 [<val>]
 
 Display or set the AX.25 timers to be used for new connections.  T1 is the 
-retransmission timer (frack), T2 is the acknowledgment delay timer (resp- 
-time) and T3 is the idle "keep alive" (check) timer.  T4 is the dormant 
-circuit timer which disconnects a circuit that has been idle for this 
-period.  Values of T1-T3 are in milliseconds, T4 is in seconds.  If you 
-are using netrom, it is best to set T3 to 0 to prevent unnecessary 
-polling.  (Some NET/ROMs are set to not poll and to maintain permanent 
-connections.  See Chapter 5 for explanation of the effect this has on mbox 
-connections.)  Defaults: t1 = 10,000, t2 = 1,000, t3 = 0, t4 = 900 sec.
+retransmission timer (frack), T2 is the transmit delay timer (resptime) 
+and T3 is the idle "keep alive" (check) timer.  T4 is the dormant circuit 
+timer which disconnects a circuit that has been idle for this period.  
+Values of T1-T3 are in milliseconds, T4 is in seconds.  The values are 
+rounded down by the integer arithmetic used.  T2 serves the important 
+function of keeping a ready frame in the computer for a delay to see if an 
+ack for it is being received.  Once sent to the KISS TNC it can't be 
+canceled.  It is best to set T3 to 0 to prevent unnecessary polling.  
+(Some NET/ROMs are set to not poll and to maintain permanent connections.  
+See Chapter 5 for explanation of the effect this has on mbox connections.)  
+Approximate defaults: t1 = 10,000, t2 = 1,000, t3 = 0, t4 = 900 sec.  Min. 
+t1 is 5,000, min. t2 is 1000.
 
-6.3.7.11.  ax25 window [<val>]
+6.3.7.11.  ax25 vers [v1|v2]
+
+Display or set the AX.25 version to be used in initiated connects.  Def-
+ault is v2.  Version 1 will give higher performance in some instances 
+because it retransmits an unacknowldeged frame instead of sending a poll 
+frame and then retransmitting the information.  However, using v1 can 
+cause mysterious disconnects if the connectee has a short fused T3 (poll) 
+timer.  In v1, rather than poll, the station disconnects when the T3 timer 
+expires.
+
+6.3.7.12.  ax25 vcipcall [<call>]
+
+Display or set the IP-only virtual circuit call sign.  This call sign is 
+one of the three you can use with NET.  This call sign will be used on 
+outgoing connects if you specified hardware type "vax25" in your arp add 
+command for the destination.  All incoming AX.25 information frames to the 
+vcipcall will be discarded unless they contain IP PID.
+
+6.3.7.13.  ax25 window [<val>]
 
 Sets the number of bytes that can be pending on an AX.25 receive queue 
 beyond which I frames will be answered with RNR (Receiver Not Ready) 
 responses.  This presently applies only to suspended interactive AX.25 
 sessions, since incoming IP datagrams are always processed immediately and 
-not allowed to remain on the receive queue.  Default is 2048.  If third 
-party networking with defective fragmentation is encountered, set ax25 win 
-to 1280.
+not allowed to remain on the receive queue.  Default is 2048.
 
 6.3.8.  cd [<directory path>]
 
@@ -425,12 +483,12 @@ to the specified path.
 On an AX.25 session, this command initiates a disconnect.  On a FTP or 
 Telnet session, this command sends a FIN (i.e., initiates a close) on the 
 session's TCP connection.  This is an alternative to asking the remote 
-server to initiate a close ("QUIT" to FTP, or the logout command 
-appropriate for the remote system in the case of Telnet).  When either FTP 
-or Telnet sees the incoming half of a TCP connection close, it 
-automatically responds by closing the outgoing half of the connection.  
-Close is more graceful than the "reset" command, in that it is less likely 
-to leave the remote TCP in a "half-open" state.
+server to initiate a close ("QUIT" to FTP, or the logout command appro-
+priate for the remote system in the case of Telnet).  When either FTP 
+or Telnet sees the incoming half of a TCP connection close, it automatic-
+ally responds by closing the outgoing half of the connection.  Close is 
+more graceful than the "reset" command, in that it is less likely to leave 
+the remote TCP in a "half-open" state.
 
 6.3.10.  connect <interface> <callsign> [<digipeater> ...  ]
 
@@ -439,10 +497,10 @@ specified interface.  Up to 8 optional digipeaters may be given; note that
 the word "via" MUST NOT be included, unless you want to connect to a 
 station with the callsign, "via".  Data sent on this session goes out in 
 conventional AX.25 packets with no upper layer protocol.  The de-facto 
-presentation standard format is used, in that each packet holds one line 
-of text, terminated by a carriage return.  A single AX.25 connection may 
-be used for both terminal-to-terminal and IP traffic, with the two types 
-of data being automatically separated by their AX.25 Level 3 Protocol IDs.
+presentation standard format is used; each packet holds one line of text, 
+terminated by a carriage return.  A single AX.25 connection may be used 
+for both terminal-to-terminal and IP traffic, with the two types of data 
+being automatically separated by their AX.25 Level 3 Protocol IDs.
 
 6.3.11.  dir [<dirname>] [/w]
 
@@ -487,12 +545,11 @@ command to the shell once you have logged in.)
 
 6.3.14.  eol [unix|standard]
 
-Displays or changes Telnet's end-of-line behavior when in remote echo 
-mode.  In standard mode, each key is sent as-is.  In unix mode, carriage 
-returns are translated to line feeds.  This command is not necessary with 
-all UNIX systems; use it only when you find that a particular system 
-responds to line feeds but not carriage returns.  Only Sun UNIX release 
-3.2 seems to exhibit this behavior; later releases are fixed.
+Displays or changes Telnet's transmitting end-of-line behavior.  In stand-
+ard mode, end-of-line is a CR-LF pair.  In unix mode, end-of-line is just 
+line feed.  This command is not necessary with all UNIX systems; use it 
+only when you find that a particular system responds as though you had 
+sent two lines with each command.
 
 6.3.15.  escape <char>
 
@@ -506,7 +563,7 @@ defaults to Ctrl-].)
 
 Display 3-Com Ethernet controller statistics (if configured).
 
-6.3.17.  exit
+6.3.17.  exit please
 
 Exit the "net" program and return to MS-DOS (or Unix).
 
@@ -543,12 +600,12 @@ hold all the current IP addresses I have assigned in the local area.
 
 6.3.19.  ftp <hostid>
 
-Open an FTP control channel to the specified remote host and enter 
-converse mode on the new session.  "ftp w1aw" initiates an ftp session 
-with host w1aw.  You will be prompted for your user name and password.  If 
-you get either of these wrong the program will loop until you either get 
-it right or escape to the command prompt and close the session.  (F-10 on 
-MS-DOS or the defined escape key in Unix to get to the command prompt.)
+Open an FTP control channel to the specified remote host and enter con-
+verse mode on the new session.  "ftp w1aw" initiates an ftp session with 
+host w1aw.  You will be prompted for your user name and password.  If you 
+get either of these wrong the program will loop until you either get it 
+right or escape to the command prompt and close the session.  (F-10 on MS-
+DOS or the defined escape key in Unix to get to the command prompt.)
 
 When in converse mode with an FTP server, everything typed on the console 
 is first examined to see if it is a locally-known command.  If not, the 
@@ -602,7 +659,6 @@ the console).  Over the control channel, the PORT command is used before
 the LIST command is sent.  See list command which acts the same as the dir 
 command.
 
-.pa
 6.3.19.6.  get <remote_file> [<local_file>]    {ftp command}
 
 Asks the remote server to send the file specified in the first argument.  
@@ -620,8 +676,9 @@ will open a file to your display and send the file contents there.)
 Ls is the abbreviated directory command.  Ls is identical to the "dir" 
 command except that the "NLST" command is sent to the server instead of 
 the "LIST" command.  This results in an abbreviated directory listing, 
-i.e., one showing only the file names themselves without any other 
-information.  You must have read permission for that directory set.
+i.e., one showing only the file names (NLST is an abbreviation for "Name 
+List") themselves without any other information.  You must have read 
+permission for that directory set.
 
 6.3.19.9.  mkdir <remote_directory>    {ftp command}
 
@@ -655,7 +712,6 @@ Then tried to delete it on the host.  (I am currently in \net):
      del deleteme
      550 Permission denied
 
-.pa
 Then I try to overwrite it:
 
      put \net\finger\all.txt \net\deleteme
@@ -676,6 +732,7 @@ argument.  Doesn't change working directory; only shows it.
 
 Quit command is used to gracefully close an FTP session.
 
+.pa
 6.3.19.14.  rmdir <remote_directory>    {ftp command}
 
 Deletes a directory on the remote machine.  You must have destroy 
@@ -710,7 +767,6 @@ the TYPE command on the control channel.
 User command is automatically sent by your client during a logon process.  
 If you want to change user after logging in you use this command.
 
-.pa
 6.3.20.  help [<subject>]
 
 Display a file, a page at a time, with an opportunity to abort at each 
@@ -765,34 +821,32 @@ kiss stats.
 Displays or sets the default time-to-live value placed in each outgoing IP 
 datagram.  This limits the number of switch hops the datagram may take.  
 The idea is to bound the lifetime of the packet should it become caught in 
-a routing loop,
+a routing loop, default is 16, maximum value is 255.
 
-6.3.24.  kport [0|1] (deleted and replaced by attach kpc4, Sect. 6.3.6.)
-
-6.3.24.1.  mail [<hostname>] [<pages to skip>]
+6.3.24.  mailscan [<hostname>] [<pages to skip>]
 
 A simple pager that paws through your mailfile, e.g. \spool\mail\k5jb.txt, 
 and displays it a page at a time, without interrupting operation of net as 
 shelling to bm would do.  It defaults to your hostname, up to the first 
 dot.  If you save mail files by renaming them as I do, you can add the 
-optional hostname argument, e.g. mail k5jb1, and it would look for 
+optional hostname argument, e.g. mailscan k5jb1, and it would look for 
 \spool\mail\k5jb1.txt.  Second arg is a number.  If used, it causes mail 
 to skip that number of screens (22 lines each) before it displays.  To use 
 the second arg you must supply the first arg (your hostname).  You abort 
 mail scanning with your defined escape.
 
-6.3.25.  mbox [ y|n|?| s [<message>] ]
+6.3.25.  mbox [ on | off | s [<message>] ]
 
-Y (or On) and N (or off) enable and disable the AX.25 mailbox.  ? returns 
-the on-off status.  S is used to send a message to a user who is connected 
-to the mbox.  If you use, "mbox s", one line is sent to a mail box user 
-prior to the next prompt string.  This line is, "I'm at the console.  If 
-you want to chat, send a "c"."  Alternatively, if you use, "mbox s Hey!  I 
-got your message!", when the mailbox sends its next prompt it will preceed 
-it with the string you typed after the "s", then send the "I'm at the 
-console..." line.  The message can be up to 79 characters long.  This 
-command is not aware that the mbox is multiuser, and if more than one user 
-is connected, your string will be sent to the next user getting a prompt.
+On and off enable and disable the AX.25 mailbox (defaulted on).  S is used 
+to send a message to a user who is connected to the mbox.  If you use, 
+"mbox s", one line is sent to a mail box user prior to the next prompt 
+string.  This line is, "I'm at the console.  If you want to chat, send a 
+"c". QRX for prompt."  Alternatively, if you use, "mbox s Hey!  I got your 
+message!", when the mailbox sends its next prompt it will precede it with 
+the string you typed after the "s", then send the "I'm at the console..." 
+line.  The message can be up to 79 characters long.  This command is not 
+aware that the mbox is multi-user, and if more than one user is connected, 
+your string will be sent to the next user getting a prompt.
 
 If mbox is enabled, an incoming AX.25 or NET/ROM connection is routed to 
 the mbox.  If mbox is disabled, the connection is routed to an AX.25 
@@ -802,7 +856,7 @@ with each incoming information frame from each user.  The time remaining
 (ms) is shown in the last column of the display.  A typical display would 
 be:
 
-     net> mbox
+     NET> mbox
       User       State    Type    &cb     ms left
       kb0qj      DATA     NET/ROM 0x6ce8  400000
 
@@ -813,13 +867,18 @@ the control block related to this session.
 
 Users have a set of commands.  They are explained in section 5.4.
 
+6.3.25.1.  motd [<message> | - ]
+
+Motd displays or sets the message of the day for incoming telnet users.  
+Default is none.  The message can be deleted by using the hyphen argument.
+
 6.3.26.  memstat
 
-Displays the internal free memory list in the storage allocator.  Not 
-implemented in the Unix version.  (There is exhaustive memory debugging 
-code available if you compile with debugging switches set in alloc.c and 
-mbuf.c.)
+Displays the internal free memory list in the storage allocator.  (Not 
+in the Unix version.  (There is memory debugging code available for MS-DOS 
+if you compile with debugging switches set in alloc.c and mbuf.c.)
 
+.pa
 6.3.27.  mode <interface> [vc|datagram]
 
 Controls the default transmission mode on the specified AX.25 interface.  
@@ -831,10 +890,10 @@ circuit and datagram modes.
 6.3.28.  mulport [on|off]
 
 The multiport switch software allows routing of frames between interfaces 
-based on a table lookup.  This provides the traditional "multi-port 
-digipeater" functionality.  (Only if compiled into the code.  If it is, 
-"Mulport" will show in the startup header.)  See Chapter 5 for information 
-on how to use the GRAPES Multiport code.
+based on a table lookup.  This provides the traditional "multi-port digi-
+peater" functionality.  (Only if compiled into the code.  If it is, "Mul-
+port" will show in the startup header.)  See Chapter 5 for information on 
+how to use the GRAPES Multiport code.
 
 6.3.29.  NET/ROM Commands
 
@@ -855,7 +914,7 @@ session command to switch sessions.  The netrom commands follow.
 6.3.29.1.  netrom acktime [<value>]
 
 This is the acknowledge delay timer, similar to ax25 t2.  The default is 
-3000 ms.  Without argument, this command shows current value.
+3000 ms (min. 2000).  Without argument, this command shows current value.
 
 6.3.29.2.  netrom bcnodes <iface name>
 
@@ -866,7 +925,7 @@ broadcasts.  If you put this command in your autoexec.net (startup.net)
 file, whenever you restart NET, it will send out nodes broadcasts to tell 
 the local nodes that you are available.
 
-6.3.29.2.1.  netrom bcstifle <iface name> 0|1
+6.3.29.2.1.  netrom bcstifle <iface name> on|off
 
 For applications where you want to make special routings and need to 
 prevent (stifle) node broadcasts altogether, use this command with the 
@@ -882,7 +941,7 @@ destination station.  Either the alias or call sign can be used.
 
 The time to wait before breaking a send choke condition.  Choke is the 
 term for NET/ROM flow control.  Without argument, this command gives 
-current value.  Default is 180000 ms (3 minutes).
+current value.  Default is 180000 ms (3 minutes), min. 60000.
 
 6.3.29.5.  netrom interface <iface name> <node alias> <qual>
 
@@ -905,21 +964,23 @@ are when broadcast by your neighbors.
 
 You need a netrom interface command for every interface you're going to 
 use with NET/ROM.  You must use the netrom interface command before using 
-the other netrom commands.  See 6.3.48.3. if using a pseudo iface for VC.
+the other netrom commands.
 
 6.3.29.6.  netrom irtt [<value>]
 
-The initial round trip time guess, used for timer setting.  Default is 
-15000.  Without argument, this command gives current value.
+The initial round trip time guess, used for timer setting.  Default 15000, 
+which is the minimum.  Without argument, this command gives current value.
+
+6.3.29.7.  netrom kick <nrcb#>
 
 The netrom kick command causes an immediate send retry on the indicated 
-control block.  &nrcb is address of the netrom control block.  It can be 
-obtained from the netrom status command.
+control block.  nrcb# is netrom control block number which is obtained 
+from the netrom status command.
 
 6.3.29.8.  netrom nodefilter [<add|drop> <call> <iface>]
 
 Sometimes you can hear broadcasts from nodes that can't hear you.  Your 
-routing table will be full of junk and your memory wasted with unusuable 
+routing table will be full of junk and your memory wasted with unusable 
 routes.  To prevent this, pick one good neighbor NET/ROM node and use the 
 netrom nodefilter command in conjunction with the netrom nodefilter mode 
 command.  The nodefilter list contains a list of callsigns and interfaces.  
@@ -930,7 +991,6 @@ the netrom nodefilter mechanism.  If no argument is given, netrom node-
 filter displays calls and associated interfaces in its list. See Para. 
 6.3.48.3. if you use the pseudo virtual circuit interface.
 
-.pa
 6.3.29.9.  netrom nodefilter mode [none|accept|reject]
 
 If the filter mode is "none", no filtering is done.  If it is "accept", 
@@ -942,7 +1002,7 @@ no argument is given, shows current mode.
 6.3.29.10.  netrom nodetimer [<value>]
 
 Netrom node broadcast interval timer in seconds is used for the value.  
-Typical value is 3600, or one hour.
+Typical value is 3600, or one hour.  Nodetimer defaults to 0.
 
 If your local NET/ROM nodes broadcast every hour, but you want to do so 
 every ten minutes, you can say:
@@ -959,24 +1019,24 @@ Obsolescence timer value is in seconds.  Typical value is 3600.  Every
 time the obsotimer kicks, the obsolescence counts for all non-permanent 
 entries are decremented by one.  When the count for an entry falls below 
 five, it is no longer broadcast.  When it falls to 0, it is removed.  The 
-count is initialized at 6.
+count is initialized at 6.  Obsotimer defaults to 0.
 
 6.3.29.12.  netrom qlimit [<value>]
 
 The maximum length of the receive queue for chat sessions.  This is 
-similar to ax25 window.  Default is 2048.
+similar to ax25 window.  Default is 2048, min is 128.
 
-6.3.29.13.  netrom reset <&nrcb>
+6.3.29.13.  netrom reset <nrcb#>
 
 Causes unilateral reset (disc) of the netrom session having a control 
-block at address &nrcb.  Obtain this address with the netrom status 
-command.  Reset does not tell the neighbor netrom of the reset.  On 
-receipt of an I frame from that node, your station will send DM.
+block number nrcb#.  Obtain this number with the netrom status command.  
+Reset does not tell the neighbor netrom of the reset.  On receipt of an I 
+frame from that node, your station will send DM.
 
 6.3.29.14.  netrom retries [<value>]
 
 Sets maximum retries on connect, disconnect, and data frames.  Without 
-argument, this command returns current value.  Default is 10.
+argument, this command returns current value.  Default 10, max 16, min 1.
 
 6.3.29.11.  netrom route
 
@@ -985,25 +1045,24 @@ Use netrom route to see the contents of your routing table.
 6.3.29.12.  netrom route add <alias> <dest> <iface> <qual>
                           <neighbor> [<digi ... >]
 
-.pa
 Netrom add adds a permanent entry to the routing table.  An example is:
 
      netrom route add #foo w9foo ax0 192 w9rly
 
-This command adds an entry for w9foo, whose alias is #foo, route quality 
-192, via w9rly on interface ax0.  Let's talk about what this means.  w9foo 
-is the *destination* node, the one to whom you want the packets routed by 
-the NET/ROM network.  w9rly is your *neighbor*, the NET/ROM node to which 
-you pass the packet to be forwarded.  Since w9rly may appear on more than 
-one interface (the callsign may be used by more than one NET/ROM node on 
-different bands), we specify that we are to use ax0 to send the packet.
+This command adds an entry for callsign, w9foo, whose alias is #foo, route 
+quality 192, via w9rly on interface ax0.  w9foo is the *destination* node, 
+the one to whom you want the packets routed by the NET/ROM network.  w9rly 
+is your *neighbor*, the NET/ROM node to which you pass the packet to be 
+forwarded.  Since w9rly may appear on more than one interface (the call-
+sign may be used by more than one NET/ROM node on different bands), we 
+specify that we are to use interface ax0 to send the packet.
 
 With NET/ROM, like IP, we don't know exactly what route a packet will take 
-to its destination.  We only know the name of a neighbor which has 
-indicated a willingness to forward that packet (of course, the neighbor 
-may be the destination itself, but that's unlikely in our application).  
-NET/ROM sends the packet to the neighbor, with a network header specifying 
-our callsign and that of the ultimate destination (in this case w9foo).
+to its destination.  We only know the name of a neighbor which has indi-
+cated a willingness to forward that packet (of course, the neighbor may be 
+the destination itself, but that's unlikely in our application).  NET/ROM 
+sends the packet to the neighbor, with a network header specifying our 
+callsign and that of the ultimate destination (in this case w9foo).
 
 We can use the netrom route add command to establish a digipeater path to 
 the neighbor.  For example:
@@ -1016,8 +1075,9 @@ connection to the NET/ROM node w9rly.
 Note that "route add" and "netrom route add" are two different commands, 
 with different purposes.  In general, you only need a "netrom route add" 
 if you need to add a route to a NET/ROM node via a digipeater path.  If 
-you find yourself using this command, ask yourself, "Why am I doing this?"  
-Also, it is a bad idea to hard wire a route to an intermittent TCP/IP 
+you find yourself using this command, ask yourself, "Why am I doing this?"
+  
+Note:  It is a BAD idea to hard wire a route to an intermittent TCP/IP 
 station that is using NET/ROM emulation.  When he goes off the air, your 
 station will try anyway and cause the NET/ROM stations to send hundreds of 
 packets trying to connect to it.  His neighbor NET/ROM station will be the 
@@ -1037,63 +1097,60 @@ Use netrom route info kb0qj-10 to see the routing entries for a station in
 your routing table with the call kb0qj-10.  You may not use an alias as an 
 argument to the netrom route info command.
 
-6.3.29.15.  netrom status [<&nrcb.]
+6.3.29.15.  netrom status [<nrcb#>]
 
 When used without argument, returns status of any netrom circuits active.  
-It shows address of the control block, the send window, the send queue, 
+It shows control block number, nrcb#, the send window, the send queue, 
 the receive queue, the local user, the remote user, the node to which the 
-user is connected, and the state of the connection.
+user is connected, and the state of the connection.  This command displays 
+the status of keyboard and mailbox NET/ROM connections.  SMTP sessions do 
+not display (oversight?).
 
-This command displays the status of all NET/ROM connections, which will 
-include those used in keyboard sessions as well as ones attached to the 
-mailbox.
-
-When the control block address is given, where <&nrcb> is the hex address 
-given in the short form of the command, or in the "session" display, you 
-can get more detailed information on a session.
+When the control block number is given, where <nrcb#> is the number given 
+in the short form of the command, you can get more detailed information on 
+a session.
 
 6.3.29.16.  netrom ttl [<value>]
 
 The "netrom ttl" command allows setting of the time-to-live initializer 
-for NET/ROM datagrams.  Recommend value is 16.  Without argument, shows 
-current value.
+for NET/ROM datagrams.  Without argument, shows current value.  Default 
+value is 16, min 2, max 20.  
 
 The purpose of the ttl initializer is to prevent a packet from getting 
 caught forever in routing loops.  Every router who handles the packet 
 decrements the ttl field of the network datagram before sending it on, and 
 when it reaches 0 it is discarded.
 
-6.3.29.17.  netrom verbose [<yes|no>]
+6.3.29.17.  netrom verbose [<on|off>]
 
 By default, the NET/ROM code does not broadcast the contents of your 
 routing table.  This is as it should be, since usually we just want to be 
 the endpoints of communications rather than relaying NET/ROM traffic.  If 
 you want to be a switch station, include the command netrom verbose yes in 
 your autoexec.  Without argument, netrom verbose give state of the 
-command.
+command.  (This is a compiler option; Not normally included in NET.)
 
 6.3.29.18.  netrom window [<value>]
 
 Maximum sliding window size, negotiated down at connect time.  Default 
-initial value is 4.  If no argument, this command returns current value.
+is 4, min 1, max 127.  If no argument, this command returns current value.
 
-6.3.30.  param <interface> [<param>]
+6.3.30.  param <interface> [<param>] | mtu [<value>]
 
-Param invokes a device-specific control routine.  On a KISS TNC interface, 
-this sends control packets to the TNC.  Data bytes are treated as decimal.  
-For example, "param ax0 1 255" will set the keyup timer (type field = 1) 
-on the KISS TNC configured as ax0 to 2.55 seconds (255 x .01 sec).  To get 
-a TNC out of the KISS mode, the command, param ax0 255 will do the 
-equivalent of telling it to return to the routine that put it in KISS.
+Param serves dual purpose.  The first invokes a device-specific control 
+routine.  On a KISS TNC interface, this sends control packets to the TNC.  
+Data bytes are treated as decimal.  For example, "param ax0 1 40" will set 
+the keyup timer (type field = 1) on the KISS TNC configured as ax0 to 0.4 
+seconds (40 x .01 sec).  To get a TNC out of the KISS mode, the command, 
+param ax0 255 will do the equivalent of telling it to return to the rou-
+tine that put it in KISS.
 
 See 8.1.4. for full explanation of KISS params.
 
 On a SLIP interface, the param command allows the baud rate to be read 
-(without arguments) or set.  The implementation of this command for the 
-various interface drivers (except DRSI) is incomplete and subject to 
-change.
+(without arguments) or set.  On other interfaces, the param command 
+behaves differently.  On most you can set, but not read params.
 
-.pa
 The following array contains startup defaults for the DRSI driver.  If you 
 want to change them, use the param n number, where n is the position in 
 the array, 0 being the first:
@@ -1106,12 +1163,17 @@ the array, 0 being the first:
 
 For example, param dr0a 0 40, changes TXD on channel 0 to 400 ms.
 
+The second use for the param command is to read or set the interface's 
+maximum transmission unit (mtu) value.  mtu is set at attach time but can 
+be changed by using the command, e.g. param ax0 mtu 507.  See Chapter 5, 
+AX.25 Segmentation for information on why you might want to do this.
+
 6.3.31.  ping [ [<hostname> [<interval>] ] | clear ]
 
 Ping stimulates a response from "hostname".  The command, ping k5jb, 
 causes a response like:
 
-     net> 44.78.0.2: echo reply id 0 seq 124, 55 ms
+     NET> 44.78.0.2: echo reply id 0 seq 124, 55 ms
 
 which indicates the round trip time was 55 ms.  (This was a ping of the 
 host running net, and is the smallest time interval in an MS-DOS computer.  
@@ -1124,7 +1186,8 @@ would show something like:
      Host                Sent    Rcvd   %   Avg RTT  Interval
      44.78.0.34             9       9 100      9698      3600
 
-The command, ping clear, would stop the repeated pinging.
+The command, ping clear, would stop the repeated pinging.  Minimum 
+interval is 300 seconds (5 minutes).
 
 6.3.32.  pwd [<dirname>]
 
@@ -1154,17 +1217,17 @@ crashed.)
 
 6.3.35.  rosebash (obsolete)
 
-A toggle command, initially off, that stuffs an IP PID into packets that 
-arrive on virtual circuits over older versions of ROSE switches.  (Rose 
-commands were replaced by vcircuit commands starting with NET version k15.  
-See 6.3.48.  Don't use rosebash unless you have to.)
+(Rose commands were replaced by vcircuit commands starting with NET vers-
+ion k15.  Vcircuit commands were eliminated in k34.)  rosebash was only 
+needed on ROSE switch versions earlier than 3.0.  See Chapter 5 for in-
+formation on handling virtual circuit.
 
 6.3.36.  route [add|drop]  (see below)
 
 There are two major route commands, route add and route drop.
 
 6.3.36.1.  route add <dest addr>[/bits]|default <interface> 
-                [<gateway hostid> [<metric>]]
+                [<gateway hostid> | * [<metric>]]
 
 With no arguments, "route" displays the IP routing table.  "route add" 
 adds an entry to the routing table, while "route drop" deletes an existing 
@@ -1177,7 +1240,8 @@ because this field is only used to determine the gateway's link level
 address, if any.  If the destination is directly reachable, <gateway 
 hostid> is also unnecessary since the destination address is used to 
 determine the interface link address).  The host names contained in 
-hosts.net can be used as well as the numeric host ids in these examples.
+hosts.net can be used as well as the numeric host ids in these examples.  
+Use of brackets ([]) around the numbers is optional.
 
 The optional "/bits" suffix to the destination host id specifies how many 
 leading bits in the host id are to be considered significant in the 
@@ -1205,32 +1269,45 @@ packets to unknown addresses back and forth in a loop until their time-
 to-live (TTL) fields expire.  (Routing loops for specific addresses can 
 also be created, but this is less likely to occur accidentally).
 
+Hierarchical routing capability of NET is one of its most powerful 
+features.  If your IP address coordinator has wisely chosen IP numbers 
+with respect to geographical or other plans you can use very simple route 
+add commands with suitable gateways and avoid having to keep up with new 
+stations as they come on the air.
+
 Here are some more examples of using the route command:
 
  # Most typical, using ax0 and a KISS TNC
  route add default ax0
 
  # Station with IP address [44.0.0.10] on local AX.25 channel
- # needing an explicit route for some reason
- route add [44.0.0.10] ax0
+ # needing an explicit route for some reason.
+ route add 44.0.0.10 ax0
+
+ # A hierarchical route to a gateway that knows in which direction a pac-
+ # ket should go
+ route add 44.78/16 ax0 44.78.0.2
+
+ # A hierarchical route at that gateway routing to another gateway.  ax1b 
+ # is another port on that computer
+ route add 44.78.8/24 ax1b 44.78.8.2
 
  # Route datagrams to IP address 44.0.0.3 to SLIP line #0.
  # No gateway is needed because SLIP is point-to point.
  route add [44.0.0.3] sl0
 
- # Route packets to IP station [44.0.0.1] using the pseudo vcircuit 
- # interface, called "vc0"
- route add [44.0.0.1] vc0
-
- # Route all default traffic to the gateway on the local Ethernet
- # with IP address [44.0.0.1]
- route add default ec0 [44.0.0.1]
-
  # The local Ethernet has an ARPA Class-C address assignment;
  # route all IP addresses beginning with 192.4.8 to it
  route add [192.4.8]/24 ec0
 
-Note:  The metric value is not used by NET.
+With version k34, and later, the metric value is used as an alternative to 
+the interface's mtu.  If there is a value in metric, then that value is 
+used instead of the interface's mtu in establishing the IP sending maximum 
+segment size (mss).  For the duration of a session, the send mss is the 
+smaller of the chosen mtu minus 40, or the mss proposed by the other 
+station.  To facilitate using the metric without specifying a gateway, the 
+optional argument "*" can be used instead of the gateway.  For more expla-
+nation of these sizing values see Chapter5.
 
 6.3.36.2.  route drop <dest hostid>
 
@@ -1253,14 +1330,15 @@ had been locally initiated.
 
 6.3.38.  shell (also Unix shell layer manager, shl)
 
-If compiled with this option, shell (or !) suspends "net" and executes a 
-sub shell ("command processor" under MS-DOS).  When the sub shell exits, 
-net resumes (under MS-DOS, enter the "exit" command, under Unix, use 
-"exit" or Ctrl-D).  Note that net is suspended during a shell escape but 
-interrupts are not.  With so some of the communication drivers the results 
-are unpredictable.  For this reason, shell is not normally compiled into 
-net.  With MS-DOS, to enable multitasking it is preferable to run net 
-under DESQview, DoubleDOS, or Windows.  For Unix, see 3.8 for shell layer 
+If compiled with this option (unlikely with MS-DOS), shell (or !) executes 
+a sub shell ("command processor" under MS-DOS).  When the sub shell exits, 
+NET resumes (under MS-DOS, enter the "exit" command, under Unix, use 
+"exit" or Ctrl-D).  Note that in MS-DOS NET is suspended during a shell 
+escape but interrupts are not.  With some of the communication drivers the 
+results are unpredictable.  For this reason, shell is not normally compil-
+ed into MS-DOS version of net.  With MS-DOS, to enable multi-tasking it is 
+preferable to run net under DESQview, DoubleDOS, or Windows.  For Unix, 
+NET continues to run in the background.  Also see 3.8 for shell layer 
 manager information.  For Coherent, I recommend using the virtual terminal 
 setup.  The "!" command is an alias for shell.  
 
@@ -1272,24 +1350,25 @@ The following are the sub-commands for smtp:
 
 Displays or sets the host to be used as a "smart" mail relay.  Any mail 
 sent to a hostid not in the host table will instead be sent to the gateway 
-for forwarding.
+for forwarding.  Initialized to your ip address when it is set.
 
 6.3.39.2.  smtp kick
 
 Run through the outgoing mail queue and attempt to deliver any pending 
 mail.  This command is periodically invoked by a timer whenever net is 
-running; this command allows the user to "kick" the mail system manually.  
+running; this commanF allows the user to "kick" the mail system manually.  
 (Note that if there was mail queued up and not sent when you exit net, 
-there will be zero length files with .lck extension in the mqueue 
-directory.  These mail messages won't go when net is restarted.  You will 
-have to delete such .lck files.
+there will be zero length files with .lck extension in the mqueue direct-
+ory.  These mail messages won't go when net is restarted.  You will have 
+to delete such .lck files.
 
 6.3.39.3.  smtp maxclients [<val>]
 
 Displays or sets the maximum number of simultaneous outgoing SMTP sessions 
 that will be allowed.  The default is 10; reduce it if network congestion 
-is a problem.
+is a problem.  Max. is same as max sessions, 10.
 
+.pa
 6.3.39.4.  smtp mode [queue|route]
 
 Normally route.  Queue is used to stage messages in the rqueue sub-
@@ -1302,19 +1381,17 @@ Displays or sets the interval, in seconds, between scans of the outbound
 mail queue.  For example, "smtp timer 600" will cause the system to check 
 for outgoing mail every 10 minutes and attempt to deliver anything it 
 finds, subject of course to the "maxclients" limit.  Setting a value of 
-zero disables queue scanning altogether, note that this is the default! 
-This value is recommended for stand alone IP gateways that never handle 
-mail, since it saves wear and tear on the floppy disk drive.  (What?  Who 
-would run this thing on a floppy?)
+zero disables queue scanning altogether.  Smtp timer is set to 1800 
+seconds when you start smtp.  If you don't want to do mail, e.g. stand 
+alone IP gateway, issue smtp timer 0 after starting smtp.
 
 6.3.39.6.  smtp trace [<value>]
 
 Displays or sets the trace level in the SMTP client, allowing you to watch 
 SMTP's conversations as it delivers mail.  Zero (the default) disables 
 tracing.  There are four levels of tracing.  You get increasing level of 
-detail by chosing values greater than 0, 1, 5, or 7, respectively.
+detail by choosing values greater than 0, 1, 5, or 7, respectively.
 
-.pa
 6.3.40.  sokname
 
 If compiled with the directive, SOKNAME, defined, sokname is available to 
@@ -1324,17 +1401,19 @@ finger, and other processes that show activity by process or user number
 or name.  Initially this information is shown as names.  (IP addresses in 
 hosts.net must conform to the pattern, 44.78.0.2; not, 44.78.00.02, 
 because sokname does a string pattern match.)  Toggle off to reduce disk 
-activity.
+activity and speed display response.
 
 6.3.41.  start <server name>
 
-Starts the specified Internet server, allowing remote connection requests.  
-(Servers: smtp, ftp, echo, discard, telnet, finger, telunix, etc.)
+Starts the specified server, allowing remote connection requests.  Servers 
+include smtp, ftp, echo, discard, telnet, finger, telunix, telserv.
 
 6.3.42.  stop <server name>
 
 Stops the specified Internet server, rejecting any further remote connect 
-requests.  Existing connections are allow to complete normally.
+requests.  Existing connections are allowed to complete normally.  You may 
+want to stop and restart a server if you change tcp parameters and want 
+them to take effect.
 
 6.3.43.  tcp
 
@@ -1343,50 +1422,103 @@ The tcp sub-commands follow:
 6.3.43.1.  tcp irtt [<val>]
 
 Display or set the initial round trip time estimate, in seconds, to be 
-used for new TCP connections until they can measure and adapt to the 
-actual value.  The default is 5 seconds.  Increasing this when operating 
-over slow channels will avoid the flurry of retransmissions that would 
-otherwise occur as the smoothed estimate settles down at the correct 
-value.  Note that this command should be given before servers are started 
-in order for it to have effect on incoming connections.  (A more typical 
-irtt value for autoexec.net or startup.net is 20000.)
+used for new TCP connections until they can measure and adapt to the act-
+ual value.  The default is 10000 (10 seconds), which is about minimum over 
+the radio, and only if you are using datagram mode and have a good RF 
+path.  Increasing this when operating over slow channels will avoid the 
+flurry of retransmissions that otherwise occur as the smoothed estimate 
+settles down to a more correct value.  Note that this command should be 
+given before servers are started in order for it to have effect on incom-
+ing connections.  (If you are to use NET/ROM or ROSE circuits, a more 
+realistic irtt value for autoexec.net or startup.net is 30000 to 60000.)
 
-6.3.43.2.  tcp kick <tcb_addr>
+6.3.43.2.  tcp kick <tcb#>
 
 If there is data on the send queue of the specified tcb, this command 
-forces an immediate retransmission.  Get the tcb address from the tcp 
-status command.
+forces an immediate retransmission.  Get the tcb# from the tcp status 
+command.
+
+6.3.43.3  tcp mss [<value>]
 
 Display or set the TCP Maximum Segment Size in bytes that will be sent on 
-all outgoing TCP connect request (SYN segments).  This tells the remote 
+all outgoing TCP connect requests (SYN segments).  This tells the remote 
 end the size of the largest segment (packet) it may send.  Changing mss 
 affects only future connections; existing connections are unaffected.  
-Default is 512.  If you find a third party networking scheme that is in-
-correctly handling fragmentation, use 216 for mss to allow 40 bytes for IP 
-and TCP headers and prevent the fragmentation.
+Default is 512 unless you have attached a port to use ax25, in which case 
+mss is reduced to 216 for you.  For radio circuits you should use 216 
+(typical paclen minus 40), to allow 40 bytes for IP and TCP headers and 
+thus prevent IP level fragmentation.  See Chapter 5 for more discussion on 
+the interaction between tcp mss and other packet sizing parameters.
 
-6.3.43.4.  tcp reset <tcb_addr>
+6.3.43.4.  tcp reset <tcb#>
 
-Deletes the TCP control block at the specified address.
+Deletes the TCP control block at the tcb number.
 
-.pa
-6.3.43.5.  tcp rtt <tcb_addr> <rttval>
+6.3.43.5.  tcp rtt <tcb#> <rttval>
 
 Replaces the automatically computed round trip time in the specified tcb 
 with the rttval in milliseconds.  This command is useful to speed up 
 recovery from a series of lost packets since it provides a manual bypass 
 around the normal backoff retransmission timing mechanisms.
 
-6.3.43.6.  tcp status [<tcb_addr>]
+6.3.43.6.  tcp status [<tcb#>]
 
 Without arguments, displays several TCP-level statistics, plus a summary 
 of all existing TCP connections, including TCB address, send and receive 
 queue sizes, local and remote sockets, and connection state.
 
-If <tcb_addr> is specified, a more detailed dump of the specified TCB is 
+If <tcb#> is specified, a more detailed dump of the specified TCB is 
 generated, including send and receive sequence numbers and timer 
-information.  If using MS-DOS, only the last four hex numbers of the TCB 
-address need be entered.  Using Unix, all eight characters are required.
+information.  <tcb#> is obtained from the tcp status listing, and will 
+change with activity on your machine.
+
+This is a useful diagnostic tool for monitoring your station's activity.  
+Here is a sample screen (edited to fit) taken during an FTP session:
+
+NET> tcp s
+conout 6, conin 9, reset out 1, runt 0, chksum err 0, bdcsts 0
+TCB# RcvQ SndQ Local socket        Remote socket           State
+  1     0    0 k5jb:finger         0.0.0.0:0               Listen (S)
+  2     0  432 k5jb:1030           k5jbspook.okla.:ftpdata Estab.
+  3     0    1 k5jb:smtp           kb0qj.ampr.org:1026     SYN rcvd
+  4     0    0 k5jb:smtp           0.0.0.0:0               Listen (S)
+  5     0    0 k5jb:discard        0.0.0.0:0               Listen (S)
+  6     0    0 k5jb:ftp            0.0.0.0:0               Listen (S)
+  7     0    0 k5jb:telnet         0.0.0.0:0               Listen (S)
+  8     0    0 k5jb:echo           0.0.0.0:0               Listen (S)
+  9     0    0 k5jb:1029           k5jbspook.okla.:ftp     Estab.
+
+The first line shows that this is a fairly fresh running of NET with only 
+six outbound connects and nine inbound ones.  The reset out was probably 
+caused by a previous session somehow being interrupted.  Note that FTP has 
+opened a data channel identified by the tcp block number in the first 
+column, 2.  We now take a closer look at that session by using that number: 
+
+NET> tcp s 2
+Local: k5jb:1030 Remote: k5jbspook.okla.:ftpdata State: Estab.
+      Init seq    Unack     Next Resent CWind Thrsh  Wind  MSS Queue Total
+Send: 48bd3ed0 48bd64ca 48bd667a    432  1080  1024  2048  216   432  9721
+Recv: 7c037d80          7c037d81      0               432          0     0
+Timer running (7205/15455 ms)
+SRTT 7775 ms. Mean dev 3828 ms. Last input 0 min. ago.
+NET>
+
+Most of the information on this screen is not needed unless you are doing 
+serious investigation.  Note that there are two lines, Send: and Recv:.  
+In this case we are sending a file and we have Resent 432 bytes.  Appar-
+ently two packets were not acknowledged.  CWind (choke window) is not 
+expanded to maximum, so the retry was fairly recent.  The other station's 
+receive window is 2048, but we won't be queueing more than 432 bytes at a 
+time, awaiting for acknowledgment.  (Note the value of the Recv Wind.)  We 
+have sent 9721 bytes so far.
+
+The timer shows that 7.2 seconds have elapsed since the last frame was 
+sent, and that it will wait for 15.4 seconds before retrying.  The smooth-
+ed round trip time and mean deviation figures are used to calculate that 
+retry time limit.  The last thing on the last line is useful when we get 
+up in the morning, see an active tcp session, and want to know if it is 
+really active or a zombie.  If last input was a few hours ago we can safe-
+ly delete the session (See tcp reset).
 
 6.3.43.6.1.  tcp timertype [linear | exponential] [<max backoff minutes>]
 
@@ -1401,8 +1533,11 @@ exponential is insignificant in typical poor RF conditions.
 
 Displays or sets the receive window size in bytes to be used by TCP when 
 creating new connections.  Existing connections are unaffected.  Default 
-is 2048.  If you encounter fragmentation problems with third party net-
-working schemes, set tcp win to 1080.  
+is 2048.  Reduce this to 4 times tcp mss if you encounter collision 
+problems (e.g. 864), or in extreme cases, you might try setting tcp window 
+equal to the tcp mss value to make NET stop and wait.  You will need a 
+large window if you are playing with AX.25 segmentation.  See Chapter 5.
+Tcp window is also used to set the outbound data queue (buffer) size.
 
 6.3.44.  telnet <hostid> [well known socket]
 
@@ -1411,7 +1546,7 @@ logon session with a remote host.  In NET, over amateur radio, Telnet,
 without arguments, creates a keyboard to keyboard chat session with the 
 specified host and enters converse mode.  You can use either the host name 
 contained in host.net, or the IP address (like 44.78.0.2).  Normally you 
-won't use the "well known socket" number but some NET and NOS implementa
+won't use the "well known socket" number but some NET and NOS implementa-
 tions have strayed a bit from amateur radio philosophy (instead of using 
 computers to augment amateur radio, they use amateur radio communications 
 to augment a computer hobby.)  In the case of working with NOS stations 
@@ -1421,20 +1556,34 @@ of NOS.  If you want to log onto a Unix equipped station that has enabled
 telunix, use 513, the well known socket number I picked for the login 
 process.  Thus telnet w1aw 513 spawns a login with "w1aw".
 
-6.3.45.  trace [<interface> [<flags>]|allmode|cmdmode]
+6.3.45.  trace [various options, see below]
 
-Controls packet tracing by the interface drivers.  Specific bits enable 
-tracing of the various interfaces and the amount of information produced.  
-Tracing is controlled on a per-interface basis; without arguments, trace 
-gives a list of all defined interfaces and their tracing status.  Output 
-can be limited to a single interface by specifying it, and the control 
-flags can be change by specifying them as well.  The flags are given as a 
-hexadecimal number which is interpreted as follows:
+Trace is an overloaded command.  Without arguments it shows the various 
+trace states.  Three of its arguments, allmode, cmdmode, and  info_only, 
+control display of traced packets.  Cmdmode allows packets to be displayed 
+only when you are in command mode.  Having tracing only in command mode 
+sometimes provides the right mix between "knowing what's going on", and 
+"keeping the garbage off the screen" while you're typing.  To select 
+tracing all the time (the default mode), use 'trace allmode'.  Info_only 
+prevents supervisory AX.25 frames from being displayed. Trace to <file> or 
+trace to console controls whether tracing goes to <file> or to your 
+screen.  In the commands discussed so far, only the first letter of the 
+argument is significant, except for console which requires at least "con" 
+to turn tracing to <file> off.
+
+Trace <interface> <flags> controls packet tracing by the interface 
+drivers.  The <interface> can be one you named at attach time, or it can 
+be "loopback".  In <flags>, specific bits enable tracing of the various 
+interfaces and the amount of information produced.  Tracing is controlled 
+on a per-interface basis.  The flags are given as a hexadecimal number 
+which is interpreted as follows:
 
      T I O
      | | |--- Enable tracing of output packets if 1, disable if 0
      | |---- Enable tracing of input packets if 1, disable if 0
      |----- Controls type of tracing:
+
+   Where type "T" is has the effect:
 
      0 - Protocol headers are decoded, but data is not displayed
      1 - Protocol headers are decoded, and data (but not the
@@ -1444,14 +1593,6 @@ hexadecimal number which is interpreted as follows:
      2 - Protocol headers are decoded, and the entire packet
          (headers AND data) is also displayed in hexadecimal
          and ASCII, 16 characters per line.
-
-There is an additional option for tracing, that allows you to select 
-whether traced packets are always displayed, or only displayed when you 
-are in command mode.  Having tracing only happen in command mode sometimes 
-provides the right mix between "knowing what's going on", and "keeping the 
-garbage off the screen" while you're typing.  To select tracing all the 
-time (the default mode), use 'trace allmode'.  To restrict tracing to 
-command mode, use 'trace cmdmode'.
 
 6.3.46.  udp status
 
@@ -1463,74 +1604,29 @@ Opens <filename> and sends it on the current session as though it were
 typed on the terminal.  Valid only on AX.25 and Telnet sessions.  When 
 through, the program will send the message, "Uploading off".
 
-6.3.48.  vcircuit [add|drop|attach]
+6.3.48.  vattrib bold|reverse|none|color <hex#>
 
-The vcircuit command is used to manipulate incoming packets so you can use 
-the ROSE transport scheme to send and receive IP datagrams.  IP stations 
-on each end of a circuit must agree on the specific ROSE circuit and 
-configure their ends in agreement with each other for IP datagrams from 
-ROSE switches to be properly recognized and responded to.  The vcircuit 
-add and drop commands are used to manage a table for incoming packets and 
-the vcircuit attach command (in conjunction with arp add and route add) is 
-used to manage outgoing packets.  (It is not necessary that packets going 
-both directions between stations follow the same path.) The vcircuit 
-command without arguments returns a table of IP station calls unless the 
-table is empty.
-
-6.3.48.1.  vcircuit add <remote IP call>
-
-The vcircuit add command is used to add up to ten IP station calls to the 
-virtual circuit table.  Use the remote IP station's AX.25 call, not his 
-host name, in this command.  SSID of the distant station is significant.
-
-An example of the vcircuit add command used to recognize packets from 
-kb0qj-10 who will be coming in on a ROSE is:
-
-   vcircuit add kb0qj-10
-
-6.3.48.2.  vcircuit drop <remote IP call>
-
-Vcircuit drop is used to drop a call from the virtual circuit table.  If a 
-call had been added to table with the vcircuit add command example above, 
-it would be dropped with:
-
-   vcircuit drop kb0qj-10
-
-6.3.48.3.  vcircuit attach <VC iface> <async iface>
-
-If you want to use the ROSE transport method, and you don't want to 
-dedicate your async interface to virtual circuit (VC, or "connected") 
-mode, attach a pseudo virtual circuit interface, with the vc attach 
-command.  The pseudo interface has almost all attributes of the 
-asynchronous interface to which it is attached except it will send packets 
-in the VC mode.  A maximum of four pseudo VC interfaces can be attached.
-
-If you only have one async interface attached, called ax0, I you can 
-simply use the command:
-
-        vcircuit attach vc0 ax0
-
-See Chapter 5 for more vcircuit attach examples.
-
-(The vcircuit attach command causes some predictable side effects to other 
-services using AX.25.  Some examples:  When tracing packets on an inter- 
-face involved in the VC attach process, you must trace both the VC 
-interface and the base interface because received packets will occasional- 
-ly appear on the base interface; you will be unable to access the other 
-stations's AX.25 mbox over the same route, using the "ax25 mycall", if 
-vcircuit is enabled (You can use the mboxcall though); netrom should be 
-attached to the vcircuit iface in preference to the natural iface, though 
-you can attach to both, in which case netrom nodefilter commands must be 
-duplicated and node broadcast would be sent twice, once on each interface.  
-These side effects are not serious and are considered acceptable 
-alternatives to adding gobs of code to achieve the marginal benefit of 
-using ROSE.)
-
-The name you choose for the VC interface is used in the "route add" 
-command to cause outgoing packets to use VC.  Use the "arp add" command to 
-specify the connect string to initiate a ROSE circuit to the destination 
-station.
-
-The vc add command can be used before the vc attach command but you will 
-be warned that the vc is not yet attached.  Without the vc attach command, 
-calls in the vc table will be ineffective.
+(MS-DOS only)  If CUTE_VIDEO was defined when your NET was compiled,  
+Incoming AX.25, NET/ROM, or telnet terminal data can appear with an 
+alternate video attribute; either bold (highlighted), reverse video, or 
+with colors of your choice if you are so equipped.  The vattrib command 
+permits changing video attributes of displayed incoming characters.  Bold 
+is the default that was selected at compile time.  (What you see on a 
+couple of lines of the startup screen is the alternate video attribute 
+that was selected before compiling.  In color it may show up as bright 
+white on blue background.)
+  
+Reverse will probably show up as black characters on white background.  If 
+you want to experiment, use the color argument, followed by a pair of hex 
+characters, e.g. vattrib c 1f.  The "1" sets the background to blue on a 
+color monitor, black on a monochrome.  The "f" sets the foreground to 
+bright white.  You can probably find numbers that will make the display 
+look pretty odd, or even disappear.  You can recover by using vattrib b, 
+r, or n.  I used use the IBM PC BIOS routines which should be compatible 
+with windowing environments, but I didn't attempt to make the process 
+foolproof.  For example, during trace of a session, an incomplete line at 
+the bottom of the screen will cause a scroll when the next line arrives 
+from trace, and the screen from then on will be in the alternate attri- 
+bute.  However, the next time you escape to the command prompt normal 
+video should resume.  NET should preserve and display the color attributes 
+you chose before starting.

@@ -1,5 +1,5 @@
 /* options.h contains more commonly changed options.  config.h contains the
- * rest.  DRSI and EKISSPORT, if defined here, will ensure AX25 is defined
+ * rest.  DRSI and MDKISSPORT, if defined here, will ensure AX25 is defined
  * even though it is normally defined in config.h.
  * Note that DRSI, COMBIOS, PACKET, SERIALTEST and the video attributes,
  * except for CUTE_VIDEO, not apply to Unix.  See also unixopt.h for Unix.
@@ -18,7 +18,7 @@
  * with the G8BPQ scheme, and to some extent with Ethernet packet driver.
  * Should work with Baycom.  Adds 2552 bytes */
 #undef	PACKET
-#undef SERIALTEST /* SERIALTEST only applies to MS-DOS; counts rx overruns */
+#define SERIALTEST /* SERIALTEST only applies to MS-DOS; counts rx overruns */
 			/* on serial port.  Costs 178 bytes */
 
 /* In the following, use attribute bit pattern, xbbbifff, where bbb is
@@ -52,19 +52,17 @@
 
 /* The following are for all operating systems */
 
-#define	EKISSPORT /* Extended KISS driver, up to 16 pseudo ports, 1016 bytes */
+#define	MDKISSPORT /* Multidrop KISS, up to 16 pseudo ports, 1016 bytes */
 #define	MULPORT /* Grapes Multiport code - adds 1398 bytes */
 #define	AX25_HEARD /* Heard list - adds 3716 bytes */
 #define	CUTE_VIDEO  /* Contrast video on incoming sessions. Adds 484 Bytes */
-#define	TRACE_TIME	/* Trace timestamping */
+#undef	TRACE_TIME	/* Trace timestamping */
 #define	SEG_CMD	/* ax25 segment command */
+#define	REWRITE	/* rewrite.net file for smtp server */
+#define	REWRITECMD	/* rewrite command for testing rewrite.net */
 
 
-#ifdef _OSK
-#undef	CUTE_VIDEO  /* Can't do it */
-#endif
-
-#if defined(DRSI) || defined(EKISSPORT) || defined(COMBIOS) || defined(PACKET)
+#if defined(DRSI) || defined(MDKISSPORT) || defined(COMBIOS) || defined(PACKET)
 #define AX25
 #endif
 
@@ -86,7 +84,7 @@
 #endif
 
 /* Edit this attach display to suit the hardware you have chosen.  Note that
- * the [port] arg only applies with EKISSPORT defined.  Maximum configuration
+ * the [port] arg only applies with MDKISSPORT defined.  Maximum configuration
  * would have slip|ax25|nrs for the hardware type.
  */
 
@@ -104,7 +102,9 @@
  */
 
 /*
+This is exactly centered
 #define	CUSTOM " Custom version for Bob, W6SWE \n"
 */
-#undef CUSTOM
+#undef	CUSTOM
+
 #endif /* GOT_OPTH */

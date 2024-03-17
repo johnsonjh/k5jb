@@ -53,7 +53,7 @@ ax_mbx.o:	./options.h	./config.h	/usr/include/string.h\
 cmdparse.o:	/usr/include/stdio.h	/usr/include/ctype.h\
 	./global.h	./cmdparse.h
 
-ekiss.o:	./options.h	./config.h	/usr/include/stdio.h\
+mdkiss.o:	./options.h	./config.h	/usr/include/stdio.h\
 	/usr/include/string.h	./global.h	./mbuf.h	./ax25.h\
 	./slip.h	./asy.h	./iface.h	./kiss.h	./trace.h	./netuser.h\
 	./timer.h	./tcp.h

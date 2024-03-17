@@ -2,11 +2,17 @@
  * This is pretty complex because I compile for a bunch who want custom
  * versions.  Unix/Coherent and MS-DOS version.c are different.
  * This is for Unix/Coherent
+ * If you change versionf[], I suggest you leave the first part of the
+ * string alone for future trouble shooting purposes.  Add your own suffix
+ * if you want, but keep the total string length LESS THAN the array size.
+ * In fact, get carried away with the length of this and your startup
+ * screen will be ugly.
  */
 #include "options.h"
 #include "config.h"
 
-char versionf[] = "K5JB.k34c";	/* for FTP and the mbox's use */
+char versionf[28] = "K5JB.k35c";	/* for FTP and the mbox's use */
+
 void
 version()
 {
@@ -33,8 +39,8 @@ version()
 
 /* Twiddle things here for cosmetics. */
 
-#ifdef EKISSPORT
-	printf("\n%sEKISS",margin);
+#ifdef MDKISSPORT
+	printf("\n%sMDKISS",margin);
 #endif
 #ifdef MULPORT
 	printf(", Mulport");

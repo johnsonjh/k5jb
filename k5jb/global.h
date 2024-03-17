@@ -40,6 +40,11 @@
 #define strrchr rindex
 char *strtok();
 #else
+/* for later Coherent compiler's benefit */
+#ifdef COH386
+#undef index
+#undef rindex
+#endif
 #define index strchr
 #define rindex strrchr
 #endif
@@ -125,6 +130,7 @@ long	ptr2long();			/* for fuzzy segment addresses */
 #define index	strchr
 #endif
 
+#define CMARK versionf
 /* Heavily used functions from the standard library */
 char *index(),*rindex(),*malloc(),*calloc(),*tmpnam();
 

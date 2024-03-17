@@ -20,11 +20,9 @@
 #define	FLOW		/* Enable local tty flow control */
 #define	_FINGER		/* Enable Finger - was in makefile - adds 2924 bytes */
 #define	NETROM		/* NET/ROM network support - adds 20856 bytes */
-#undef	NR_VERBOSE	/* Able to send contents of NET/ROM table 766 bytes */
 #define	SEGMENT		/* NOS type ax25 frame segmentation - adds 556 bytes */
 #define	CUTE_FTP	/* a logon assistant in ftpcli, adds 270 bytes */
-#define	AX_VERS_DEFAULT V1	/* Alternate: V2. If undefined, will do V1 */
-#undef	POLITE		/* Control whether chat sessions interrupt us */
+#define	AX_VERS_DEFAULT V2	/* Alternate: V1. If undefined, will do V1 */
 
 /* edit these as you see fit.  main.c was getting to be a mess */
 /* Typical ones shown here for Unix and MS-DOS */
@@ -44,7 +42,7 @@
 /* see options.h for commonly changed options:
 
 	DRSI			DRSI standard driver
-	EKISSPORT	Extended KISS driver for up to 16 ports
+	MDKISSPORT	Extended KISS driver for up to 16 ports
 	MULPORT		Grapes Multiport code
 	AX25_HEARD	A "heard" and "jheard" function
 	PACKET		Sufficient FTP Corp. packet driver to do G8BPQ, apparently
@@ -69,7 +67,7 @@
 #define  PACKET
 #endif
 
-/* note that if DRSI, COMBIOS, PACKET, or EKISSPORT defined in options.h,
+/* note that if DRSI, COMBIOS, PACKET, or MDKISSPORT defined in options.h,
  * AX25 will be defined
  */
 

@@ -10,6 +10,7 @@
 #endif
 #include <ctype.h>
 #include <string.h>
+#include "options.h"
 #include "global.h"
 #include "mbuf.h"
 #include "netuser.h"
@@ -24,6 +25,14 @@ int validate_address();
 long get_msgid();
 struct list *addlist();
 struct list * expandalias();
+#ifdef REWRITE
+#define RWBUFLEN 80
+#define TRUE 1
+#define FALSE 0
+
+char *rewrite_address();
+int dorewrite();
+#endif
 
 /* Command table */
 static char *commands[] = {
@@ -57,9 +66,12 @@ static char ourname[] = "250 %s, Share and Enjoy!\015\012";
 static char enter[] = "354 Enter mail, end with .\015\012";
 static char ioerr[] = "452 Temp file write error\015\012";
 static char mboxerr[] = "452 Mailbox write error\015\012";
-static char badcmd[] = "500 No speakee Zulu\015\012";
+static char badcmd[] = "500 Say WHAT??\015\012";
+#ifdef notdef
 static char syntax[] = "501 Syntax error\015\012";
-static char needrcpt[] = "503 Need RCPT (recipient)\015\012";
+#endif
+static char badfrom[] = "503 Bad originator\015\012";	/* k35a */
+static char needrcpt[] = "503 Bad recipient\015\012";
 static char unknown[] = "550 <%s> address unknown\015\012";
 
 static struct tcb *smtp_tcb;
@@ -257,6 +269,9 @@ register struct mail *mp;
 	FILE *tmpfile();
 	time_t t;
 	char address_type;
+#ifdef REWRITE
+	char *newaddr, buf[RWBUFLEN];
+#endif
 
 	cmd = mp->buf;
 	if(mp->cnt < 4){
@@ -308,8 +323,8 @@ register struct mail *mp;
 			break;
 		} else {
 			if((cp = getname(arg)) == NULLCHAR){
-				(void) tprintf(mp->tcb,syntax);
-				break;
+				(void) tprintf(mp->tcb,badfrom);
+				break;	/* memory leak here?  Note mp->from now unused */
 			}
 			strcpy(mp->from,cp);
 			(void) tprintf(mp->tcb,ok);
@@ -319,12 +334,19 @@ register struct mail *mp;
 		(void) tprintf(mp->tcb,closing);
 		close_tcp(mp->tcb);
 		break;
-	case RCPT_CMD:  /* Specify recipient */
+	case RCPT_CMD:  /* Specify recipient - corrected getname, added 2 tests */
 		if((cp = getname(arg)) == NULLCHAR){
-			(void) tprintf(mp->tcb,syntax);
+			(void) tprintf(mp->tcb,needrcpt);	/* was syntax - k35a */
 			break;
 		}
 
+#ifdef REWRITE
+		if((newaddr = rewrite_address(cp)) != NULLCHAR){
+			strcpy(buf,newaddr);
+			cp = buf;
+			free(newaddr);
+		}
+#endif
 		/* check if address is ok */
 		if ((address_type = validate_address(cp)) == BADADDR) {
 			(void) tprintf(mp->tcb,unknown,cp);
@@ -376,7 +398,10 @@ register struct mail *mp;
 }
 
 /* Given a string of the form <user@host>, extract the part inside the
- * brackets and return a pointer to it.
+ * brackets and return a pointer to it.  Wasn't working.  If it is null
+ * we want to return null pointer.  While we are at it, reject "@host"
+ * or " @host", "host" can be interpreted as "user" and error handled
+ * later in mailing cycle. - k35a
  */
 static
 char *
@@ -391,6 +416,8 @@ register char *cp;
 	if((cp1 = strchr(cp,'>')) == NULLCHAR)
 		return NULLCHAR;
 	*cp1 = '\0';
+	if(*cp == '\0' || *cp == '@' || *cp == ' ')	/* k35a */
+		return NULLCHAR;
 	return cp;
 }
 
@@ -603,7 +630,7 @@ char *s;
 		cp++;
 		/* 1st check if its our hostname
 		 * if not then check the hosts file and see
-		 * if we can resolve ther address to a know site
+		 * if we can resolve ther address to a known site
 		 * or one of our aliases
 		 */
 		if (strcmp(cp,hostname) != 0) {
@@ -622,10 +649,11 @@ char *s;
 		return LOCAL;
 
 	/* check for the user%host hack */
-	if ((cp = strchr(s,'%')) != NULLCHAR) {
+	/* k35 changed from strchr() so user%host2%host2@host would work */
+	if ((cp = strrchr(s,'%')) != NULLCHAR) {
 		*cp = '@';
 		cp++;
-	/* reroute based on host name following the % separator */
+		/* reroute based on host name following the % separator */
 		if (mailroute(cp) == 0)
 			return BADADDR;
 		else
@@ -854,3 +882,142 @@ char *user;
 	/* no alias found treat as a local address */
 	return addlist(head, user, LOCAL);
 }
+
+#ifdef REWRITE	/* swiped from NOS */
+
+static int
+Star(s,p,argv)
+register char *s;
+register char *p;
+register char **argv;
+{
+	int splatmat();
+
+	char *cp = s;
+	while (splatmat(cp, p, argv) == FALSE)
+		if(*++cp == '\0')
+			return -1;
+	return (int)(cp - s);
+}
+
+/* shortened the RE pattern matcher here to only what we need - K5JB */
+int
+splatmat(s,p,argv)
+register char *s;
+register char *p;
+register char **argv;
+{
+	register int cnt;
+
+	for(; *p; s++,p++){
+		switch(*p){
+			default:
+				if(*s != *p)
+					return FALSE;
+			continue;
+		case '*':
+			/* Trailing star matches everything. */
+			if(argv == (char **)0)
+				return *++p ? 1 + Star(s, p, (char **)0) : TRUE;
+			if(*++p == '\0')
+				cnt = strlen(s);
+			else
+				if((cnt = Star(s, p, argv+1)) == -1)
+					return FALSE;
+			*argv = malloc(cnt+1);
+			strncpy(*argv,s,cnt);
+			*(*argv + cnt) = '\0';
+			return TRUE;
+		}
+	}
+	return *s == '\0';
+}
+
+/* Read the rewrite file for lines where the first word is a regular
+ * expression and the second word are rewriting rules. The special
+ * character '$' followed by a digit denotes the string that matched
+ * a '*' character. The '*' characters are numbered from 1 to 9.
+ * Example: the line "*@*.* $2@$1.ampr.org" would rewrite the address
+ * "foo@bar.xxx" to "bar@foo.ampr.org".
+ * $H is replaced by our hostname, and $$ is an escaped $ character.
+ * If the third word on the line has an 'r' character in it, the function
+ * will recurse with the new address.
+ */
+char *
+rewrite_address(addr)
+char *addr;
+{
+	char *argv[10], buf[RWBUFLEN], *cp, *cp2, *retstr;
+	int cnt;
+	FILE *fp;
+	extern char hostname[],*Rewritefile;
+	void rip();
+
+	if ((fp = fopen(Rewritefile,"rt")) == NULLFILE)
+		return NULLCHAR;
+
+	memset((char *)argv,0,10*sizeof(char *));
+	while(fgets(buf,sizeof(buf),fp) != NULLCHAR) {
+		if(*buf == '#')	 /* skip commented lines */
+			continue;
+
+		if((cp = strchr(buf,' ')) == NULLCHAR) /* get the first word */
+			if((cp = strchr(buf,'\t')) == NULLCHAR)
+				continue;
+		*cp = '\0';
+		if((cp2 = strchr(buf,'\t')) != NULLCHAR){
+			*cp = ' ';
+			cp = cp2;
+			*cp = '\0';
+		}
+		if(!splatmat(addr,buf,argv))
+			continue;	   /* no match */
+		rip(++cp);
+		/* scan past additional whitespaces */
+		while (*cp == ' ' || *cp == '\t') ++cp;
+		cp2 = retstr = (char *) calloc(1,RWBUFLEN);
+		while(*cp != '\0' && *cp != ' ' && *cp != '\t')
+			if(*cp == '$'){
+				if(isdigit(*(++cp)))
+					if(argv[*cp - '0'-1] != '\0')
+						strcat(cp2,argv[*cp - '0'-1]);
+				if(*cp == 'h' || *cp == 'H') /* Our hostname */
+					strcat(cp2,hostname);
+				if(*cp == '$')  /* Escaped $ character */
+					strcat(cp2,"$");
+				cp2 = retstr + strlen(retstr);
+				cp++;
+			}else
+				*cp2++ = *cp++;
+		for(cnt=0; argv[cnt] != NULLCHAR; ++cnt)
+			free(argv[cnt]);
+		fclose(fp);
+		/* If there remains an 'r' character on the line, repeat
+		 * everything by recursing.
+		 */
+		if(strchr(cp,'r') != NULLCHAR || strchr(cp,'R') != NULLCHAR) {
+			if((cp2 = rewrite_address(retstr)) != NULLCHAR) {
+				free(retstr);
+				return cp2;
+			}
+		}
+		return retstr;
+	}
+	fclose(fp);
+	return NULLCHAR;
+}
+
+#ifdef REWRITECMD	/* smtp EXPN can be used instead of this - K5JB */
+int
+dorewrite(argc,argv)
+int argc;
+char *argv[];
+{
+	char *address = rewrite_address(argv[1]);
+	printf("to: %s\n", address ? address : argv[1]);
+	if(address)
+		free(address);
+	return 0;
+}
+#endif /* REWRITECMD */
+#endif /* REWRITE */

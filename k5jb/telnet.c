@@ -17,8 +17,6 @@
 #include "finger.h"
 #include "nr4.h"
 
-#define	CTLZ	26
-
 extern char nospace[];
 extern char badhost[];
 int refuse_echo = 0;
@@ -54,7 +52,6 @@ char *argv[];
 	struct telnet *tn;
 	struct tcb *tcb;
 	struct socket lsocket,fsocket;
-
 
 	lsocket.address = ip_addr;
 	lsocket.port = lport++;
@@ -116,7 +113,8 @@ int16 n;
 	}
 	send_tel(buf,n);
 }
-int
+
+int	/* return value ignored */
 send_tel(buf,n)
 char *buf;
 int16 n;
@@ -141,12 +139,11 @@ register struct telnet *tn;
 struct mbuf *bp;
 {
 	char c;
-	void doopt(),dontopt(),willopt(),wontopt(),answer();
-	int term_recv();
+	void doopt(),dontopt(),willopt(),wontopt(),term_recv();
 
 	/* Optimization for very common special case -- no special chars */
-	if(tn->state == TS_DATA){
-		if(!term_recv(bp,tn->session->record,1));
+	if(tn->state == TS_DATA && memchr(bp->data,IAC,bp->cnt) == NULLCHAR){
+		term_recv(bp,tn->session->record);
 		return;
 	}
 	/* got here if TS_DATA if there was an IAC in the buf */
@@ -279,9 +276,6 @@ char unused,new;
 	extern char *reasons[];
 	extern char *unreach[];
 	extern char *exceed[];
-#ifdef HOLD
-	extern int noprompt;
-#endif
 
 	/* Can't add a check for unknown connection here, it would loop
 	 * on a close upcall! We're just careful later on.
@@ -301,10 +295,6 @@ char unused,new;
 		close_tcp(tcb);
 		break;
 	case CLOSED:	/* court adjourned */
-#ifdef HOLD
-		if(tcb->reason == RESET)
-			noprompt = 1;	/* k35 */
-#endif
 		if(notify){
 			printf("%s (%s",tcpstates[new],reasons[tcb->reason]);
 			if(tcb->reason == NETWORK){
@@ -328,27 +318,16 @@ char unused,new;
 			printf("%s\n",tcpstates[new]);
 		break;
 	}
-#ifdef DEBUG
-printf("new: %s mode: %s\n",tcpstates[new],current->cb.telnet == tn ? "CURRENT" : "NOTCURRENT");
-fflush(stdout);
-#endif
-#ifdef OLD
-	if(notify && !(new == SYN_SENT || new == ESTABLISHED ||
-			new == FINWAIT1 || new == CLOSE_WAIT || new == LAST_ACK))
-		cmdmode();	/* mostly doing this for the prompts k35 */
-#else
 	if(notify)
 		switch(new){
 			case SYN_SENT:
 			case ESTABLISHED:
-/*			case FINWAIT1: */
 			case CLOSE_WAIT:
 			case LAST_ACK:
 				break;
 			default:
 				cmdmode();	/* mostly doing this for the prompts k35 */
 		}
-#endif
 	fflush(stdout);
 }
 /* Delete telnet structure */
@@ -388,6 +367,7 @@ char opt;
 		if(tn->remote[uchar(opt)] == 1)
 			return;		/* Already set, ignore to prevent loop */
 		if(uchar(opt) == TN_ECHO){
+			fflush(stdout);	/* k35a */
 			if(refuse_echo){
 				/* User doesn't want to accept */
 				ack = DONT;
@@ -396,13 +376,14 @@ char opt;
 				raw();		/* Put tty into raw mode */
 		}
 		tn->remote[uchar(opt)] = 1;
-		ack = DO;			
+		ack = DO;
 		break;
 	default:
 		ack = DONT;	/* We don't know what he's offering; refuse */
 	}
 	answer(tn,ack,opt);
 }
+
 void
 wontopt(tn,opt)
 struct telnet *tn;
@@ -426,6 +407,7 @@ char opt;
 	}
 	answer(tn,DONT,opt);	/* Must always accept */
 }
+
 void
 doopt(tn,opt)
 struct telnet *tn;
@@ -454,6 +436,7 @@ char opt;
 	}
 	answer(tn,ack,opt);
 }
+
 void
 dontopt(tn,opt)
 struct telnet *tn;
@@ -477,6 +460,7 @@ char opt;
 	}
 	answer(tn,WONT,opt);
 }
+
 static
 void
 answer(tn,r1,r2)
@@ -512,5 +496,45 @@ int r1,r2;
 	s[2] = r2;
 	bp = qdata(s,(int16)3);
 	send_tcp(tn->tcb,bp);
+}
+
+int
+doecho(argc,argv)
+int argc;
+char *argv[];
+{
+	extern int refuse_echo;
+
+	if(argc < 2){
+		if(refuse_echo)
+			printf("Refuse\n");
+		else
+			printf("Accept\n");
+	} else {
+		if(argv[1][0] == 'r')
+			refuse_echo = 1;
+		else if(argv[1][0] == 'a')
+			refuse_echo = 0;
+		else
+			return -1;
+	}
+	return 0;
+}
+
+/* set for unix end of line for remote echo mode telnet */
+doeol(argc,argv)
+int argc;
+char *argv[];
+{
+	extern int unix_line_mode;
+
+	if(argc < 2)
+		printf("%s\n",unix_line_mode ? "Unix" : "Standard");
+	else
+		if(!(argv[1][0] == 'u' || argv[1][0] == 's'))
+			return -1;
+		else
+			unix_line_mode = argv[1][0] == 'u' ? 1 : 0;
+	return 0;
 }
 #endif /* _TELNET */

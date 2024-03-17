@@ -5,11 +5,17 @@ you are using the MS-DOS version on an IBM PC or clone and you have
 configured your files as suggested in Chapter 2.  Also, we assume a TNC 
 has been set up as interface 'ax0'.
 
-Start by typing 'NET' to get the program up and running.  You should be 
+Start by typing 'net' to get the program up and running.  You should be 
 presented with a banner including revision information and copyright 
-statements, followed by a prompt of 'net>'.  If you don't get this, some- 
-thing is horribly wrong.  Go back and check the installation instructions 
-in Chapter 2 or find a friend and ask for help.
+statements, followed by a prompt of 'NET>'.  You may get some "Note:", 
+"Warning:", or "Error:" messages if some of the expected files or 
+directories are missing or incorrect.  Notes relate to files that a normal 
+NET installation would have to be complete.  Warnings relate to files that 
+are necessary for NET to operate as you would expect.  Errors relate to 
+required directories and will stop NET's execution so you can correct 
+them.  If NET doesn't start in this manner, something is horribly wrong.  
+Go back and check the installation instructions in Chapter 2 or find a 
+friend and ask for help.
 
 If you set up the files and environmental variables as recommended in 
 Chapter 2, you can run NET from any directory or drive on your computer.  
@@ -65,7 +71,7 @@ without closing the session, type "record off".  Record works in any
 session except FTP (File Transfer Protocol).  See Chapter 6.
 
 When you're ready to disconnect, use the <F10> key to escape from the 
-session back to the 'net>' prompt, and then type 'disconnect'.  You will 
+session back to the 'NET>' prompt, and then type 'disconnect'.  You will 
 discover that all commands can be abbreviated, and you can type a "d" to 
 get the same results as "disconnect".
 
@@ -169,6 +175,11 @@ continue to ask for these two things until you either get them right, or
 escape back to the command prompt and close the session.  In MS-DOS, 
 escape with F-10 key.  In Unix use your defined escape key.
 
+Note:  It is undesirable to escape to the command prompt while at the 
+password prompt because your keystrokes aren't echoed.  If you do this, 
+they won't resume echoing until you complete an FTP to yourself, or stop 
+and restart NET.
+
 Try ftp with yourself as host, and when you get logged in, try,
 
   get /net/autoexec.net con
@@ -217,24 +228,30 @@ in Chapter 6.  For example:
 Note that you also have control over whether tracing can bother you in a 
 session, see the trace command summary in Chapter 6 for more details.
 
-.pa
 3.8. Unix and shell layers
 
 If you are running this under Unix, there are provisions to run it in the 
-background with the shell layer manager.  This enables you to run NET, run 
-BM, or send a letter to your grandmother, from one terminal without 
-interrupting NET.  To use it invoke the shell layer manager, shl.  At the 
->>> prompt, create a shell with "c".  It will return with the first layer 
-prompt, "(1)" and you can start NET.
+background either with the shell escape (!) or with the shell layer 
+manager.  This enables you to run NET, run BM, or send a letter to your 
+grandmother, from one terminal without interrupting NET.  To use the 
+shell, just enter a ! or the shell command.  When you shell out of NET a 
+child process is created to wait for you to return from the shell and the 
+parent process continues to run.   When you "exit" or do Ctrl-D to return 
+to NET, the child process is killed.
 
-Before you put NET in the background you must first disable its keyboard 
-input by issuing a Ctrl-\ (Ctrl-backslash) and NET will respond that it is 
-OK to go in background.  Use Ctrl-Z (or the "swtch" character defined in 
-your environment) to get the shl prompt, >>>.  Now you can create another 
-shell with the "c" command or switch to an already running one.  Net is 
-still running and if you left trace on, or someone fingers you, NET's 
-output will appear on your screen even if you are in another shell layer.  
-Don't tell shl to block this or NET will suspend when it has output.
+To use the shell layer manager invoke shl.  At the >>> prompt, create a 
+shell with "c".  It will return with the first layer prompt, "(1)" and you 
+can start NET.
+
+With shl, before you put NET in the background you must first disable its 
+keyboard input by issuing a Ctrl-\ (Ctrl-backslash) and NET will respond 
+that it is OK to go in background.  Use Ctrl-Z (or the "swtch" character 
+defined in your environment) to get the shl prompt, >>>.  Now you can 
+create another shell with the "c" command or switch to an already running 
+one.  NET is still running and if you left trace on, or someone fingers 
+you, NET's output will appear on your screen even if you are in another 
+shell layer.  Don't tell shl to block this or NET will suspend when it has 
+output.
 
 When you are ready to send commands to NET, go to that shell layer and 
 issue another Ctrl-\ which will signal NET to restart scanning for input.  

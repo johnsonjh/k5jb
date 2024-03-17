@@ -1,12 +1,12 @@
-/* This is a special verion of telunix.c (telunix.c3) that I use with my
- * 3B2's pty driver with blocks on read of the master pty.  It spawns a
- * child process that does the read and feeds a pipe.  For Coherent, and
- * other Unixes use telunix.c1, the normal distribution version.
- * Currently only one login permitted at a time.
+/* This version of telunix.c is the one that should be used with Unix
+ * systems that have normal ptys on them.  My AT&T 3B2 has brain-damaged
+ * pty driver so I had to booger telunix.c to get it to work.  Often I
+ * distribute the NET package with the wrong telunix.c in it.  If this
+ * is the case, replace the telunix.c in the package with this one.
  *
- * It will work in Coherent.  Set up ttyp0, ttyp1 and ttyp2 in /etc/ttys
- * (I used 1lPttyp0, for example), do a kill quit 1, and use the start
- * telunix command.
+ * This version of telunix.c will work in Coherent.  Set up ttyp0, ttyp1
+ * and ttyp2 in /etc/ttys (I used 1lPttyp0, for example), do a kill quit 1,
+ * and use the start telunix command.
  * Users can be provided with a .profile that does stty -echo.  They will
  * have to use "eol unix" or they will get double prompts.  If you start
  * telunix with the default port (513), a user would do telnet yourhostname 513
@@ -26,23 +26,9 @@
 #include "telnet.h"
 #include "session.h"
 #include <errno.h>
-#include <fcntl.h>
-#ifdef PTY_PIPE
-#include <signal.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <termio.h>
+#include <fcntl.h>	/* one uploaded to ucsd.edu 2/8/92 used sys/fcntl.h */
 
-int pipefd[2];
-int pipepid;
-extern int exitval;
-#endif
-
-#ifdef PTY_PIPE
-#define TUMAXSCAN 1	/* only want to deal with one forked processe */
-#else
 #define TUMAXSCAN 3	/* max number of telunix clients active */
-#endif
 #define TURQSIZ	512	/* max data we will request from pty at once */
 
 struct tcb *tnix_tcb = NULLTCB;
@@ -53,13 +39,6 @@ OpenPty()
 {
 	int		pty;
 	int		letcnt=0, numcnt=0;
-
-#ifdef PTY_PIPE	/* only going to do one of these */
-	static int onlypty;
-	void proc_recv();
-	int ptyflg;
-	struct termio iopty;
-#endif
 
 /* we will sort these out after I find out what is common - K5JB */
 
@@ -75,11 +54,6 @@ OpenPty()
 #endif
 #endif
 	static int	letmax, nummax;
-
-#ifdef PTY_PIPE	/* are only having one pty open on this thing */
-	if(onlypty)
-		return onlypty;
-#endif
 
 	letmax=strlen(letters)-1, nummax=strlen(numbers)-1;
 	do {
@@ -97,52 +71,8 @@ OpenPty()
 			numcnt = 0;
 		} 
 	} while ((pty=open(master, O_RDWR | O_NDELAY)) < 0);
-#ifdef PTY_PIPE	/* only going to do one of these */
-	if(!pipepid){	/* only going to let this happen once */
-		if(pipe(pipefd) == -1)
-			return -1;
-		if(!(pipepid = fork()))	/* start the receive daemon */
-			proc_recv(pty);	/* child process won't return */
-	}
-	onlypty = pty;
-#endif
 	return(pty);
 }
-
-#ifdef PTY_PIPE
-/* This in necessary because my brain-damaged pty driver blocks on
- * read of the master port.
- */
-
-void
-proc_recv(pty)
-int pty;
-{
-#define RBUFSIZ 256 /* probably way too much */
-	char ch[RBUFSIZ];
-	int r,thispty;
-
-#ifdef PTY_PIPE
-	(void) signal(SIGQUIT,SIG_IGN);	/* SIGQUIT is a Ctrl \ */
-#endif
-
-	thispty = dup(pty);	/* patchwork */
-	close(pty);
-	for(;;){
-#ifdef IGNORE
-		if((r = read(thispty,ch,RBUFSIZ)) == -1){
-			printf("Bad pty read - ignored");
-			exitval = 1;
-			doexit();	/* check this out */
-		}
-#endif
-		r = read(thispty,ch,RBUFSIZ);
-
-		if(r > 0)
-			write(pipefd[1],ch,r);
-	}
-}
-#endif
 
 /* Start telnet-unix server */
 int
@@ -158,9 +88,7 @@ char *argv[];
 
 	if((fd = OpenPty()) == -1)
 		return -1;
-#ifndef PTY_PIPE
 	close(fd);
-#endif
 
 	lsocket.address = ip_addr;
 
@@ -206,12 +134,6 @@ char old,new;
 	extern int del_tcp();
 	extern int close_tcp();
 	extern void free();
-#ifdef PTY_PIPE
-	char junk;
-	char *login = "\0x0a";
-	char *logout = "@";
-	struct stat s;
-#endif
 
 	tn = (struct telnet *)tcb->user;
 
@@ -239,14 +161,6 @@ char old,new;
 			close_tcp(tcb);
 			return;
 		}
-#ifdef PTY_PIPE	/* flush old login prompts */
-		fstat(pipefd[0],&s);
-		while(s.st_size--)
-			read(pipefd[0],&junk,1);
-#endif
-#ifdef PTY_PIPE
-		write(tn->fd,login,1);
-#endif
 		log(tcb,"open Telunix - (%d %x %d %d)",tn->fd,tcb,old,new);
 		break;
 
@@ -259,13 +173,8 @@ char old,new;
 		   tn->fd > 2) {
 			log(tcb,"close Telunix - (%d %x %d %d)",
 				tn->fd,tcb,old,new);
-#ifndef PTY_PIPE
 			close(tn->fd);
 			tn->fd = 0;
-#endif
-#ifdef PTY_PIPE
-			write(tn->fd,logout,2);
-#endif
 		}
 		tnix_rmvscan(tcb);
 		break;
@@ -286,10 +195,8 @@ char old,new;
 			if(tn->fd > 2) {
 				log(tcb,"close Telunix - (%d %x %d %d)",
 					tn->fd,tcb,old,new);
-#ifndef PTY_PIPE
 				close(tn->fd);
 				tn->fd = 0;
-#endif
 			}
 			if(tn->inbuf != NULLBUF)
 				free_p(tn->inbuf);
@@ -317,9 +224,6 @@ register struct tcb *tcb;
 
 	register struct telnet *tn;
 	register int i;
-#ifdef PTY_PIPE
-	struct stat s;
-#endif
 
 	if((tn = (struct telnet *)tcb->user) == NULLTN || tn->fd < 3) {
 		/* Unknown connection - remove it from queue */
@@ -347,16 +251,8 @@ register struct tcb *tcb;
 			break;		/* can't do much without a buffer */
 	
 		if(tn->outbuf->cnt < TURQSIZ) {
-#ifdef PTY_PIPE
-			fstat(pipefd[0],&s);
-			if(s.st_size)
-				if((i = read(pipefd[0], tn->outbuf->data + tn->outbuf->cnt,
-					TURQSIZ - (int)tn->outbuf->cnt)) == -1)
-#else
 			if((i = read(tn->fd, tn->outbuf->data + tn->outbuf->cnt,
-				TURQSIZ - (int)tn->outbuf->cnt)) == -1)
-#endif
-			{
+				TURQSIZ - (int)tn->outbuf->cnt)) == -1) {
 #ifdef COH386
 				/* Coherent read() returns -1 on no data available */
 				i = 0;
@@ -365,12 +261,6 @@ register struct tcb *tcb;
 					log(tcb,"error Telunix - read (%d %d %d)",
 						errno, tn->fd, TURQSIZ - tn->outbuf->cnt);
 					close_tcp(tcb);
-#ifdef PTY_PIPE
-					if(pipepid){
-						kill(pipepid,SIGKILL);
-						pipepid = 0;
-					}
-#endif
 					break;
 				}
 			}
@@ -406,29 +296,9 @@ register struct telnet *tn;
 
 	/* Optimization for very common special case -- no special chars */
 	if(tn->state == TS_DATA){
-#ifdef PTY_PIPE
-		char *cp;
-		int j;
-#endif
 		while(bp != NULLBUF &&
 		      memchr(bp->data,IAC,(int)bp->cnt) == NULLCHAR) {
-#ifdef PTY_PIPENOWORK	/* maybe we can eliminate the eol unix command */
-					cp = bp->data;
-					j = bp->cnt;
-					while(j--){
-						if(*cp == 0x0d){
-							*cp++ = 0x0a;
-							if(*cp == 0x0a)
-								*cp = '\0';
-						}else cp++;
-					}
-#endif
-#ifdef LOOKIE
-printf("cnt %d, ",bp->cnt);
-printf("<%c%c%c>",bp->data[0],bp->data[1],bp->data[2]);
-fflush(stdout);
-#endif
-			if((i = write(tn->fd, bp->data, (unsigned)bp->cnt)) == bp->cnt) {
+			if((i = write(tn->fd, bp->data, (int)bp->cnt)) == bp->cnt) {
 				tn->inbuf = bp = free_mbuf(bp);
 			} else if(i == -1) {
 				log(tn->tcb,"error Telunix - write (%d %d %d)",

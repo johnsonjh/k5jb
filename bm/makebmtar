@@ -1,0 +1,2 @@
+tar cvf bmtar *.[ch] bmnote make* readme.os9
+compress bmtar

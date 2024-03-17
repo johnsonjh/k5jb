@@ -1,4 +1,8 @@
 /* OS- and machine-dependent stuff for OSK machines */
+/* Note that I added a couple of type declarations, but otherwise didn't
+ * touch this file - K5JB
+ */
+
 #include <stdio.h>
 #include <sgstat.h>
 #include <modes.h>
@@ -10,8 +14,8 @@
 #define NULLFILE (FILE *)0
 
 #define MAXCMD 80
-struct sgbuf orgsgbufi, orgsgbufo;
-int savedtty=0;
+struct sgbuf orgsgbufi;
+int inrawmode=0;
 
 #ifndef	_UCC
 #define MAXTMP 26
@@ -40,7 +44,7 @@ int setrawmode()
     sbuf.sg_backsp = 0;
     sbuf.sg_delete = 0;
     sbuf.sg_echo = 0;
-    sbuf.sg_alf = 0;
+    sbuf.sg_alf = 1;
     sbuf.sg_nulls = 0;
     sbuf.sg_pause = 0;
     sbuf.sg_page = 0;
@@ -60,48 +64,20 @@ int setrawmode()
 	sbuf.sg_kbich = 0;
 	sbuf.sg_kbach = 0;
 	_ss_opt(0,&sbuf);
-	
 
-	_gs_opt(1,&sbuf);
-    memcpy(&orgsgbufo,&sbuf,sizeof(sbuf));
-    sbuf.sg_case = 0;
-    sbuf.sg_backsp = 0;
-    sbuf.sg_delete = 0;
-    sbuf.sg_echo = 0;
-    sbuf.sg_alf = 1;
-    sbuf.sg_nulls = 0;
-    sbuf.sg_pause = 0;
-    sbuf.sg_page = 0;
-    sbuf.sg_bspch = 0;
-    sbuf.sg_dlnch = 0;
-    sbuf.sg_eorch = 0;
-    sbuf.sg_eofch = 0;
-    sbuf.sg_rlnch = 0;
-    sbuf.sg_dulnch = 0;
-    sbuf.sg_psch = 0;
-    sbuf.sg_bsech = 0;
-    sbuf.sg_bellch = 0;
-    sbuf.sg_xon = 0;
-    sbuf.sg_xoff = 0;
-    sbuf.sg_tabcr = 0;
-    sbuf.sg_tabsiz = 0;
-    sbuf.sg_kbich = 0;
-    sbuf.sg_kbach = 0;
-	_ss_opt(1,&sbuf);
-
-	savedtty=1;
+	inrawmode=1;
 	setbuf(stdin,NULL);
 	return 0;
 }
 
 /* Called just before exiting to restore console state */
+void
 setcookedmode()
 {
-	if (savedtty)
+	if (inrawmode)
 	{
 	_ss_opt(0,&orgsgbufi);
-	_ss_opt(0,&orgsgbufo);
-	savedtty=0;
+	inrawmode=0;
 	}
 }
 
@@ -118,7 +94,8 @@ static struct direct *r;
 
 
 /* wildcard filename lookup */
-void filedir (dirname, times, ret_str)
+void
+filedir (dirname, times, ret_str)
 char *dirname;
 int times;
 char *ret_str;
@@ -161,30 +138,33 @@ doshell(argc,argv)
 int argc;
 char **argv;
 {
-	struct sgbuf sgbufi, sgbufo;
+	struct sgbuf sgbufi;
 	_gs_opt(0,&sgbufi);
-	_gs_opt(1,&sgbufo); 
 	_ss_opt(0,&orgsgbufi);
-	_ss_opt(1,&orgsgbufo);
 	system("");
 	_ss_opt(0,&sgbufi);
-	_ss_opt(1,&sgbufo);
 }
 
-/* This function return one character from the keyboard. It will wait
-* for a character to be input. This function will echo the character.
-* This funtion will return afer each character is typed if raw is set
-* (We really don't need this function - K5JB)
+/* This function is supposed to return one character from the keyboard
+ * waiting until a key is pressed, but with the input in cooked mode
+ * it may not return until a new line is entered.  In Unix I had to
+ * twiddle with the input to get it to return with just one character.
+ * This function is just so we can do the "hit any key to continue" and
+ * the wordwrap thing.  It should not echo the keypress.  K5JB
 */
 int
-getrch()
+getch()
 {
-	int	c;
+	char c;
+	read(0,&c,1);
+/*	
 	c = getchar();
-	return c & 0xff;
+*/
+	return c;
 }
 
 
+void
 setsignals()
 {
 }
@@ -214,8 +194,8 @@ char *s1, *s2;
 }
 
 
-char
-*make_path(path_ptr,file_ptr,slash)
+char *
+make_path(path_ptr,file_ptr,slash)
 char *path_ptr;
 char *file_ptr;
 int slash;

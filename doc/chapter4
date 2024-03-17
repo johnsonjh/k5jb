@@ -15,12 +15,9 @@ extended the mailer creating revision 3. BM provides a full set of mail
 services to the user which allow sending and receiving electronic mail, 
 and perform local mail manipulation.
 
-4.1.1.  Installation
-
 To install BM requires the modification of the supplied configuration 
 files and the creation of the proper directory structure.  The following 
 sections describe the file and directory structure used by BM and SMTP.
-
 
 Note:  The following directory structure matches the rigid structure of 
 older versions of net in MS-DOS.  If you fail to use environmental 
@@ -32,7 +29,7 @@ in the NETHOME directory.  Bm.exe goes wherever it can be found on your
 execution path.  In MS-DOS, you can include drive in a path, e.g. set 
 NETHOME=e:/net.
 
-4.1.1.1.  Directory Structure
+4.1.1.  Directory Structure
 
      \spool\mqueue
 
@@ -54,12 +51,14 @@ NETHOME=e:/net.
      the mailbox name.  Mail received by the SMTP server is appended to 
      the mailbox file.
 
-4.1.1.2.  Configuration File
+4.1.2.  Configuration File
 
 The bm.rc file provides BM with the configuration needed for the operation 
 of the mailer.  It goes in the directory identified by the NETHOME 
 environmental variable, or if NETNOME is not identified, bm.rc goes in 
-root.  The Unix version uses a runtime configuration file named .bmrc.
+root (MS-DOS) or current directory (Unix).
+
+Note: The Unix version uses a runtime configuration file named .bmrc.
 
 The format for the bm.rc file is:
 
@@ -67,42 +66,42 @@ The format for the bm.rc file is:
 
 The following variables are valid in the bm.rc file:
 
-4.1.1.2.1.  edit <path of your editor>
+4.1.2.1.  edit <path of your editor>
 
 Defines the name of your favorite editor which can be used to construct 
 and edit the text of outgoing messages.  The use of edit is optional.  You 
 must provide enough memory to shell out of bm to use the editor.
 
-4.1.1.2.2.  folder <directory name>
+4.1.2.2.  folder <directory name>
 
 If defined, folder contains the path used by the save command.
 
-4.1.1.2.3.  fullname <your full name>
+4.1.2.3.  fullname <your full name>
 
 Is used to provide your full name to the mailer for use in the comment 
 portion of "From:" header line.  The use of fullname is optional.
 
-4.1.1.2.4.  host <your hostname>
+4.1.2.4.  host <your hostname>
 
 Is used to set the local hostname for use in the RFC822 mail headers.  
 This is a required field.  This should match the hostname definition in 
 autoexec.net.  This is the host names others on your network will try to 
-mail to if they use the "reply" command in bm.
+mail to if they use the "reply" command in BM.
 
-4.1.1.2.5.  maxlet <number of messages>
+4.1.2.5.  maxlet <number of messages>
 
 Defines the maximum number of messages that can be processed by BM in one 
 mailbox file.  The default value of maxlet is 100.
 
-4.1.1.2.6.  mbox <filename>
+4.1.2.6.  mbox <filename>
 
 Specifies the default file to be used for the "save" command.  This file 
 is in the same format as a mailbox and may later be viewed using the -f 
 option of BM.  If this option is not used then the default is set to mbox.  
-(This should not be confused with the term, "mbox" often used in 
-conjunction with the AX.25 mail box.)
+(This should not be confused with the term, "mbox" used in conjunction 
+with the AX.25 mail box.)
 
-4.1.1.2.7.  mqueue <path>
+4.1.2.7.  mqueue <path>
 
 Defines the path to the directory containing outgoing mail files.  If you 
 define the environmental variable NETSPOOL, you don't need this command.  
@@ -110,11 +109,11 @@ If you don't use this command and don't define NETSPOOL, bm will use
 \spool\mqueue on the current drive.  This command, if present will 
 override the environmental variable.
 
-4.1.1.2.8.  record <filename>
+4.1.2.8.  record <filename>
 
 If defined, a copy of each message sent will be saved in <filename>.
 
-4.1.1.2.9.  reply <return address>
+4.1.2.9.  reply <return address>
 
 Defines the address where you wish to receive replies to messages sent.  
 This option is useful if you are operating your pc on a local area network 
@@ -123,14 +122,15 @@ address specified by reply is used to generate a "Reply-To:" header in
 outbound mail.  The "Reply-To:" header overrides the "From:" header which 
 is the address normally used to reply to mail.  This field is optional.
 
-4.1.1.2.10.  screen [bios|direct]
+4.1.2.10.  screen [bios|direct]
 
 In the Turbo C compiled version of BM, screen sets the display output mode 
 to use either direct writes to screen memory or the ROM BIOS.  The default 
 is direct which provides the fastest output mode.  If you are using a 
-windowing system such as DESQview you should set the mode to bios.
+windowing system such as DESQview you should set the mode to bios.  (This 
+option may not be included, but use of the command won't cause an error.)
 
-4.1.1.2.11.  smtp <path>
+4.1.2.11.  smtp <path>
 
 Defines the path to the directory (and optionally in MS-DOS, the drive) 
 containing the incoming mail files.  This command is not needed if you 
@@ -138,14 +138,19 @@ defined the environmental variable NETSPOOL.  If you omit this command and
 don't define NETSPOOL, bm will use \spool\mail on the current drive.  This 
 command, if present, will override the environmental variable.
 
-4.1.1.2.12.  user <username>
+4.1.2.12.  user <username>
 
 Defines the user name of the person who is sending mail.  This is also 
 used as the default mailbox for reading mail.  On the AMPRNET this is 
 usually set to your call.  There is a DOS limit of 8 characters for the 
 user name.
 
-4.1.1.2.13.  zone <timezone>
+4.1.2.13.  wordwrap
+
+Unix only.  Line wordwrapping is defaulted off unless you include this 
+command in .bmrc.
+
+4.1.2.14.  zone <timezone>
 
 In non-Unix versions, this command enables BM to add timezone to the mail 
 header.  Timezone is in the form, CST6CDT, for Central Time, PST8PDT, for 
@@ -154,8 +159,7 @@ in the same format, to perform this function.  The MS-DOS version will
 also use this environmental variable, if defined.  If timezone is nowhere 
 defined, BM will add GMT to the message header.
 
-.pa
-4.1.1.2.14.  Example BM.RC File
+4.1.2.15.  Example BM.RC File
 
      host nn2z.ampr
      user dave
@@ -169,7 +173,7 @@ defined, BM will add GMT to the message header.
      folder c:\folder
      maxlet 200
 
-4.1.1.3.  The alias File
+4.1.3.  The alias File
 
 The alias file provides an easy way to maintain mailing lists.  An alias 
 can be any string of characters not containing the "@" symbol.  The format 
@@ -194,15 +198,16 @@ Some examples aliases are:
 In the above example, when specifying nnj as the recipient, BM will expand 
 the alias into the list of recipients from the alias file.  An alias may 
 not contain any other aliases.  Alias goes in the directory identified by 
-NETHOME.  In Unix, the alias file is called "aliases".
+the environmental variable NETHOME.  In Unix, the alias file is called 
+"aliases".
 
-4.1.1.4.  \spool\mqueue\sequence.seq
+4.1.4.  \spool\mqueue\sequence.seq
 
 The sequence file maintains a message counter which is used by BM and SMTP 
 to generate message ids and unique filenames.  This file is created by BM 
 if not already present.
 
-4.1.2.  Environment - Timezone
+4.2.  Environment - Timezone
 
 The timezone used in mail headers is obtained from the DOS environment
 variable TZ.  An example TZ setting is:
@@ -217,15 +222,56 @@ to UTC or your messages will have the wrong time on them.
 
 The NETSPOOL environmental variables have already been mentioned.
 
-4.2.  Commands
+4.3.  Commands
 
 All BM commands are single letters followed by optional arguments.  The 
 command list has been designed to make those familiar with Berkeley 
 mailers comfortable with BM.
 
-4.2.1.  Main Menu Commands
+4.3.1.  Main Menu Commands
 
-4.2.1.1.  m [<userlist>]
+4.3.1.1.  b [<msg>]
+
+Bounce a message.  Bounce is similar to forwarding but instead of your 
+user information, the original sender information is maintained.  If no 
+message number is supplied the current message is used.
+
+4.3.1.2.  d [<msglist>]
+
+Mark messages for deletion.  Messages marked for deletion are removed when 
+exiting BM via the 'q' command or when changing to an alternate mailbox 
+with the 'n' command.  In this and the following commands, "msglist" 
+contains the numbers of the mail message(s) you want to act on.
+
+4.3.1.3.  f [<msg>]
+
+The 'f' command is used to forward a mail message to another recipient.  
+If no message number is supplied the current message is used.  The user is 
+prompted for the recipients and a subject.  The RFC822 header is added to 
+the message text while retaining the complete original message in the 
+body.  Also see the ~m command.
+
+4.3.1.4.  h
+
+Display message headers.  The message headers contain the message number, 
+the status indicating whether it has been read or deleted, the sender, 
+size, date, and subject.
+
+4.3.1.5.  k <job id>
+
+Remove an outbound message from the mqueue.  A message can be removed from 
+the send queue by specifying the job number obtained by the l command.  If 
+the message is locked you will be warned that you may be removing a file 
+that is currently being sent by SMTP.  You will asked if this job should 
+still be killed.
+
+4.3.1.6.  l
+
+List outbound messages.  The job number, the sender, and the destination 
+for each message is displayed.  A status of "L" will appear if the SMTP 
+sender has the file locked.
+
+4.3.1.7.  m [<userlist>]
 
 The mail command is used to send a message to one or more recipients.  All 
 local recipient names ( those which don't contain an '@' ) are checked for 
@@ -241,6 +287,10 @@ available such as: invoking an editor, and reading in text from other
 messages or files.  See the section below for a description of these 
 commands.  To end a message enter a line containing a single period.
 
+This note is almost obsolete except in the Unix version BM can be started 
+with wordwrap turned off.  If wordwrap is on, or if you are running the 
+MS-DOS version, you can ignore the following (K5JB modified BM, only).
+
 It is important to remember that the input line buffer has a 128 character 
 limit.  If you type beyond that point, BM will put a carriage return at 
 the end of this buffer for you and the results will look ragged on the 
@@ -251,50 +301,21 @@ lines less than 80 characters is always a good idea.  (Most causes of this
 data loss have been found and fixed, but it is still looks better to send 
 a C/R before you hit 80 characters on a line.
 
-4.2.1.2.  d [<msglist>]
-
-Mark messages for deletion.  Messages marked for deletion are removed when 
-exiting BM via the 'q' command or when changing to an alternate mailbox 
-with the 'n' command.  In this and the following commands, "msglist" 
-contains the numbers of the mail message(s) you want to act on.
-
-4.2.1.3.  h
-
-Display message headers.  The message headers contain the message number, 
-the status indicating whether it has been read or deleted, the sender, 
-size, date, and subject.
-
-.pa
-4.2.1.4.  u <msglist>
-
-Undelete a message that is marked for deletion.  The status of a message 
-can be determined by looking at the status field of the message using the 
-'h' command.
-
-4.2.1.5.  n [<mailbox>]
+4.3.1.8.  n [<mailbox>]
 
 Display or change mailbox.  The 'n' command with no arguments will display 
 a list of mailboxes containing mail.  If an argument is supplied, then the 
 current mailbox is closed and a new mailbox is opened.  
 
-4.2.1.6.  ! <cmd>
+4.3.1.9.  N
 
-Run a DOS command from inside BM.  An error message will result if there 
-is not enough memory available to load the command.
+(Note upper case.)  Makes the username the same as the notefile name. Use-
+ful if you want to send a reply, using a name other than the username you
+specified in bm.rc.  The fullname will remain the same as the one in 
+bm.rc.  Change the notesfile name with n first and then use N to make the 
+username agree.
 
-4.2.1.7.  ?
-
-Print a help menu for BM commands.
-
-4.2.1.8.  s [<msglist>] [<file>]
-
-The 's' command is used to save messages in a file.  If no filename is 
-given the default from the mbox variable in bm.rc is used.  If no message 
-number is supplied then the current message is saved.  The message is 
-stored in the same format as a mailbox file with all mail headers left 
-intact.
-
-4.2.1.9.  p <msglist>
+4.3.1.10.  p <msglist>
 
 The 'p' command is used to send messages to the printer.  (This is a 
 compile time option and may not be in the kit version of bm.exe.  This 
@@ -303,28 +324,11 @@ to:
 
      s <msglist] PRN
 
-4.2.1.10.  w <msglist> <file>
+4.3.1.11.  q
 
-The 'w' command is used to save messages in a file.  Only the message body 
-is saved.  All mail headers are removed.  If no message number is supplied 
-then the current message is saved.
+Quit to DOS updating the mailbox.
 
-4.2.1.11.  f [<msg>]
-
-The 'f' command is used to forward a mail message to another recipient.  
-If no message number is supplied the current message is used.  The user is 
-prompted for the recipients and a subject.  The RFC822 header is added to 
-the message text while retaining the complete original message in the 
-body.  Also see the ~m command.
-
-.pa
-4.2.1.12.  b [<msg>]
-
-Bounce a message.  Bounce is similar to forwarding but instead of your 
-user information, the original sender information is maintained.  If no 
-message number is supplied the current message is used.
-
-4.2.1.13.  r [<msg>]
+4.3.1.12.  r [<msg>]
 
 Reply to a message.  Reply reads the header information in order to 
 construct a reply to the sender.  The destination information is taken 
@@ -335,41 +339,57 @@ from k5abc.ampr to k5jb.org.  If this happens SMTP will return the message
 to you as undeliverable.  Add the new hostname to your hosts.net file 
 along with the old one and the next message reply will work correctly.
 
-4.2.1.14.  msg#
+.pa
+4.3.1.13.  s [<msglist>] [<file>]
 
-Entering a message number from the header listing will cause the message 
-text to be displayed.
+The 's' command is used to save messages in a file.  If no filename is 
+given the default from the mbox variable in bm.rc is used.  If no message 
+number is supplied then the current message is saved.  The message is 
+stored in the same format as a mailbox file with all mail headers left 
+intact.
 
-4.2.1.15.  l
+4.3.1.14.  u <msglist>
 
-List outbound messages.  The job number, the sender, and the destination 
-for each message is displayed.  A status of "L" will appear if the SMTP 
-sender has the file locked.
+Undelete a message that is marked for deletion.  The status of a message 
+can be determined by looking at the status field of the message using the 
+'h' command.
 
-4.2.1.16.  k [<msglist>]
+4.3.1.15.  w <msglist> <file>
 
-Remove an outbound message from the mqueue.  A message can be removed from 
-the send queue by specifying the job number obtained by the l command.  If 
-the message is locked you will be warned that you may be removing a file 
-that is currently being sent by SMTP.  You will asked if this job should 
-still be killed.
+The 'w' command is used to save messages in a file.  Only the message body 
+is saved.  All mail headers are removed.  If no message number is supplied 
+then the current message is saved.
 
-4.2.1.17.  $
+4.3.1.16.  x
+
+Exit to DOS without changing the data in the mailbox.
+
+4.3.1.17.  .
+
+Period causes BM to display the current message.
+
+4.3.1.18.  ! <cmd>
+
+Run a DOS (or Unix) command from inside BM.  An error message will result 
+if there is not enough memory available to load the command.
+
+4.3.1.19.  $
 
 Update the mailbox.  This command updates the mailbox, deleting messages 
 marked for deletion and reading in any new mail that may have arrived 
 since entering BM.
 
-4.2.1.18.  x
+4.3.1.20.  ?
 
-Exit to DOS without changing the data in the mailbox.
+Display a help menu for BM commands.
 
-4.2.1.19.  q
+4.3.1.21.  msg#
 
-Quit to DOS updating the mailbox.
+Entering a message number from the header listing will cause the message 
+text to be displayed.
 
 .pa
-4.2.2.  Text Input Commands
+4.3.2.  Text Input Commands
 
 The following commands are available while entering message text into the 
 message buffer.
@@ -378,10 +398,12 @@ message buffer.
 
      ~m <msg #> read <msg #> into the message buffer.
 
+     ~M <msg #> read <msg #> into the message buffer, with quoting.
+
      ~p display the text in the message buffer.
 
-     ~e invoke the editor defined in /bm.rc with a temporary file 
-     containing the text in the message buffer.
+     ~e (or ~v) invoke the editor defined in /bm.rc with a temporary file      
+        containing the text in the message buffer.
 
      ~q Abort the current message.  No data is sent.
 
@@ -389,11 +411,13 @@ message buffer.
 
      ~? Display help menu of tilde escape commands.
 
-4.2.3.  Command Line Options BM may be invoked as follows:
+     ~. Same effect as just, ".", closes and queues message.
 
-To send mail:
+4.3.3.  Command Line Options BM may be invoked as follows:
 
-     bm [-s <subject>] [<recip1> ...  [<recipN>]
+To send mail (See note about the -a option):
+
+     bm [-a <alias>] ] [-r <rc>] [-s <subj>] [<recip1> ...  [<recipN>]
 
 To read mail:
 
@@ -401,22 +425,35 @@ To read mail:
 
 The meanings of these switches are:
 
+     -a <alias>
+
+     This option permits using an alias filename other than alias (MS-DOS)
+     or aliases (Unix).
+     Note: This may not be compiled into the executable you have.  The 
+     disadvantage of using another alias name is that NET (or NOS) won't
+     be able to use it.
+
+     -r <rc>
+
+     This option permits using a runtime configuration file other than 
+     bm.rc (MS-DOS) or .bmrc (Unix).
+
      -s <subject>
 
-     This option sets the subject to the text on  the command line.
+     This option sets the subject to the text on the command line.
 
      -u <mailbox> 
 
-Specify which mailbox to read.  This  overrides the default from the 
-bm.rc.
+     Specify which mailbox to read.  This  overrides the default from 
+     bm.rc.
 
      -f <file>
 
      Read message from "file" instead of a  mailbox.
 
-4.3.  Technical Information
+4.4.  Technical Information
 
-4.3.1.  Outbound Mail Queue File Formats
+4.4.1.  Outbound Mail Queue File Formats
 
 Outgoing mail messages consist of two files each in the \spool\mqueue 
 directory.  The names of the two files will be of the form <integer>.WRK 
@@ -433,12 +470,8 @@ lines, as follows:
 
      some number of full destination addresses, in user@host format.
 
-4.3.2.  Standards Documents
+4.4.2.  Standards Documents
 
 The SMTP specification is RFC821.  The Format for text messages (including 
 the headers) is in RFC822.  RFC819 discusses hostname naming conventions, 
 particularly domain naming.
-
-4.4.  Bug Reports
-
-(There aren't any bugs in this thing -- no bug reports needed)

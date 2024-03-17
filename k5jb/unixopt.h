@@ -8,6 +8,11 @@
 /* This is a wait value for the Coherent sleep2() function */
 #define COHWAIT 50	/* 50 ms */
 
+/* If you have Coherent version 4.xx, define this.  Also, in the
+ * Makefile, make MSPTICK=10.  (It is 1000 for older versions)
+ */
+#undef COH4
+
 /* if you want remote users to be able to log on to your machine with
  * telnet - Requires having pseudo tty ports on the computer. This works
  * well with Coherent but my 3B2 master pty blocks on read and I have
@@ -15,18 +20,18 @@
  * Contact me for source code if you have same problem.
  */
 
-#define TELUNIX
+#undef TELUNIX
 
 /* On k5jb3b2 only, has to do with brain damaged pty on my machine.
  * Don't define this unless you have the file that I call telunix.c3
  * linked to telunix.c in your set.
  */
-#define PTY_PIPE
+#undef PTY_PIPE
 
 /* a client stub with PORT 87.  Uses IPC to transact with a server.
  * Contact me for a sample server if you want to try this.
  */
-#define TELSERV
+#undef TELSERV
 #define SERVNAME "telserv"	/* suggest 7 max for screen formatting */
 
 #ifdef _OSK
@@ -34,12 +39,23 @@
 #undef TELSERV
 #undef PTY_PIPE
 #endif
-#undef STARTOPT
+
+/* the start and stop options for MSDOS are defined in config.h.  Edit
+ * these to suit your installation.  Here is a full set of options for
+ * reference:
+
 #define STARTOPT \
 	"start: discard, echo, finger, ftp, remote, smtp, telnet, telserv, telunix"
 #undef STOPOPT
 #define STOPOPT \
 	"stop: discard, echo, finger, ftp, remote, smtp, telnet, telserv, telunix"
+*/
+
+#define STARTOPT \
+	"start: discard, echo, finger, ftp, remote, smtp, telnet"
+#undef STOPOPT
+#define STOPOPT \
+	"stop: discard, echo, finger, ftp, remote, smtp, telnet"
 
 
 /* We can either USE_QUIT and the shell layer manager (shl) or USE_QUIT

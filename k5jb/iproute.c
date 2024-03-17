@@ -196,8 +196,9 @@ no_opt:
 		return -1;
 	}
 	/* Look up target address in routing table */
-	if((rp = rt_lookup(ip.dest)) == NULLROUTE){
-		/* No route exists, return unreachable message */
+	/* Added special null gateway 0.0.0.1 to bounce as unreachable */
+	if((rp = rt_lookup(ip.dest)) == NULLROUTE || rp->gateway == (int32)1){
+		/* No route exists, (or we interfered) return unreachable message */
 		icmp_output(&ip,bp,DEST_UNREACH,HOST_UNREACH,NULLICMP);
 		free_p(bp);
 		return -1;
@@ -511,6 +512,7 @@ struct mbuf *data;
 	struct mbuf *bp;
 	register char *cp;
 	int16 checksum,cksum();
+	void *memcpy();
 
 	hdr_len = IPLEN + ip->optlen;
 	if((bp = pushdown(data,hdr_len)) == NULLBUF){

@@ -128,14 +128,14 @@ char *argv[];
 	int atoi();
 	struct ax25_cb *axp;
 	int ax25val(),reset_ax25();
-	extern int noprompt;
-
+	extern int noprompt; /* k35 */
 
 	if((axp = simple_getax(atoi(argv[1]))) == NULLAX25)
 /*	 || !ax25val(axp)	I doubt we need this test */
 		return -1;
 	else{
-		noprompt = 1;	/* k35 */
+		if(current == (struct session *)axp->user)	/* k35 */
+			noprompt = 1;
 		reset_ax25(axp);
 	}
 	return 0;
@@ -291,7 +291,7 @@ char *argv[];
 
 	if(setcall(&ip_call,argv[1]) == -1)
 		return -1;
-	bbscall.ssid |= E;
+	ip_call.ssid |= E;	/* oops!  K35 */
 	return 0;
 
 }
@@ -568,6 +568,9 @@ int old,new;
 		/* Don't print transitions between CONNECTED and RECOVERY */
 		if(new != RECOVERY && !(old == RECOVERY && new == CONNECTED))
 			printf("%s\n",ax25states[new]);
+#ifdef PESKYPROMPT
+printf("<%s %s>\n",ax25states[old],ax25states[new]);
+#endif
 		fflush(stdout);	/* moved up - k35 */
 		if(new == DISCONNECTED || new == DISCPENDING)
 			cmdmode();
@@ -683,7 +686,7 @@ int16 cnt;
 {
 	register struct mbuf *bp;
 	struct mbuf *recv_ax25();
-	int term_recv();
+	void term_recv();
 #ifdef	FLOW
 	extern int ttyflow;	/* added - K5JB */
 #endif
@@ -698,7 +701,7 @@ int16 cnt;
 
 	if((bp = recv_ax25(axp,cnt)) == NULLBUF)
 		return;
-	(void)term_recv(bp,current->record,0);
+	term_recv(bp,current->record);
 }
 
 /* Handle transmit upcalls. Used only for file uploading */
@@ -819,7 +822,12 @@ int mbox;
 		return(NULLCHAR);
 	if((pp = make_path(homedir,"heard.hlp",1)) == NULLCHAR)
 		return(NULLCHAR);
-	if((hfp = fopen(pp,"w+t")) == NULL){
+#ifdef MSDOS
+	if((hfp = fopen(pp,"w+t")) == NULL)
+#else
+	if((hfp = fopen(pp,"w+")) == NULL)
+#endif
+	{
 		if(!mbox)
 			printf("doheard: Cannot open file: %s\n",pp);
 		free(pp);

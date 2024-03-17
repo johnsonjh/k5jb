@@ -2,19 +2,16 @@
 
 7.1.  Technical Information for Client/Server Developers
 
-First things first.  The program has been tested out with the Turbo C 2.0 
-and Borland C++ compilers under MS-DOS, The AT&T System V, the HP-UX 5.21 
-and 6.2 compilers, the Microport 286 compiler, and the Mark Williams 
-compiler on the Atari ST.  There is a known problem compiling under Aztec 
-C 4.10d on the PC.
+First things first.  The program has been recently tested with the Turbo C 
+2.0 and Borland C++ compilers under MS-DOS, The AT&T System V, release 3.  
+The program also compiles under Coherent and OS9/86K.  See the Unix notes 
+for details on those.
 
-(Further notes specific to the mechanics of compiling net and bm from the 
-K5JB source kit are included in the archives with source files.  Source 
-common to MS-DOS and AT&T System V Unix are kept together.  Source 
-specific to either of these operating systems are kept separate.  Source 
-for the Atari, Macintosh and other versions of Unix have not been changed 
-by me since the 4/21/89 "Dayton Release" and are kept separate.  I have 
-been kitting only the MS-DOS files.)
+Further notes specific to the mechanics of compiling net and bm from the 
+K5JB source kit are included in the archives with source files.  A number 
+of files are common between MS-DOS and the other systems, but for conven-
+ience, the MS-DOS files are kept in Lha archives, and the Unix/Coherent/-
+OS-9 source files are kept in .tar.Z files.
 
 This section describes the "guts" of the Internet package for the benefit 
 of programmers who wish to write their own applications, or adapt the code 
@@ -23,7 +20,7 @@ should consider strongly writing new applications for the NOS version of
 the package, which is currently in development.  Contact Phil Karn KA9Q or 
 Bdale Garbee N3EUA for more information.  There will *not* be another 
 release of the software based on the internal structure used through this 
-release.  (At least by Phil and Bdale, eh?)
+release (by Phil or Bdale).
 
 Editor's note.  Bdale indicated to me, in a conversion during Dayton, 
 1990, that he was not interested in any further work on this version of 
@@ -32,10 +29,10 @@ the 1989 Dayton release, and only fixed serious things, until June 1991.
 At that time, I got tired of being buried in compiler warnings and seeing 
 an occasional (very occasional, like every 6 months) free() audit warning 
 about freeing garbage.  I set out to fix EVERYTHING in sight.  The result 
-is that the MS-DOS executable shrank by almost 20k, while a couple of nice 
-cosmetic features were added.  (For every feature that I add that takes 
-100 bytes, I will try to find a place to recover 200.  At that rate, it 
-will eventually disappear!)
+is that the MS-DOS executable shrank by almost 30k, while some nice cos-
+metic features were added.  (For every feature that I add that takes 100 
+bytes, I will try to find a place to recover 200.  At that rate, it will 
+eventually disappear!)
 
 In the various patched versions that have floated by me I have not seen 
 any bug fixes so I decided that traceability to the 4/89 version was of no 
@@ -43,10 +40,10 @@ further value.  My mission in working over this code was to get it working
 perfectly on MY machines, and with minimum memory.  NOS may be nice, but 
 it is not suitable for my mode of operation.  By tightening up this old 
 code, and correcting errors, I have been able to make this thing work 
-fine, error free, for over two years.
+fine, error free, since 1989.
 
-I think it is a really valuable set of program modules displaying many 
-different programmer's styles.  I have been critical of some of the 
+I think the NET suite is really valuable set of program modules displaying 
+many different programmer's styles.  I have been critical of some of the 
 apparently obvious mistakes I fixed, but it was done by committee, and it 
 is a hell of a big project -- hard for any one person to understand.  For 
 example It took me a week to perform my first make-over, which was to 
@@ -70,20 +67,17 @@ mean an unsigned 16-bit integer and a signed 32-bit integer, respectively.
 Ordinarily these types are defined in global.h to be "unsigned short" and 
 "long".
 
-Editor's note:  This convention has hidden a number of problems with 
-inconsistent data types, for example, dealing with timer values.  
-Depending on the foibles of your compiler, you may find problems where 
-ints (16 bit on the PC, 32 bits on minis) can't hold the quantity you 
-want it to hold.  Where it is used, atol() must be declared long so you 
-don't get wierdo numbers.  (e.g. ax25 t3 of more than 32k ms used to be 
-totally awesome.)  Htol(), a function contained in this program, returns 
-longs, but the value is generally put into an int (addressing control 
-blocks in memory).  The result of this is that on the MS-DOS version, it 
-is not necessary to type in the segment address, only the offset.  In 
-Unix, which uses 32 bit int, it is necessary to type all eight numbers of 
-an address (which is kind of silly, come to think of it, because the first 
-four numbers are always "8088" for some reason -- I ought to look into 
-that.
+Editor's note:  This convention has hidden a number of problems with in-
+consistent data types, for an example here is what happened with timer 
+values:  There are problems where ints (16 bit on the PC, 32 bits on 
+minis) can't hold the quantity you want it to hold.  Where it was used, 
+atol() was never declared as a function returning long so the NET user 
+would sometimes get really wierdo numbers.  (e.g. ax25 t3 of more than 32k 
+ms used to be totally awesome.)  For another example, Htol(), a function 
+contained in this program, returns longs, but it was never properly de-
+clared and the return value generally put into an int (addressing control 
+blocks in memory).  These and other problems are corrected as I work 
+through the files.
 
 The various modules pass data in chained structures called mbufs, with the 
 following format:
@@ -107,7 +101,6 @@ user may create, fill, empty and free mbufs himself with the alloc_mbuf
 and free_mbuf primitives, or at the cost of a single memory-to-memory 
 copy he he may use the more convenient qdata() and dqdata() primitives.
 
-.pa
 Editor's note.  malloc(), calloc() and free() in the MS-DOS package are 
 non-standard.  They include an audit header that will catch most 
 violations caused by trying to free un-allocated memory.  If you get a 
@@ -169,6 +162,7 @@ UDP sections.
 The IP implementation consists of three major functions: ip_route, ip_send 
 and ip_recv.
 
+.pa
 7.6.  IP Gateway (Packet Router) Support
 
 The first, ip_route, is the IP packet switch.  It takes a single argument, 
@@ -215,9 +209,11 @@ struct interface *interface; /* device interface structure */
 key for subsequent packet destination address lookups.  If target == 0, 
 the default entry is modified.  "metric" is simply stored in the table; it 
 is available for routing cost calculations when an automatic routing 
-protocol is written.  "interface" is the address of a control structure 
-for the particular device to which the datagram should be sent; it is 
-defined in the section "IP Interfaces".
+protocol is written.  (Note:  metric was unused so I used it to hold an 
+optional interface mtu that could over-ride the port's default setting.)  
+"interface" is the address of a control structure for the particular dev-
+ice to which the datagram should be sent; it is defined in the section "IP 
+Interfaces".
 
 rt_add returns 0 on success, -1 on failure (e.g., out of memory).
 
@@ -327,11 +323,11 @@ that is addressed to the local system.
  struct mbuf *bp; /* Datagram */
  char rxbroadcast; /* Incoming broadcast */
 
-.pa
 ip_recv reassembles IP datagram fragments, if necessary, and calls the 
 input function of the next layer protocol (e.g., tcp_input, udp_input) 
 with the appropriate arguments, as follows:
 
+.pa
  (*protrecv)(bp,protocol,source,dest,tos,length,rxbroadcast);
  struct mbuf *bp; /* Pointer to packet minus IP header */
  char protocol; /* IP protocol ID */
@@ -429,7 +425,6 @@ open_tcp) return -1 in the event of an error, and net_error should be
 examined to determine the cause.  The possible errors are defined as 
 constants in the header file netuser.h.
 
-.pa
  /* Open a TCP connection */
  struct tcb *
  open_tcp(lsocket,fsocket,mode,window,r_upcall,t_upcall,s_upcall,tos,user)
@@ -482,7 +477,6 @@ the receive upcall is invoked first, followed by the state change to
 CLOSE_WAIT state.  In this case, the user may interpret this state change 
 as a "end of file" indicator.
 
-.pa
 "tos" is the Internet type-of-service field.  This parameter is passed 
 along to IP and is included in every datagram.  The actual precedence 
 value used is the higher of the two specified in the corresponding pair of 
@@ -537,7 +531,6 @@ receive window fills.  It is called before an ACK is sent back to the
 remote TCP, in order to give the user an opportunity to piggyback any data 
 in response.)
 
-.pa
 When the remote TCP closes its half of the connection and all prior 
 incoming data has been read by the local user, subsequent calls to 
 recv_tcp return 0 rather than -1 as an "end of transmission" indicator.  
@@ -664,25 +657,81 @@ ie: a user station on the high speed trunk.
 
 See Chapter 5 for the rules followed by mulport.
 
-7.12.  Other Add-Ons - Good BAD and __UGLY__
+.pa
+7.12.  Other Add-Ons - Editorial Comments
 
 (This section reduced because nobody is messing with NET anymore.)
 
-As a journeyman C programmer, I was really staggered by the bad practices I 
-saw when I set out to stop NET from crashing.  NET was programmed by 
-committee, and some of the committee members couldn't program "hello world" 
-without screwing it up.  Some of the code was wonderful though.  Finger and 
-NET/ROM were excellent modules.  Dan Frank is one super programmer, and I 
-have only had to make trivial changes to his work.
+For me, as a journeyman C programmer, NET has been an interesting and 
+time-consuming activity that will probably continue as long as I have 
+interest in amateur packet radio.  My tactical objective has changed from 
+"bug fixing" to "enhancing".  My strategic objective has not changed how-
+ever.  I only intend NET to run flawlessly on MY machines, and perform the 
+functions that I want.  If someone else wants to run NET I am happy to 
+share it, but I am still my main customer.  By working on the documentat-
+ion and making it public, I hope to displace some of the buggy versions of 
+NET still lying around.
 
-Some real idiots got their fingers into NET and I suppose they are now 
-messing up NOS.  I won't comment on NOS (BBS with incidental TCP/IP) but I 
-have fixed some versions of NOS for special friends who needed some of its 
-gee-gaws.  NET is portable, running on MS-DOS, Unix, Coherent, and OSK.  A 
-good programmer could add any of the newer schemes (POP, RSPF, whatever) to 
-NET if he wanted to because NET is modular and quite efficient.  What NET 
-(and NOS, for that matter) really needs instead of more BBS features is an 
-alternate IP routing scheme to deal with our flakey amateur radio operators 
-and their weak RF paths, and a scripting method to deal with connects across 
-various transport schemes (TEXNET, ROSE, etc.).  I'll leave these things to 
-you who are more ambitious than I.  Joe, K5JB
+In my recent releases I began to agressively tune NET for radio operations 
+which will make it less automatic to set up for telephone use.  Users who 
+choose to try NET instead of commercial products on the telephone networks 
+will just have to know more about how to tune it for that application.  
+Recent changes in dealing with AX.25 radio circuits have yielded enormous 
+performance and manner improvements.
+
+Recently I started changing defaults and building safety nets that would 
+enable new amateur radio users to get started with TCP/IP quickly.  I 
+supply them with a copy of NET and tell them that after they progress 
+beyond the need for NET's "training wheels" I'll lead them to the various 
+versions of NOS and send them out into the world.
+
+Some users have provided me with excellent ideas that I incorporated into 
+NET, and others have found errors by doing things that I never tried.  I 
+know the code well enough by now that if something strange happens I can 
+usually find the cause in a few minutes.  I enjoy the association with 
+others who play with NET.  I particularly enjoy working with others who 
+have similar interest in making NET work better and on different plat-
+forms.
+
+I want to say that some of NET's code was wonderful.  Finger and NET/ROM 
+were excellent add-on modules.  Dan Frank is one super programmer, and I 
+have only had to make trivial changes to his work.  In the balance of the 
+code I found most concepts exemplary, but sometimes executed in haste, or 
+by committee members unaware of side effects.  NET is so large, I am still 
+finding errors on a regular basis.  Fortunately, none of them have been 
+fatal to its operation for a long time.
+
+In the course of working over NET, I have folded some code and eliminated 
+some waste, but I have tried to keep it from becoming obscure.  Hopefully, 
+the source code can be beneficial as sample of programming methods for 
+apprentice C programmers.  It contains about everything you can do in K&R 
+C, except maybe bit fields.
+
+NET is portable, running on MS-DOS, Unix, Coherent, and OSK.  A good pro-
+grammer could add any of the newer schemes (POP, RSPF, whatever) to NET if 
+he wanted to because NET is modular and quite efficient.  However, by 
+design some of NET's routines are tightly bound to each other and require 
+more thought to change than those in NOS.  I suspect Phil, KA9Q, concluded 
+his NET activity and started NOS to enable more loosely bound code, and 
+easier module addition.  I think it would be rather futile for a program-
+mer to add these kinds of things to NET when they are available in NOS.
+
+Anyone who wants to try porting NET to another operating system will find 
+me very willing to help so it is done in a manner that prevents divergence 
+in future versions.
+
+Recently, in the Unix version I built a stub that permits communicating 
+(using TCP/IP) with any kind of a server by using Unix's IPC, and will 
+probably simulate the same thing in the MS-DOS version.  If someone has a 
+burning yen to add some kind of special purpose server it is trivial in 
+the Unix version.  The MS-DOS version will probably have some constraints 
+on the computer configuration because I am going to keep it simple.
+
+Final opinion:  What NET (and NOS, for that matter) really needs instead 
+of more BBS features is an alternate IP routing scheme to deal with our 
+flakey amateur radio operators and their weak RF paths, and a scripting 
+method to deal with connects across various transport schemes (TEXNET, 
+ROSE, etc.).  Additions must be made in a way that will not stop NET from 
+operating while the added code is running.  If anyone wants to work on an 
+added module, I'll show them how to do this, or at least how I did it.
+  Joe, K5JB

@@ -58,6 +58,9 @@ char *mailqdir = "mqueue";	/* Outgoing mail spool */
 char *mailqueue = "mqueue/*.wrk";/* Outgoing mail work files */
 char *routeqdir = "rqueue";	/* queue for router */
 char *alias = "alias";			/* the alias file */
+#ifdef REWRITE
+char *Rewritefile = "rewrite.net";	/* note different name from NOS */
+#endif
 #ifdef AX25
 char *helpbox = "helpbox.hlp";	/* help file for mbox */
 #endif
@@ -86,6 +89,9 @@ char *mailqdir = "mqueue";
 char *mailqueue = "mqueue/*.wrk";
 char *routeqdir = "rqueue";		/* queue for router */
 char *alias = "aliases";			/* the alias file */
+#ifdef REWRITE
+char *Rewritefile = "rewrite.net";	/* note different name from NOS */
+#endif
 #ifdef AX25
 char *helpbox = "helpbox.hlp";		/* mbox help file */
 #endif
@@ -189,6 +195,9 @@ char *cmdarg;
 	/* not too worried if these don't exist */
 	mdigilist = make_path(ep,mdigilist,1); /* GRAPES mulport code */
 	mexlist = make_path(ep,mexlist,1);
+#endif
+#ifdef REWRITE
+	Rewritefile = make_path(ep,Rewritefile,1);
 #endif
 #ifdef UNIX
 	netexe = make_path(ep,"net",1);

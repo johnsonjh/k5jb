@@ -96,7 +96,7 @@ LIBS =$(SHLIB) $(CURSES)
 ########################################################################
 
 SRCS =	main.c arp.c arpcmd.c arpdump.c ax25.c ax25cmd.c \
-	ax25dump.c ax25subr.c ax25user.c ax_mbx.c cmdparse.c ekiss.c \
+	ax25dump.c ax25subr.c ax25user.c ax_mbx.c cmdparse.c mdkiss.c \
 	files.c fingcli.c fingserv.c ftp.c ftpcli.c ftpserv.c icmp.c \
 	icmpcmd.c icmpdump.c icmpmsg.c iface.c ip.c ipcmd.c ipdump.c \
 	iproute.c kiss.c lapb.c lapbtime.c lcsum.c mbuf.c misc.c \
@@ -108,7 +108,7 @@ SRCS =	main.c arp.c arpcmd.c arpdump.c ax25.c ax25cmd.c \
 	udpdump.c version.c wildmat.c
 
 OBJS =	main.o arp.o arpcmd.o arpdump.o ax25.o ax25cmd.o \
-	ax25dump.o ax25subr.o ax25user.o ax_mbx.o cmdparse.o ekiss.o \
+	ax25dump.o ax25subr.o ax25user.o ax_mbx.o cmdparse.o mdkiss.o \
 	files.o fingcli.o fingserv.o ftp.o ftpcli.o ftpserv.o icmp.o \
 	icmpcmd.o icmpdump.o icmpmsg.o iface.o ip.o ipcmd.o ipdump.o \
 	iproute.o kiss.o lapb.o lapbtime.o lcsum.o mbuf.o misc.o \

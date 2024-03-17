@@ -1,4 +1,5 @@
-5.  Other Things: NET/ROM, Finger, Mulport, Mbox, Datagrams and V Circuit
+5.  Other Things: NET/ROM, Finger, Mulport, Mbox, Datagrams, V Circuit and 
+    AX.25 Segmentation
 
 5.1.  NET/ROM Services
 
@@ -8,7 +9,7 @@ NET/ROM support for NET.EXE.
 The NET/ROM support for the KA9Q package serves three purposes:
 
    1) Existing NET/ROM networks may be used to send IP traffic.
-   2) NET may be used as a NET/ROM packet switch.
+   2) NET may be used as a NET/ROM packet switch (if compiled that way).
    3) NET may be used to communicate with NET/ROM nodes, and its
       mailbox facility can accept connects over the NET/ROM network.
 
@@ -22,15 +23,16 @@ you attach the NET/ROM pseudo-interface ("attach netrom").  Then you
 identify to the NET/ROM software those interfaces you want to allow it to 
 use, with the "netrom interface" command.  The format of this command is:
 
-     netrom interface ax0 #ipnode 192
+     netrom interface ax0 #ipnode 80
 
 The first argument is the name of the previously attached interface you 
 want to use.  The second argument is the alias of your node, to be used in 
 your routing broadcasts.  The alias is never used for anything else (as 
 you will see!).  The last number is the NET/ROM quality figure.  This is 
 used in computing the route qualities; it represents the contribution of 
-this interface to the overall computation.  For a 1200 baud half-duplex 
-connection, 192 is the right number.  
+this interface to the overall computation.  Coordinate this value with 
+other NET/ROM users in your area.  NET/ROM route management is beyond the 
+scope of this document.
 
 You need a netrom interface command for every interface you're going to 
 use with NET/ROM.
@@ -71,9 +73,8 @@ this for every interface on which you want to do this.
 By default, the NET/ROM code does not broadcast the contents of your 
 routing table.  This is as it should be, since usually we just want to be 
 the endpoints of communications rather than relaying NET/ROM traffic.  If 
-you want to be a switch station, include in your autoexec the command:
-
-     netrom verbose yes
+you want to be a switch station, include in your autoexec the command, 
+"netrom verbose on".  (This is a compiler option, not normally included.)
 
 Sometimes you can hear broadcasts from nodes that can't hear you.  If your 
 routing table gets filled with these unusable routes, your node will grind 
@@ -140,8 +141,14 @@ I can not stress enough that "route add" and "netrom route add" are two
 different commands, with different purposes.  In general, you only need a 
 "netrom route add" if you need to add a route to a NET/ROM node via a 
 digipeater path.  If you find yourself using this command, ask yourself, 
-"Why am I doing this?"  Many people do not understand that NET/ROM does 
-automatic routing (well, sort of :-)).
+"Why am I doing this?"
+
+Note: Using the netrom route add command to create a route to another IP 
+station running NET/ROM is generally a BAD idea because it implies that the 
+destination station is either not coordinated in the NETROM network, or 
+that it may not be on the air all the time.  Attempting to create a 
+session, such as smtp, with a non-existent IP station drives the NET/ROM 
+circuit crazy with futile retrys and gives you a VERY BAD reputation.
 
 5.1.1.5.  The Importance of the Routing Table
 
@@ -176,7 +183,7 @@ the "netrom interface" command.
 
 The "netrom ttl" command allows setting of the time-to-live initializer 
 for NET/ROM datagrams.  I recommend a value of 16 for most networks.  Use 
-more if you expect to go more than 16 hops.  The default is 64.
+more if you expect to go more than 16 hops.  The default is 16.
 
 The purpose of the ttl initializer is to prevent a packet from getting 
 caught forever in routing loops.  Every router who handles the packet 
@@ -318,6 +325,7 @@ subcommands.  Their meanings are listed below:
    window: Maximum sliding window size, negotiated down at connect
            time.
 
+.pa
 5.1.3.  Where to go for More Information
 
 The paper "Transmission of IP Datagrams over NET/ROM Networks" appeared in 
@@ -414,18 +422,18 @@ default port.
 5.3.2.  Digilist file
 
 The asynchronous port names in the following examples came off of my 
-setup.  They are ax0, ax1, vc0a, vc0b, etc.  An example of a digilist file 
+setup.  They are ax0, ax1, ax20, ax21, etc.  An example of a digilist file 
 is:
 
-   lan vc0a
-   k5jb-5 vc0a
-   n0els5 vc0a
+   lan ax20
+   k5jb-5 ax20
+   n0els5 ax20
 
 5.3.3.  Exlist file
 
 An example of an exlist file is:
 
-   k5jb vc0b
+   k5jb ax21
    k5jb-11 ax0
    kb0qj-10 ax0
    n5owk-2 ax1
@@ -436,7 +444,6 @@ mulport.c routine that reads them is not very robust; a badly formed file
 can crash the program, or make it run erratically.  The program only reads 
 the first two fields of each line, and it doesn't do much error checking.
 
-.pa
 The following exlist and digilist file rules are important:
 
      1. Don't put comments in the file unless you put them on the same 
@@ -491,10 +498,13 @@ If packets digipeated through our switch are intended for a directly
 reachable station, put that station's call in exlist if it is not on the 
 "lan" port.
 
-.pa
 5.4.  AX.25 and NET/ROM Mailbox
 
 5.4.1.  A two way communication
+
+(This is pretty much old hat information, but at the time it was revolut-
+ionary when I added some user friendliness to the non-IP user.  I am leav-
+ing it in the manual for historic reasons.)
 
 If you have enabled mbox (mbox on) non-TCP/IP users can connect to your 
 station and get something besides a blinking cursor.  Previous to the 
@@ -503,20 +513,20 @@ terminal session.  You had to enable the session on your end, to receive
 their typing.  (With version K28, such sessions are automatically made 
 active.
 
-Dan Frank, W9NK, incorporated the interception of NET/ROM and AX.25 
-connections when he did his NET/ROM code.  The initial mbox enabled a user 
-to do three things, send a message, initiate a telnet (chat) or 
-disconnect.  I added the ability for a user to read mail addressed to him 
-and download files that were put in a special place so their content and 
-size could be controlled so as to not flood the AX.25 network.
+Dan Frank, W9NK, incorporated the interception of NET/ROM and AX.25 con-
+nections when he did his NET/ROM code.  The initial mbox enabled a user 
+to do three things, send a message, initiate a telnet (chat) or discon-
+nect.  I added the ability for a user to read mail addressed to him and 
+download files that were put in a special place so their content and size 
+could be controlled so as to not flood the AX.25 network.
 
 An incoming AX.25 connection to your ax25 call requires the user to enter 
 a carriage return (or any information frame) to bring up the mailbox 
 banner and prompt.  This is because there is no protocol information in 
-the AX.25 link layer connect request (SABM).  If you use the ax25 mboxcall 
-and the user connects to that call the mailbox prompt will be sent 
-immediately after connect.  The NET/ROM mailbox also is activated as soon 
-as the incoming connection is completed over a NET/ROM circuit.
+the AX.25 link layer connect request (SABM).  If you specify the ax25 
+mboxcall and the user connects to that call the mailbox prompt will be 
+sent immediately after connect.  The NET/ROM mailbox also is activated as 
+soon as the incoming connection is completed over a NET/ROM circuit.
 
 With version, 890421.0g (K5JB.g or later), the user is able to read mail, 
 kill his mail, see who has mail, get a help message, get directory lists 
@@ -599,7 +609,7 @@ Enjoy!  Joe, K5JB
 (end of helpbox.hlp)
 
 Helpbox.hlp is short because people are prone to type "h" when they can't 
-think of anything else to do.  A short file makes the results ofer a poor 
+think of anything else to do.  A short file makes the results over a poor 
 path merciful.  "Morehelp" in the \public directory is much more inform-
 ative.  A sample morehelp file is in the samples provided with this kit.
 
@@ -709,8 +719,9 @@ provides a window for those who are learning about packet to peer through
 to the possibilities of TCP/IP.  It is difficult to stifle adding goodies 
 in this area of net.
 
-To witness facination amateur radio operators have with BBSs, notice the 
-transformation of NOS from a TCP/IP program to a full blown BBS.
+To witness fascination amateur radio operators have with BBSs, notice the 
+transformation of NOS from a TCP/IP program with incidental mailbox to a 
+full blown BBS with incidental TCP/IP.
 
 5.5.  Virtual Circuits and Datagrams
 
@@ -721,40 +732,31 @@ AX.25.  The mode command is given for each interface and can be either
 In "vc" (virtual circuit) mode, IP packets are encapsulated in AX.25 I 
 frames and are acknowledged at the link layer according to the AX.25 
 protocol.  Link layer connections are opened if necessary.  With the 
-proper setting of the AX.25 T2 (acknowledgment delay) timer, AX.25 
-acknowledgments can be piggybacked on I frames carrying other IP datagrams 
-(e.g., TCP level acknowledgments), thereby eliminating the extra overhead 
+proper setting of the AX.25 T2 (response delay) timer, AX.25 acknowledg- 
+ments can be piggybacked on I frames carrying other IP datagrams (e.g., 
+TCP level acknowledgments), thereby eliminating the extra overhead 
 ordinarily incurred by link layer acknowledgments.
 
-In both modes, ARP is used to map IP to AX.25 addresses.  The defaults can 
-be overridden with the type-of-service (TOS) bits in the IP header.  
-Turning on the "reliability" bit causes I frames to be used, while turning 
-on the "low delay" bit uses UI frames.  (The effect of turning on both 
-bits is undefined and subject to change).
-
-In both modes, IP-level fragmentation is done if the datagram is larger 
-than the interface MTU.  In virtual circuit mode, however, the resulting 
-datagram (or fragments) is further fragmented at the AX.25 layer if it (or 
-they) are still larger than the AX.25 "paclen" parameter.  In AX.25 
-fragmentation, datagrams are broken into several I frames and reassembled 
-at the receiving end before being passed to IP.  This is preferable to IP 
-fragmentation whenever possible because of decreased overhead (the IP 
-header isn't repeated in each fragment) and increased robustness (a lost 
-fragment is immediately retransmitted by the link layer).
+In both modes, ARP is used to map IP to AX.25 addresses.  (Programmer's 
+note: The defaults can be overridden with the type-of-service (TOS) bits 
+in the IP header.  Turning on the "reliability" bit causes I frames to be 
+used, while turning on the "low delay" bit uses UI frames.  The effect of 
+turning on both bits is undefined and subject to change.)
 
 5.6. ROSE Transport
 
-If included at compilation, NET has two commands that permit conducting 
-sessions over ROSE circuits.  ROSE networking software prior to version 
-3.0 replaced the protocol identifier (PID) in user AX.25 information 
-frames with F0, the "no layer 3" PID, when it delivered them to their 
-destinations.  Version 3.0 and later ROSE switches preserve the user's 
-PID.  Depending on the types of ROSE switches (or other virtual circuit 
-networking schemes) you encounter, you and the other IP stations you work 
-with, will have to take steps in NET (or NOS) to deal with these 
-networking schemes.  (With NET version k15, and later, "Vcircuit" and 
-"rosebash" commands replace the "rose" commands that were in earlier 
-versions of net.)
+If included at compilation, NET is capable of easily conducting sessions 
+over ROSE circuits.  ROSE networking software prior to version 3.0 
+replaced the protocol identifier (PID) in user AX.25 information frames 
+with 0xF0, the "no layer 3" PID, when it delivered them to their destin- 
+ations.  Version 3.0 and later ROSE switches preserve the user's PID.  
+Depending on the types of ROSE switches (or other virtual circuit net- 
+working schemes) you encounter, you and the other IP stations you work 
+with, will have to take steps in NET (or NOS) to deal with these net- 
+working schemes.  (With NET version k34, and later, the vcipcall is used 
+to replace the "vcircuit" scheme that was introduced in k15.  NET no 
+longer has the "rosebash" command that would insert IP PID in pre-version 
+3.0 ROSE circuits.)
 
 There are two conditions that have to be satisfied BY BOTH IP stations in 
 order to use ROSE transport circuits.  1. Stations using ROSE must be 
@@ -763,181 +765,243 @@ the ROSE circuit sends packets with F0 PID, both stations must be able to
 discard them.
 
 In its native datagram mode NET communicates with other NET or NOS 
-stations using un-numbered information frames (UI) but can be made to run 
-in VC mode by using the "mode" command.  Since VC mode is lower perform- 
-ance than datagram, it should be avoided.  NET version k15, and later, 
-have the command, vcircuit, that permits adding a synthetic interface to 
-an existing asy interface.  Outgoing packets that are routed over that 
-synthetic interface use virtual circuit, even if the associated real 
-interface is in the default datagram mode.
+stations using un-numbered information frames (UI) but by using the mode 
+command NET can be made to exclusively use VC mode on a given interface 
+(port).  Since VC mode is lower performance than datagram, its exclusive 
+use should be avoided.  NET version k34, and later, have the command, arp 
+add <hostid> vax25 <call), that causes outgoing packets to take the 
+virtual circuit.  "vax25" is a pseudo hardware type that signals the other 
+layers in NET to use virtual circuit.
 
 Incoming packets from TCP/IP stations, if carried by ROSE virtual circuits,
 must be handled specially.  If they contain IP or Netrom PIDs they can be
 handled normally but if they contain F0 PID they have to be trapped or they
 will be routed to the AX.25 mailbox.  ROSE switches send unexpected alias
-frames that are trapped by using the vcircuit command (explained shortly.)
+frames that are trapped by using the ax25 vcipcall command (explained 
+shortly.)
 
-A second command, rosebash, can be used to replace the missing IP PID in 
-incoming VC packets that are unfaithful reproductions transported by 
-ROSE versions earlier than 3.0  Don't use rosebash unless necessary.
+Normally it would be beyond the scope of this document to tell NOS users 
+how to run their NOS but ROSE information seems to be sparse (or incor-
+rect).  Any version of NOS will work fine on a ROSE circuit that contains 
+switches running 3.0 or later ROSE versions, but if but one of the switch-
+es in the circuit is running a version prior to 3.0, NOS must be modified 
+to deal with it.  The rest of this discussion assumes that all ROSE 
+switches in a circuit have the later code.
 
-Stations on each end of a ROSE circuit must coordinate their activities if 
-they are to use ROSE.  Both TCP/IP stations on a ROSE circuit must be 
-running a version of NET (or NOS) capable of specially handling the ROSE 
-transport mechanism.  NOS must be modified to use earlier ROSE versions, or
-can be used on later ROSE versions if the "reliable mode" is used.  (Use
-your neighbor ROSE switch's digipeater call instead of its regular call in
-setting up your AX.25 route command.  This is _Supposed_ to work, but I 
-haven't seen a knowledgable NOS user make it work yet.  I have a patch for 
-NOS if we need it.  Even in the "reliable mode" ROSE persists in sending an I 
-frame to the connecting station (it is zero length) and the F0 protocol ID 
-spawns an AX.25 user service from an unsuspecting NET or NOS.)
+If you have a version of NOS designed to work specifically with ROSE (e.g. 
+TNOS) follow the author's instructions.  I understand it uses a separate 
+AX.25 call sign for IP users, similar to NET.
 
-For outgoing frames, to avoid dedicating the async port to the VC mode, 
-you can use the "vcircuit attach" command to attach a pseudo interface 
-which has most of the attributes of an already attached asynchronous 
-interface.  (This command can be abbreviated to "v at".)  You then use 
-that pseudo interface to specify that you want to use virtual circuit.  
-This way, not all transactions that start from that async port need to be 
-VC.  The vcircuit attach command syntax is:
+With PA0GRI NOS or JNOS, and probably others, do the following:
+  1.  Use the ax25 route add command to create a route to the destination
+  2.  Use the ROSE's "reliable mode".  (See below)
+  3.  Use the ax25 route mode <target> vc command to make NOS use vc.
+  4.  Stifle the NOS mailbox's "jumpstart" (mbox jumpstart off).
+  5.  Use the arp, route, etc. commands you would use with a local user.
+  6.  Coordinate what you are doing with the station on the other end.
 
-   vcircuit attach <virtual circuit iface name> <async iface name>
+ROSE's "reliable mode" suppresses enough of the spurious F0 PID infor- 
+mation frames to make it usable by any regular version of NOS.  To use it, 
+use your neighbor ROSE switch's digipeater call sign instead of its 
+regular call sign in setting up your AX.25 route command.  Even in the 
+"reliable mode" ROSE persists in sending a zero length F0 PID I frame to 
+the connecting station after receiving an SABM, and when the far end 
+disconnects, ROSE sends an F0 PID I frame telling all about it.  The 
+latter frame briefly spawns an AX.25 NOS mailbox session, but it is 
+harmless since the ROSE switch immediately disconnects.
 
-If you only have one async interface attached, called ax0, I suggest you 
-simply use the command:
+Now back to running NET.  For outgoing frames, to avoid dedicating the 
+async port to the VC mode, you use the arp add command to specify that 
+you want to use virtual circuit to the other station, and specify a 
+unique call sign (ssid) for your ax25 vcipcall.
 
-   vcircuit attach vc0 ax0
+In summary, in order to set up a ROSE circuit to send IP frames, you must 
+do the following:
 
-If you are using more than one interface, you might use "vc0", "vc1", etc.  
-Put this command in autoexec.net after AX25 parameters are defined and 
-before it is referenced.
+  1.  Set up a virtual circuit IP call sign e.g.
 
-If you are using the Kantronics KPC-4 or KAM interface, there is a strict 
-naming convention you must follow.  The KPC interface name must be four 
-characters long, start with a 'k' and end with an 'a'.  If the interface 
-to be used is kp0a, use the vc interface name vc0a, kpva, or whatever.  
-(Another vc interface will also be automatically attached to the second 
-KPC interface.  Simultaneous dual port attachment is necessary because of 
-the way the KPC-4 code handles incoming traffic.)
+      ax25 vcipcall k5jb-8
 
-You can add a maximum of 4 pseudo interfaces to 4 corresponding async 
-interfaces.  This maximum can be changed by defines in vcircuit.c.  If you 
-use the pseudo VC interface you don't use the mode command.  Instead you 
-use the VC interface name in place of the real interface name in the route 
-add command.
+  2.  Use arp add on the other station's call sign and route, e.g.
 
-If you want to trace incoming data on a port that has an associated VC
-interface attached, trace it by its VC (pseudo) interface name because the
-vast majority of incoming packets will be handled by that interface because
-of its position on the interface chain.  If you are transmitting on the
-real interface, put the trace on both the real and VC interfaces.
+      arp add wb5cqu vax25 wb5cqu-10 k5jb-6 817105
 
-Use the vcircuit add command to create a table of distant IP stations that 
-will be feeding packets to you over a ROSE circuit.  This table is used to 
-catch incoming F0 information frames from those stations, divert them from 
-triggering the AX.25 mailbox, and, if (remotely) necessary, put the IP PID 
-back so NET will handle them internally.  Syntax for this command is:
+      where wb5cqu is the other station's host name, vax25 is the "hard- 
+      ware" type that signals to use virtual circuit, wb5cqu-10 is the 
+      AX.25 call sign of the other station, k5jb-6 is the call sign of 
+      the local ROSE switch, and 817105 is address of the other station's 
+      neighboring ROSE switch.
 
-   vcircuit add <remote station's call>
+  3.  Use the route add command as you normally would, e.g.
 
-The distant IP station's call is the AX.25 call, not his host name.
+      route add wb5cqu ax0
 
-For an example of calls used, I will describe a test circuit I used. 
-K5JB-10 is my IP station #1 (host is k5jb), with N0ELS-5 as a neighbor 
-ROSE (address 405771).  It will be using async port kp0a which is 
-connected to a Kantronics KPC-4 using logical port a.  K5JB-11 is my IP 
-station #2 (k5jbspook) on another frequency with K5JB-5 as a neighbor ROSE 
-(address 405732).  It will use a conventional port named ax0.
+      where wb5cqu is the host, same as above, and ax0 is the name of the
+      interface to use.
 
-First, on IP station Number 1 (k5jb), I would use, vcircuit attach vc0a 
-kp0a.  (Second port would automatically be called vc0b and be attached 
-to kp0b.)
+  4.  Put the other station's hostname and IP address in your hosts.net
 
-Then I would add the remote station to the vcircuit table with a command 
-like:
+  5.  Coordinate with the other station so he can build a route back to
+      you.  Have him/her use your vcipcall in the arp entry.
 
-   vcircuit add k5jb-11
+If you are replacing an earlier version of NET, remove all references to
+the vcircuit command and associated interfaces.  Change any previous vc
+interfaces references to their base interface names, e.g. change vc0 to
+ax0.
 
-Where the -11 call is my #2 IP station's call.  (SSIDs are significant.)
+The only thing you do differently when using ROSE, as compared to setting 
+up a datagram circuit over a non-ROSE path, is to set your ax25 vcipcall, 
+and use "vax25" instead of "ax25" in the arp add command.
 
-If you want to drop a call from the table, the command would be:
+It is noteworthy that ROSE circuits imply slow responses, so set your tcp
+irtt (initial round trip time) to a fairly large value, at least 60000,
+(60 seconds).  Otherwise, tcp will flood the ROSE network with unnecessary
+duplicates.  One thing that ROSE can't seem to stand is being flooded, 
+which causes it to flounder.
 
-   vcircuit drop <destination station's call>
+5.7  AX.25 Segmentation
 
-You can have a maximum of 10 IP station calls in the VC table.
+KA9Q's NOS has an AX.25 segmentation scheme.  In order to cooperate with 
+NOS, I added this scheme to NET.  This section describes what segmentation 
+is and how to manage it.
 
-This takes care of incoming packets on IP station #1; now to route 
-outgoing packets.  Use two standard NET commands, arp add, and route add.  
-For our purpose, we use a simple form of the arp add command with the 
-syntax:
+The reason for AX.25 segmentation is to permit sending a stream of AX.25 
+frames containing IP frames, with the IP and TCP header contained in only 
+the first frame of the stream, thus avoiding repetition of these 40 bytes 
+in each AX.25 frame.  Segmented frames are identified by a PID byte of 
+0x08 instead of IP PID of 0xCC in each AX.25 Information frame.
 
-   arp add <hostname> ax25 <AX.25 call path>
+First, let's review some terminology relating to relevant parameters.
 
-Using the calls in the example above, the arp add command would be:
+TCP mss is maximum segment size for TCP, not to be confused with AX.25 
+link layer segmentation discussed here.  Its value is global for all 
+interfaces.  Also, the word "fragmentation" is used in this document where 
+IP level fragmentation is discussed.  I removed the earlier AX.25 "frag- 
+mentation" attempts from NET.
 
-   arp add k5jbspook ax25 k5jb-11 n0els-5 405732
+Send mss is a value that is negotiated during TCP session setup.  Each 
+station in the session has an independent send mss.
 
-The call sign string is the same as one you would use to make an ax25 
-connection manually over that ROSE circuit (destination call, neighbor 
-ROSE call, destination ROSE address).
+Interface mtu is maximum transmission unit, set at attach time, but 
+changeable later, or even selectable on a route by route basis (with 
+version k33 and later).  It controls IP level fragmentation and is a 
+factor in establishing the send mss for a TCP session.
 
-For our purpose we use a simple version of the route add command with the 
-syntax:
+AX.25 Paclen (ax25 paclen) establishes the maximum packet length in both 
+the AX.25 virtual circuit (connected mode) and datagram (unconnected 
+mode).  It is global to all interfaces.  Note that I chose to control 
+datagram size differently than is done in NOS.  (Footnote 1)
 
-   route add <hostname> <iface name>
+Segmentation is only used in the AX.25 connected mode (virtual circuit).  
+It is not used in AX.25 UI frames (datagram mode) nor is it used on 
+NET/ROM circuits.  (Segmentation is in current versions of NOS NET/ROM 
+files but it will not work over NET/ROM the way it is written in NOS.)
 
-And using the example calls, and assuming that we are using kp0a as our 
-asynchronous port for this circuit, our route add command would be:
+Interface mode (e.g. mode ax0 v) is either virtual or datagram.  Each 
+interface has its own mode.  If the special hardware type "vax25" is used 
+instead of "ax25" in the arp add command virtual circuit will be used to 
+reach the destination.
 
-   route add k5jbspook vc0a
+TCP session setup proceeds as follows:
 
-In summary, it takes three command entries for each circuit: vcircuit add, 
-arp add, and route add.  You can add all the sophistication you want to 
-them.  See Chapter 6.
+Each station's tcp send mss is established during tcp session synchroniz- 
+ation (SYN).  The originating station proposes an mss equal to its tcp 
+mss.  The destination examines its own setup for the value of mtu that it 
+wants to use for that route.  If the route table entry for that destin- 
+ation contains a value for metric other than zero it uses that value for 
+mtu, otherwise it uses one of the following depending on whether the 
+interface is set for vc or datagram mode.  If set for vc mode, it uses 
+interface mtu.  If set for datagram it uses the smaller of interface mtu 
+or paclen.  It subtracts 40 from whichever number it chooses (to prevent 
+unnecessary IP fragmentation) and compares the result to the proposed mss.  
+For the balance of this session its send mss will be the smaller of this 
+result or the mss proposed by the other station.
 
-(If you don't use the vcircuit attach command we must tell NET to use 
-virtual circuit mode on your async port (kp0a in this example) by using 
-the mode command, mode kp0a v.)
+In Summary, each station's send mss is the smaller of:
 
-To complete our example, we move to the second IP station (k5jbspook) and 
-use the following to reach k5jb on ROSE:
+   1. The other station's tcp mss, or
+   2. A. The route metric minus 40 if one is specified, or
+      B. If interface is vc mode, its interface mtu minus 40, or
+      C. If interface is datagram mode, its paclen or its mtu, 
+         whichever is smaller, minus 40.
 
-   vcircuit attach vc0 ax0
-   vcircuit add k5jb-10
-   arp add k5jb ax25 k5jb-10 k5jb-5 405771
-   route add k5jb vc0
+If the negotiated send mss is greater than the transmitting station's 
+paclen minus 40, and it is operating in the vc mode, it will transmit 
+AX.25 segments.
 
-NET feeds outgoing packets to the ROSE network by looking up the host in 
-the arp table, getting the route from the route table, and since the 
-pseudo interface was installed as a VC, initiating an AX.25 connect to the 
-ROSE switch.  After some spurious packets from the ROSE switch are read 
-and discarded, you are in business!
+If you don't want to mess with AX.25 segmentation, in your attach command 
+set your interface mtu to 256 and accept NET's defaults for the rest.  If 
+you want to use smaller packets, set your interface mtu to the same size 
+as planned ax25 paclen and set your tcp mss to your planned ax25 paclen 
+minus 40.  (Footnote 3)
 
-If one of the ROSE switches in a ROSE circuit loses the IP PID and it is 
-necessary to replace it, use the command, rosebash, on both IP stations 
-involved.  (The spurious setup and disconnect packets from the neighbor 
-ROSE switches are discarded by the IP handler because they fail the 
-checksum test.  These failures are duly recorded in the statistics 
-displayed by the ip stat command.)
+If you want to set up a particular AX.25 segmentation scheme, to prevent 
+generating final runt packet segments, calculate interface mtu by using 
+the formula,
 
-In summary:
+  mtu = N * (paclen - 2) - 1
 
- 1. Decide what you want to do
- 2. Get someone else to agree (use the AX.25 mailbox to pass messages)
- 6. Either use the mode command or the vcircuit attach command, or if 
-    using NOS, use the ax25 route add and ax25 route mode commands.
- 3. Use the vcircuit add command
- 4. Use the arp add command
- 5. Use the route add command
- 7. Get the other person to set his/her station to correspond.
- 8. Ping the other station.  Watch for the return.
- 9. Do it again, it won't take so long for a return this time.
+where N, the desired number of AX.25 segments per IP frame, is greater 
+than 1.  (The segmentation method adopted creates paclen - 1 size data 
+chunks).
 
-If you want to use ROSE to reach a Netrom station, use the netrom route add
-command to specify the ROSE path.  The command prompter doesn't indicate so
-but you can add digipeater calls after the <neighbor> argument.  Add the
-neighbor ROSE's call there, followed by the destination ROSE's address.  For
-IP, put the other IP station's AX.25 call in the <destination> field.  If you
-just want to be able to make Netrom connects (unlikely), put the Netrom's
-call in the <destination> field.  In either case, put the Netrom's call in
-your VC table to discard ROSE's spurious frames.  Joe, K5JB
+Then, set your tcp mss to the mtu - 40.
+
+For this to be coordinated, the other station would need to use a tcp mss 
+that is at least as large as your interface mtu minus 40, and a paclen at 
+least as large as yours.  (In other words, same numbers as yours should 
+work fine, but other numbers can work too.)
+
+Stated another way:
+If you set your tcp mss to a value that is no more than the other
+station's paclen minus 40, (e.g. tcp mss = 216, other station's paclen =
+256) he will not send AX.25 segments to you.  If you leave the route
+metrics set to zero and set your station's interface mtu to no greater
+than your paclen (e.g. 256 for both) your station won't transmit AX.25
+segments.
+
+These numbers will not prevent your station from having to receive and 
+queue segmented AX.25 frames if, like in my case, it is acting as a switch 
+between two other stations that have negotiated tcp send mss that causes 
+AX.25 segmentation.
+
+In conjunction with this segmentation addition, I modified one command and 
+added another to NET.  They are the param command and the ax25 segment- 
+ation command.  They are discussed in Chapter 6.
+
+Footnotes:
+
+Footnote 1. I'm sorry that paclen (AX.25 packet length), tcp mss (maximum 
+segment size), and interface mtu (maximum transmission unit), aren't bet-
+ter coordinated in NET.  It makes it much more complicated than it needs 
+to be, and in some cases makes setting correct packet sizes very awkward.  
+I am working on better coordination; in the interim, if you use standard 
+values provided as defaults NET should work fine.  
+
+Note that, unlike NOS, UI datagram size will be no bigger than paclen.  To 
+tie it only to interface mtu causes real problems if you want to use I 
+frame segmentation and UI datagrams on the same port.
+
+For more discussion of these values, see PA0GRI's NOS documentation, near 
+its end.
+
+Footnote 2.  Note that the actual packet data size is governed by other 
+things also.  The sending choke window grows and shrinks, based on perfor-
+mance.  AX.25 segmentation, if it is to occur, starts after the first few 
+transactions has established sufficiently large choke window.  Be sure 
+your tcp window and ax25 windows are adequate to not stifle performance.
+
+During a session, while doing its work, the IP router will compare out- 
+going datagram size to the interface mtu (or the route metric, if it is 
+non zero) and fragment the packet at the IP level if necessary.)
+
+Footnote 3.  Netrom interface presents some special problems. When netrom 
+is attached its mtu will be set to paclen minus 20, but greater than 43 
+and less than 237.  This number will cause send mtu to take on a sane 
+value if another station initiates a connection to NET, but outgoing 
+connections over netrom will have a proposed send mss a little bit too 
+large (216 bytes) which will be trimmed only if the destination station 
+does it because of its netrom interface mtu (hopefully 236).  The other 
+station's actions would reduce the send mss to correct value of 196.  The 
+NRS interface mode used for serial communication with a TNC using NET/ROM 
+has also been constrained at attach time to paclen - 20.

@@ -27,12 +27,12 @@ lint:
 # dependencies - please keep up to date!
 #
 
-bmutil.r: bmutil.c bm.h header.h
-files.r: files.c
+bmutil.r: bmutil.c bm.h header.h config.h
+files.r: files.c config.h
 getopt.r: getopt.c
 header.r: header.c bm.h header.h
-main.r: main.c bm.h
-send.r: send.c bm.h
+main.r: main.c bm.h config.h
 osk.r: osk.c bm.h ndir.h
-version.r: version.c
+send.r: send.c bm.h config.h
+version.r: version.c config.h
 wildmat.r: wildmat.c

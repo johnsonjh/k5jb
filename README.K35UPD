@@ -1,0 +1,215 @@
+
+                     Version Update Notes for the Operator
+
+                                   July 1994
+
+A complete and updated set of instructions is contained in the user document-
+ation.  This file contains notes that should be useful to those who may be 
+replacing an earlier version of NET.  NET is intended for those who don't 
+know any better (like a worm in a sauerkraut barrel).  Once you become educat-
+ed and sophisticated you will want to run NOS (JNOS, GRINOS, WNOS, SuperNOS, 
+or WonderNOS).  Those of you who suffer from arrested development, like me, 
+may be satisfied with NET.  NOS is wonderful and does everything, even balance 
+your checkbook, and run Nintendo, but NET only does TCP/IP over amateur radio, 
+blush!.
+
+These notes reflect the changes that might affect NET's operation over the
+last couple of releases.
+
+The main changes were to simplify things for the amateur radio user.  Setting 
+up and running NET is so simple now that the program, autoip.exe in etcfiles-
+.lzh is almost obsolete.  (I did update autoip.exe for this release.)  NET 
+will start and run if the correct directories are set up and it is given five
+configuration commands and six start commands, and not all these are actually
+required.  The five configuration commands are:
+
+ Your AX.25 call sign, e.g. k5jb-10
+ Your IP address, e.g. 44.78.0.2
+ Your host name (normally same as your call sign except no ssid, e.g. k5jb
+ The attach command that tells it about your com: port.
+ A route add default command, e.g. route add default ax0
+   (This latter command is not required but is recommended.)
+
+A couple of the start commands are kind of silly (echo, discard), but every-
+body starts them.  Telnet, smtp, ftp, and finger standard with TCP/IP oper-
+ation so you probably would want to start them.
+
+The ax25 mboxcall makes things easier for non-IP users (unenlightened) who 
+play with your system, and the ax25 vcipcall make things easier if you deal 
+with NOS stations that are using the BBS jump-start command (malicious).  If 
+you have to use Net/ROM to get around (isolated and depraved) you have to add 
+some netrom commands.
+
+That is it!  If you don't have the directories set up correctly, or NET can't 
+find the files it needs or would like to have, it will tell you.  Oh yeah, NET 
+doesn't set your TNC into KISS mode.  You still have to do that yourself.
+
+The autoexec.net example in etcfiles.lzh has been updated to reflect this 
+simplification, but contain examples of most common commands you would use for 
+special applications.
+
+Here is a synopsis of the changes made since the last TAPR library update:
+
+June-Nov 93 k30-k31 - Changes to NET were mostly internal with miscellaneous 
+corrections to improve code portability between different kinds of computers.  
+With help from Bob, N0QBJ, I made necessary changes to make NET compile under 
+OS9/68K.  I removed the shell command from the MS-DOS version because it was 
+worthless, and since there were interrupts going on, unpredictable.  I Added a 
+receive overrun counter to the MS-DOS version.  It reports as a part of the ip 
+stat command.  If you are flatlining your computer (I am with a 10 MHz AT 
+running a BBS simultaneously and using a whole bunch of ports) you may find 
+this information interesting.
+
+11/7/93 k32-k33 - Added AX.25 segmentation (only so the NOS users couldn't 
+point fingers), along with an ax25 seg command, and revised lapb handling to 
+try and reduce obsolete packets queuing in KISS TNC.  Did it by making t2 
+effective.  The latter made an ENORMOUS improvement in AX.25 connected mode 
+operation.  Added ability to tune interface mtu after program start by add-
+ing param <iface> mtu command.  Corrected error in uploading to an incoming 
+telnet session, and corrected a midnight anomaly in the PC clock.  (It was 
+jumping back to zero and causing the timer to do an hour's worth of looping 
+which caused some interesting ax.25 problems!)  Wrote some advice regarding 
+parameters and put it in Chapter 5 of the operator's manual.  
+
+1/14/94 k34 - This is the most modified release yet.  Replaced the vcircuit 
+scheme (for dealing with ROSE circuits) with an IP only virtual circuit call 
+sign.  This greatly simplified dealing with ROSE and NOS (the BBS with inci-
+dental TCP/IP) and substantially reduced code size.  The ax25 vcipcall command 
+syntax is, ax25 vcipcall [<call-ssid>].  In conjunction with this, I changed 
+two commands, the arp add, and the route add commands.  In arp add, I added 
+another "hardware" type to the arp table.  This new type, "vax25", signals NET 
+to use virtual circuit to reach a specific station.  In route add, I changed 
+the syntax to, route add <dest addr>[/<bits>] <if name> [gateway|*] [metric].  
+The [gateway|*] permits using a value for metric without specifying a gateway.  
+This metric value, if present, replaces the interface mtu for a specific 
+route, permitting you to tune by route.
+
+I also enabled NET to operate in AX.25 Version 1 protocol as well as Version 
+2.  NET's default on starting is V2, but can be changed with the ax25 version 
+[V1|V2] command.  (The default governs with what version NET starts a connect- 
+ion.  Regardless of the default, NET will switch to the same version used by 
+the other end.)  Along with these changes I did some completion work on the 
+ax25 stat and tcp stat commands, and incidentally added a "time since last 
+heard" report to the tcp stat command.  With this information you can tell 
+which sessions are zombies and can be reset.
+
+Since I was in a cosmetic improvement mood, I added a prompt, "FTP>" to the 
+ftp client.  I also added a message of the day (motd) command for incoming 
+telnet sessions. Default is none. motd <One line message> creates one, motd - 
+(dash) deletes it.  Also added an axmotd command so a custom greeting could be 
+made for AX.25 and Netrom chat users.  There is a default.  This axmotd will 
+be sent to an AX.25 connectee even if the mbox is not turned on.  Note that an 
+incoming telnet or AX.25 chat session will automatically become your current 
+session.  If this bothers you, Tough!  (Or get a programmer to define POLITE 
+in config.h and recompile NET for you -- or I will do it for the cost of a 
+postage stamp.)
+
+I wrote a multidrop KISS driver (mdkiss.c) that takes over when you use the
+command attach asy, and specify mode ax25.  It is backward compatible with
+the previous KISS driver, but if an additional argument for the number of
+pseudo ports is given, it creates them, appending "0", "1", etc to the name.  
+
+This driver replaced the KPC-4 driver and I guess you could have 16 virtual 
+ports with this goofy thing.  Prior to version k35, this was called extended
+KISS, which was a poor choice of names since there is something else called
+extended KISS.
+
+In the MS-DOS version, I added bios routines to simulate the alternate video 
+attributes on incoming telnet traffic as was done in the Unix version with 
+curses, and extended the process to AX.25 as well as Netrom sessions.  This 
+may cause some problems with some non-standard MS-DOS computers.  If it does I 
+want to know about it!  There is rudimentary color control.  The routines have 
+one known flaw, having to do with scrolling and inherited attribute, but I am 
+not concerned about perfection here.  You who are ambitious programmers could 
+use the basic bios routines to do a windowing terminal thing.  (I don't happen 
+to like split screen, except for teletype.)
+
+In the Unix version, I made some alternative telunix.c (remote login) files to 
+deal with different kinds of pseudo terminal problems, and created a new cli-
+ent, telserv.c which uses Unix's IPC message processes to communicate with a 
+separate server.  I assigned it port 87, one used by NOS ttylink, until I 
+decide what to do with it.  (If you are a Unix programmer I can supply you 
+with the toy demonstration server to use as a model.  Hell, I can even supply 
+it to you if you aren't a Unix programmer, but that would be kind of useless.)
+
+I completed the "shell" (!) code in Unix so it creates a child process enabl-
+ing NET to continue to run in the background while you are shelled out at the 
+terminal.  This is much simpler to use than "shl" the shell layer manager.  
+(This code is still being changed as I release k34 but appears to run OK at 
+this time.)
+
+I corrected errors in AX.25 Mailbox (in s jy1@w1aw, the @ was punched out), 
+and converted all callsigns to lower case, which reduced SMTP processing 
+cycles by one.  I corrected an omission in netrom chat session that allowed 
+incoming stuff to interrupt your typing.  Corrected error that permitted 
+you to enter garbage call signs when doing connects.  Added some constraint 
+on some of the user variables (e.g. AX.25 T1 & T2), and removed erroneous 
+scaling of T2 and T3 times for digipeat strings.  Corrected errors in smtp t, 
+netrom obs, and netrom nodet commands that showed awful things if you set to 
+zero.  While messing with mail addressing, (in k35) I enabled the ability to
+handle messages with multiple redirection, e.g. To: user%host2%host1@host0.
+
+In order to make NET easier for you, the radio amateur, to set up, as I worked 
+through them, I made defaults more closely match the radio environment so it 
+is unnecessary to correct defaults by putting commands in autoexec.net, (e.g. 
+when an attach asy command refers to ax25 hardware type the default tcp mss is 
+automatically set to 216).  Likewise, I changed several defaults to more real-
+istic values for radio (e.g. tcp irtt, netrom ttl, ip ttl).  Non-radio users 
+will just have to know what they are doing to use NET over the telephone.  
+Since most operators have no business broadcasting contents of their NET/ROM 
+node tables, I made the netrom verbose option a compiler option, defaulted 
+off.  If someone actually wants to use use NET as a Net/ROM switch, contact me 
+for a custom version, or if you have a compiler, grep for NR_VERBOSE in the 
+source code to see where to enable verbose.
+
+To further assist you, if you are a new user, I added tests to create Note, 
+Warning, and Error messages when NET starts.  Error conditions stop NET.
+
+There are only four changes that may affect your previous autoexec.net or 
+startup.net file.  They are the netrom verbose, netrom bcstifle, mbox and 
+attach kpc4 commands.  As mentioned above, the netrom verbose command is hist-
+ory.  The netrom bcstifle and mbox commands were changed to respond to on|off 
+to be consistent with other commands.  Incidentally mbox is now defaulted on.  
+If you were using the Kantronics KPC-4 or KAM with both ports active you must 
+now use the attach asy command instead of attach kpc4.
+
+I made the exit command  require an argument to help prevent accidental exit.  
+(Error message reads, "Usage: exit please".)  I fixed up the trace command so 
+it was easier to use and added an option, info_only, default active, which 
+prevents display of AX.25 supervisory frames in tracing.  I removed some spur-
+ious linefeeds in the trace display, and added a space between displayed 
+frames.
+
+I replaced the requirement for typing in memory addresses for TCP, AX.25, and 
+Netrom control blocks with numbers (1, 2, ...).  The numbers are displayed 
+with the stat command and further reference (for tcp stat #, tcp kick #, etc.) 
+is by that index number.  The TCP reference numbers are created when you do 
+the tcp stat command, and remain unchanged until you do tcp stat again.  AX.25 
+and Netrom numbers are handled differently; they are dynamic and can change 
+between stat commands if sessions open or close.
+
+The final changes before release dealt with smtp.  Because of brain-damaged 
+Wampes that Bob, W6SWE, encounters, I had to provide a way to send "QUIT" in a 
+separate packet.  Since this lowers NET's performance, it is not the default.  
+You who have to deal with Wampes might have to use an undocumented command, 
+smtp timer w, which will change NET's behavior when sending mail.  This is a 
+toggle.  You can see the current state with the smtp timer command.  If wampes 
+is in effect, a "W" will appear to the right of timer values.  Since I was 
+meddling in smtp portions of the code, I worked them over to stop chronic 
+addition of lines to the ends of messages.  I also fixed an error in BM that 
+was adding an unnecessary line to the last message in the mail file.
+
+8/5/94 k35 - Most of the modifications were cosmetic, and I edited the above
+material to include changes that would affect operations.  There was a lot
+of twiddling to try and make the NET> prompt appear consistently, and it
+still doesn't do it.  I fixed some old errors here and there.  With the
+receipt of a new, fully functional Coherent, I removed old patchwork that
+enabled NET to hobble along under earlier Coherent versions.
+
+73 es Enjoy!
+
+Joe Buswell, K5JB@K5JB.OK
+[44.78.0.2]
+3312 N. Idylwild Dr,
+Midwest City OK 73110-1643
+Internet: k5jb@k5jb.org  (That's correct -- No "ampr")

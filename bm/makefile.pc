@@ -6,17 +6,41 @@
 #	This makefile for Turboc C's make.  (Supposed to also work with
 #	ndmake.  K5JB
 #
+# Simplified compiler selection, use first one for Turbo C 2.0, second one
+# for Borland C++ 2.0 or 3.1.  BC makes larger code.
+COMPILER=DOTURBO
+#COMPILER=DOBORLAND
 
-CFLAGS= -ms -v- -y- -w-nod -w-rvl -O -Z -d -DMSDOS
-LDFLAGS= -ms -v-
+!if ($(COMPILER) == DOTURBO)
+# For Turbo C 2.0 you might use:
+CFLAGS= -v- -y- -ms -w-nod -w-rvl -O -Z -d -DMSDOS
+!else
+# For Borland C++ version 2.0, I have used:
+#CFLAGS= -w-par -w-rvl -w-pro -O -K -G- -Z -DMSDOS
+# For Borland C++ version 3.1, I have used:
+# (Note: -3 is for 80386; delete for 8086):
+#CFLAGS= -y- -w-par -w-rvl -w-pro -O1 -K -DMSDOS
+# One I lifted from my NOS project.  Remove -3 and -DC386 for 8086 version.
+CFLAGS= -v- -y- -ms -a -d -f- -w-par -w-rvl -w-pro -O1 -Z -3 -DC386 -DMSDOS
+!endif
+
+LDFLAGS= -v- -y-
 HDRS=	bm.h header.h
 OBJS=	main.obj send.obj pc.obj bmutil.obj version.obj header.obj \
 	files.obj getopt.obj
 
 all:	bm.exe 
 	
-bm.exe:  $(OBJS)
+!if ($(COMPILER) == DOTURBO)
+bm.exe:	$(OBJS)
 	tcc $(LDFLAGS) -ebm $(OBJS)
+!else
+bm.exe:	$(OBJS)
+	bcc $(LDFLAGS) -ebm $(OBJS)
+!endif
+
+#bm.exe:  $(OBJS)
+#	tcc $(LDFLAGS) -ebm $(OBJS)
 
 clean:
 	del *.obj
@@ -26,14 +50,22 @@ clobber: clean
 #
 # dependencies - please keep up to date!
 #
-bmutil.obj:	bmutil.c bm.h header.h
-pc.obj:	pc.c
-main.obj: 	main.c bm.h
-send.obj:	send.c bm.h
+bmutil.obj:	bmutil.c bm.h header.h config.h
+pc.obj:		pc.c config.h
+main.obj: 	main.c bm.h config.h
+send.obj:	send.c bm.h config.h
 header.obj:	header.c bm.h header.h
-files.obj:	files.c
+files.obj:	files.c config.h
 getopt.obj:	getopt.c
-version.obj:	version.c
+version.obj:	version.c config.h
 
+!if ($(COMPILER) == DOTURBO)
 .c.obj:
-	tcc -c $(CFLAGS) $<
+	tcc -c $(CFLAGS) $*
+!else
+.c.obj:
+	bcc -c $(CFLAGS) $*.c
+!endif
+
+#.c.obj:
+#	tcc -c $(CFLAGS) $<

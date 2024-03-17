@@ -11,6 +11,9 @@
 #include "iface.h"	/* K5JB */
 #include "netrom.h"
 #include "lapb.h"
+#ifdef COH386
+#undef __ARGS	/* avoid a redefinition */
+#endif
 #include <ctype.h>
 
 /* Convert a net/rom network header to host format structure

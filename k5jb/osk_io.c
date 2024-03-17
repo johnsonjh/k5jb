@@ -90,6 +90,8 @@ ioinit()
 #endif
         _gs_devn(2, termname+1);
         termname[0] = '/';
+
+#ifdef STRANGECONS
         fclose(stdin);
         if (fopen(termname, "r+") != stdin)
           exit(1000);
@@ -103,6 +105,7 @@ ioinit()
       
     if (fileno(stdout) != 1)
       exit(4000);
+#endif
 
         _gs_opt(0,&sbuf);
         memcpy(&orgsgbufi,&sbuf,sizeof(sbuf));
@@ -110,7 +113,7 @@ ioinit()
     sbuf.sg_backsp = 0;
     sbuf.sg_delete = 0;
     sbuf.sg_echo = 0;
-    sbuf.sg_alf = 0;
+    sbuf.sg_alf = 1;
     sbuf.sg_nulls = 0;
     sbuf.sg_pause = 0;
     sbuf.sg_page = 0;
@@ -131,7 +134,7 @@ ioinit()
         sbuf.sg_kbach = 0;
         _ss_opt(0,&sbuf);
         
-
+#ifdef STRANGECONS
         _gs_opt(1,&sbuf);
     memcpy(&orgsgbufo,&sbuf,sizeof(sbuf));
     sbuf.sg_case = 0;
@@ -156,17 +159,20 @@ ioinit()
     sbuf.sg_tabcr = 0;
     sbuf.sg_tabsiz = 0;
     sbuf.sg_kbich = 0;
-    sbuf.sg_kbach = 0;
-        _ss_opt(1,&sbuf);
+	sbuf.sg_kbach = 0;
+	_ss_opt(1,&sbuf);
+#endif
 
-        setbuf(stdin,NULL);
+	setbuf(stdin,NULL);
 }
 
 /* Called just before exiting to restore console state */
 iostop()
 {
         _ss_opt(0,&orgsgbufi);
+#ifdef STRANGECONS
         _ss_opt(0,&orgsgbufo);
+#endif
 }
 
 eihalt()
@@ -577,12 +583,18 @@ char **argv;
 {
         struct sgbuf sgbufi, sgbufo;
         _gs_opt(0,&sgbufi);
+#ifdef STRANGECONS
         _gs_opt(1,&sgbufo); 
+#endif
         _ss_opt(0,&orgsgbufi);
+#ifdef STRANGECONS
         _ss_opt(1,&orgsgbufo);
+#endif
         system("");
         _ss_opt(0,&sgbufi);
+#ifdef STRANGECONS
         _ss_opt(1,&sgbufo);
+#endif
 }
 
 /* close a pipe (not different in osk)? */

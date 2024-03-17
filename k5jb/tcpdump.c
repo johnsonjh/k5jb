@@ -9,6 +9,8 @@
 #include "tcp.h"
 #include "trace.h"
 
+#define DODECIMAL /* experimental aid in tracing */
+
 extern FILE *trfp;
 
 /* TCP segment header flags */
@@ -45,15 +47,21 @@ int check;		/* 0 if checksum test is to be bypassed */
 
 	ntohtcp(&seg,bpp);
 
-/*	fprintf(trfp,"TCP: %u->%u Seq x%lx",seg.source,seg.dest,seg.seq,seg.ack);*/
+#ifdef DODECIMAL
+	fprintf(trfp,"TCP: %u->%u Seq x%lx (...%lu)",seg.source,seg.dest,seg.seq,
+		(unsigned long)seg.seq - ((unsigned long)seg.seq/1000L)*1000l);
+#else
 	fprintf(trfp,"TCP: %u->%u Seq x%lx",seg.source,seg.dest,seg.seq);
+#endif
 	if(seg.flags & ACK)
+#ifdef DODECIMAL
+		fprintf(trfp," Ack x%lx (...%lu)",seg.ack,(unsigned long)seg.ack - ((unsigned long)seg.ack/1000l)*1000l);
+#else
 		fprintf(trfp," Ack x%lx",seg.ack);
-	for(i=0;i<6;i++){
-		if(seg.flags & (1 << i)){	/* compiler thot possibly ambiguous */
+#endif
+	for(i=0;i<6;i++)
+		if(seg.flags & (1 << i))	/* compiler thot possibly ambiguous */
 			fprintf(trfp," %s",tcpflags[i]);
-		}
-	}
 	fprintf(trfp," Wnd %u",seg.wnd);
 	if(seg.flags & URG)
 		fprintf(trfp," UP x%x",seg.up);

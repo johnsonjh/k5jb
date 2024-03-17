@@ -8,7 +8,7 @@ ax25dump.r
 ax25subr.r 
 ax25user.r 
 cmdparse.r
-ekiss.r
+mdkiss.r
 files.r 
 fingcli.r 
 fingserv.r 

@@ -30,6 +30,7 @@
 #include "finger.h"
 #include "nr4.h"
 
+extern int mode;	/* cmd mode or conv mode */
 extern struct session *current;
 extern char nospace[];
 extern char badhost[];
@@ -669,6 +670,8 @@ register struct ftp *ftp;
 			}
 			break;	/* other strings are legal too */
 		case USER_STATE:	/* revised this part to loop the login - K5JB */
+			if(!strcmp(ftp->buf, "331-"))	/* continuation k34a */
+				break;
 			if (!strcmp(ftp->buf, "331 ")) {
 				ftp->state = PASS_STATE;
 				noecho();
@@ -732,8 +735,10 @@ char old,new;
 			close_tcp(tcb);
 			break;
 		case CLOSED:    /* heh heh */
-			if(tcb->reason == RESET)
+#ifdef NOTNEEDED
+			if(mode == CMD_MODE && tcb->reason == RESET)
 				noprompt = 1;	/* k35 */
+#endif
 			if(notify){
 				printf("%s (%s",tcpstates[new],reasons[tcb->reason]);
 				if(tcb->reason == NETWORK){

@@ -66,7 +66,7 @@ int check;
 	}
 	switch(uchar(ip.protocol)){
 	case TCP_PTCL:
-		fprintf(trfp," prot TCP\n");
+		fprintf(trfp," prot TCP dat %u\n",ip.length - 40);
 		tcp_dump(bpp,ip.source,ip.dest,check);
 		break;
 	case UDP_PTCL:

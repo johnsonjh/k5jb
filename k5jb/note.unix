@@ -1,29 +1,18 @@
 
-                                unix.note
+                    k5jb.k35.txt and preface to unix.note
 
-When Bob, N0QBJ, provided the changes necessary to compile version k34
-on OS9/68K I incorporated them into my current files.  Since there have
-been numerous file changes since the k34 upload, I am uploading a new
-source code kit, k5jb.k34c.tar.Z.  Most of the changes were cosmetic but
-two programming errors were fixed.  This .tar.Z replaces k5jb.k34.tar.Z.
-None of the other files have changed sufficiently for replacement.  This
-text is contained in k5jb.k34c.txt, and as a preface to note.unix,
-contained in the source code kit.
+Version k35 was uploaded to ftp.ucsd.edu as a complete kit.  Previous files
+are irrlevant.  The complete kit consists of:
 
-Version k34 was uploaded to ucsd.edu as a complete kit.  Previous files
-were irrlevant.  Now, the complete kit --  with new files marked with
-(*) -- consists of:
-
-
-k5jb.k34c.txt   -- This file (*)
-k5jb.k34upd.usr -- File for users.  Contains recent changes.
-k5jb.k34c.tar.Z -- Source code for Unix KA9Q NET (*)
-k5jb.dock34.tar.Z -- Complete user documentation for same.
-k5jb.bmk34.tar.Z  -- Source code for BM v.3.3.1m, mailer.  Updated a little.
+k5jb.k35.txt   -- This file
+k5jb.k35upd.usr -- File for users.  Contains recent changes.
+k5jb.k35.tar.Z -- Source code for Unix KA9Q NET
+k5jb.k35doc.tar.Z -- Complete user documentation for same.
+k5jb.k35bm.tar.Z  -- Source code for BM v.3.3.1n, mailer.  Updated a little.
 k5jb.samp.tar.Z -- Optional, Sample startup files for beginners.
 
-(These files on ucsd.edu are either in /hamradio/packet/tcpip/incoming, or in 
-/hamradio/packet/tcpip/k5jb.)
+(These files on ftp.ucsd.edu are either in /hamradio/packet/tcpip/incoming,
+or in /hamradio/packet/tcpip/k5jb.)
 
                         Brief description of Unix NET
 
@@ -36,36 +25,36 @@ doc on how to do this.
 
 If you are unfamiliar with NET (the TCP/IP suite, written by Phil Karn, KA9Q, 
 and preceding his current project, NOS), you need to break out the files in 
-k5jb.dock33.tar.Z and browse them.  k5jb.k31.tar.Z contains a file,
+k5jb.k35doc.tar.Z and browse them.  k5jb.k35.tar.Z contains a file,
 source.note, which has modification information.
 
                           Brief description of kit
 
 More detail on files contained in this set:
 
-k5jb.k34c.tar.Z
+k5jb.k35.tar.Z
 Contains files needed to compile NET under various System V, Release 3 
-versions of Unix (I use AT&T); under Coherent, version 4.0.1; and under
-OS9-68K.  This file also contains source.note, a collection of revision notes,
-an os9osk.note, and unix.note for information specific to Unix, Coherent and
-OS9-68K that I not yet included in the main documentation.  (This .txt file is
-also the preface to unix.note.)  W5GFE compiled NET and BM under SCO Unix
-(80386) Sys V, release 3, both with the native compiler and with GNU.  Others
-report compiling it under various versions of Unix, but were not specific on
+versions of Unix (I use AT&T); under Coherent, and under OS9-68K.  This file
+also contains source.note, a collection of revision notes, an os9osk.note,
+and unix.note for information specific to Unix, Coherent and OS9-68K that I
+not yet included in the main documentation.  (This .txt file is also the
+preface to unix.note.)  W5GFE compiled NET and BM under SCO Unix (80386)
+Sys V, release 3, both with the native compiler and with GNU.  Others report
+compiling it under various versions of Unix, but were not specific on
 versions used.
 
-k5jb.bmk34.tar.Z
+k5jb.k35bm.tar.Z
 Contains source for Bdale's Mailer (BM).  Works with same environmental 
 variables as K5JB version of NET.  Has been sanitized to prevent memory 
-violations.  Version in this kit is 3.3.1m, modified to deal with some
+violations.  Version in this kit is 3.3.1n, modified to deal with some
 non-RFC-822 compliant mailers (like ELM), and to correct some errors in
 file reading.
 
-k5jb.k34upd.usr
+k5jb.k35upd.usr
 Contains changes made to NET.  Written for the user.  Some of the
 changes affect composition of startup.net.
 
-k5jb.dock34.tar.Z
+k5jb.k35doc.tar.Z
 Contains NET and BM user's documentation.  Targeted for MS-DOS users, but 
 contains essential Unix information.
 
@@ -82,9 +71,15 @@ serial ports attached (like if you have no startup.net file), and issue
 a quit signal to ignore keyboard input, NET will become a CPU hog,
 consuming an enormous amount of the machine's resources.
 
-(End of k5jb.k34c.txt)
+The Coherent problems described in earlier NET releases are now fixed with
+completion of some functions by the time version 4.0.1 was released.  Block-
+ing reads with timed releases, finer time granualarity, and normal creation
+of temporary files makes this the Coherent version almost the same as the
+regular Unix version of NET.
 
-                       File: unix.note, Revised 12/24/93
+(End of k5jb.k35.txt)
+
+                       File: unix.note, Revised 8/4/94
 
      Unix Supplement to K5JB manual for kit of KA9Q NET (pre NOS TCP/IP)
 
@@ -132,11 +127,20 @@ know why that is.  Another person was having some trouble at the console so
 I advised him that I was using virtual terminal drivers.  I don't know if
 that helped him or not but he reported back that it was running fine.
 
-There are two (known) deficiencies in the Coherent version.  Times() doesn't 
-return a the long integer value of clock ticks like the Unix times() so I had 
-to use time() to get clock ticks.  Therefore, timing has one second granular- 
-ity instead of 10 ms.  (Tick(), referred to in the Coherent manual, is non-
-existent in my release of Coherent.)
+I haven't tried logging in from the serial port since I got the Coherent
+4.0.1 release.
+
+The following applies to older versions of Coherent.  If you are running
+release 4.0.1, or a later, version, see the notes in Makefile.coh and in
+unixopt.h, and define COH4 to override the patches made for the deficient
+version(s).  If you are running an earlier Coherent release, but not the
+earliest, try compiling with COH4 defined to see if it works.
+
+There were three (known) deficiencies in the older Coherent version.  Times()
+didn't return a the long integer value of clock ticks like the Unix times()
+so I had to use time() to get clock ticks.  Therefore, timing had one second
+granularity instead of 10 ms.  (Tick(), referred to in the Coherent manual,
+was non-existent in my release of Coherent.)
 
 (Net times and controls events by maintaining a linked list of timers that is 
 synchronized with the CPU's internal clock.  In Coherent's /usr/include/sys/-
@@ -146,22 +150,24 @@ to use Coherent's time() function which returns seconds since 1/1/1970 is
 probably satisfactory except that short duration processes, like pinging 
 yourself, will not return realistic values.)
 
-There is no tmpfile() function in Coherent so temporary files I create with 
-tmpnam() are not deleted when you quit NET.  They are created in /tmp and are 
-deleted if you reboot.  To make them go away upon quitting I guess one would 
-have to build a list of them and delete them when exiting (or create our own 
-unique file names and delete them on exiting).
+There was no tmpfile() function in Coherent so temporary files I created with 
+tmpnam() were not deleted when you quit NET.  They were created in /tmp and
+were deleted if you reboot.
 
 Note that the termio structure members where the control characters are kept
 can be used for timeout values if canonical processing is disabled.  This
-didn't work in Coherent, so I used a poll trick to make a micro-sleep, which
-worked very well.  See sys5_io.c.  The value of the argument to sleep2() is a 
-manifest constant kept in unixopt.h.  You can dink with this number (milli-
-seconds) to tune performance.  (Note that sleep2 has a granularity of 10 ms.)
-
+didn't work in earlier Coherent, so I used a poll trick to make a micro-sleep,
+which worked very well.  See sys5_io.c.  The value of the argument to sleep2()
+is a manifest constant kept in unixopt.h.  You can dink with this number
+(milliseconds) to tune performance.  (Note that sleep2 has a granularity of
+10 ms.)  Later Coherent has a similar function, nap().
+ 
 A couple of Coherent users reported NET caused a core dump, or did other
 un-nice things when starting.  The problem may be related to the Coherent
-driver kit.  I'm really sorry about that, but things like that just happen...
+driver kit.  I'm really sorry about that, but things like that just happen.
+My tests of NET in Coherent consist of running it a few hours on the air
+whenever I make changes, and testing all the things that I changed.  I
+have never had it behave badly.
 
                                    Telunix
 
@@ -180,6 +186,9 @@ Here is how I tested the telunix under Coherent.  I added three pseudo
 1lPttyp0
 1lPttyp1
 1lpttyp2
+
+(They were already identified in release 4.0.1 and I only edited the leading
+0 to a 1 to enable three ports.)
 
 And issued a kill quit 1 command before starting NET.
 
@@ -220,24 +229,20 @@ window at the weather, look up a callsign, add two numbers, login into
 your stupid computer, whatever) and then make the server do it.
 
 I finally completed the shell (!) command to spawn a child process which
-executes the shell for you to return while NET continues to run.  This has
-not been extensively tested but seems to work ok.  I chose to not enable the
-! <cmd> syntax because the method I used has some possible problems with
-certain Unix processes.  The shell (!) command simply spawns a shell process
-which runs until you quit it with an exit or a Ctrl-D.
+executes the shell for you to return while NET continues to run.  I chose
+to not enable the ! <cmd> syntax because the method I used has some possible
+problems with certain Unix processes.  The shell (!) command simply spawns a
+shell process which runs until you quit it with an exit or a Ctrl-D.
 
 What you do from here on is up to you...
 
 Those of you who have OS9-68K have Bob Brose, N0QBJ, to thank for porting
-the code.  See his note, os9osk.note in the kit.
+the code.  See his note, note.os9 in the kit.
 
                              Most recent changes
 
-The following is snipped from the tail end of my source.note:
-
-
                      Source Code Notes for the Programmer
-                                 Jan 14, 1994
+                                 Aug 4, 1994
 
 Since the complete set of source notes is getting lengthy, I will only be 
 including the tail end of my notes.  If someone wants a blow-by-blow account 
@@ -408,10 +413,29 @@ smtpcli.c messing around, I worked it and smtpserv.c over to stop chronic
 adding of lines to the ends of messages.  I also fixed an error in BM that 
 was adding unnecessary line to the last message in the mail file.
 
+7/94, k35
+Much twiddling of things to try and make the NET> prompt come up more
+consistently.  Fixed handling of zero length I frames.  Hardened the
+mailbox a little and added "X-Msgtype" to messages posted with AX.25.
+Added test of mail left with "." only on a line.  Fixed error in Telnet
+relating to IAC.  Fixed omitted format fields in a couple of printf()s.
+Did more work on combios driver once I found one that would transmit in
+blocks.  Fixed an old error in upload and changed "upload stop" to
+"upload off" (to abort an upload).  Modified smtpcli.c to make multiple
+redirections possible (user%host3%host2%host1@host0).  Fixed error in
+ax25cmd.c relating to vcip ssid.
+
+Finally got a Coherent release that fixed things I had to work around.
+Version 4.0.1 now is almost same as Unix in handling blocking reads,
+reading system clock ticks, and making temporary files.  Makefile.coh
+and unixopt.h have places to define whether the newer Coherent is to be
+used.  (This version is a honey on a 486/66.  Really makes my old AT&T
+3B2 look like a plug.)
+
 73 es Enjoy!
 
 Joe Buswell, K5JB@K5JB.OK
 [44.78.0.2]
 3312 N. Idylwild Dr,
 Midwest City OK 73110-1643
-Internet: k5jb@k5jb.ampr.org
+Internet: k5jb@k5jb.org

@@ -147,7 +147,7 @@ ioinit()
 		return -1;
 	}
 
-#ifdef COH386
+#if defined(COH386) && !defined(COH4)
 	/* remove this if Coherent adds VTIME and VMIN functions */
 	fcntl(0, F_SETFL, saveconfl | O_NDELAY); /* non-blocking Input */
 #else
@@ -215,7 +215,9 @@ unsigned bufsize;
 		return -1;
 	}
 
-#ifndef COH386	/* Coherent can't break a block */
+	/* Older Coherent versions can't break a blocking read */
+
+#if !(defined(COH386) && !defined(COH4))
 	/* now make port blocking - first write will report error if so */
 	fcntl(IORser[dev], F_SETFL, tempttyfl & ~O_NDELAY);
 #endif
@@ -373,7 +375,7 @@ unsigned short cnt;
 	return 0;
 }
 
-#ifdef COH386
+#if defined(COH386) && !defined(COH4)
 #include <poll.h>
 
 /* this always returns 0 unless interval is -1.  It returns either when
@@ -437,7 +439,7 @@ unsigned cnt;
 	/* fill the read ahead buffer */
 	if(IOBUF[dev].cnt == 0) {
 		IOBUF[dev].data = IOBUF[dev].buf;
-#ifdef COH386
+#if defined(COH386) && !defined(COH4)
 		sleep2(COHWAIT);	/* a 10 ms sleep to give up CPU cycles */
 #endif
 		r = read(IORser[dev], IOBUF[dev].data, IOBUFLEN);

@@ -100,7 +100,7 @@ int
 kbread()
 {
 	unsigned char c;
-#ifdef COH386
+#if defined(COH386) && !defined(COH4)
 	int sleep2();
 
 	sleep2(COHWAIT);	/* only needed when no async ports are used */
@@ -128,7 +128,7 @@ clksec()
 	return ((int) tim);
 }
 
-#ifdef COH386
+#if defined(COH386) && !defined(COH4)
 FILE *
 tmpfile()
 {
@@ -254,22 +254,30 @@ check_time()
 {
 	int32 iss();
 	void tickle();
-#ifdef COH386
+#if defined(COH386) && !defined(COH4)
 	long time();
 #else
 	struct tms tb;
+#ifndef COH4
 	long times();
+#endif
 #endif
 
 	static long clkval;
 	long ntime, offset;
 
-	/* read elapsed real time (typ. 60 Hz) */
-/* until I figure out how to make tick() work, will work in seconds */
-#ifdef COH386
+	/* With older Coherent, read elapsed real time in seconds, others
+    * are done in machine clock ticks.  Later Coherent has times()
+    * fixed but it returns an int instead of a long
+    */
+#if defined(COH386) && !defined(COH4)
 	time(&ntime);
 #else
+#ifdef COH4	/* damned thing returns an int */
+	ntime = (long)times(&tb);
+#else
 	ntime = times(&tb);
+#endif
 #endif
 
 	/* resynchronize if the error is large (10 seconds or more) */

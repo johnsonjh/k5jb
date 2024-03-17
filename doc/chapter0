@@ -35,7 +35,7 @@
 
 
 
-                              Bdale' Preface
+                   Bdale' Preface to Original Document
 
 
 As is so often the case, when it came down to the wire and something had 
@@ -59,32 +59,33 @@ My profound thanks to the folks who contributed to this release.
 
                        Joe Buswell, K5JB, 44.78.0 2
 
-(Editor's note: I must express my appreciation to Bdale for the work he 
-put into this document.  I certainly would have been unable to understand, 
-and be unable to manipulate the program suite as well as I have, without 
-this information.  I have been supplying beginners in my area with a 
-collection of files from other sources (and notes of things I discovered) 
-to supplement this tome, and my collection was getting so large I felt 
-that doing some editing was in order to simplify other's search for 
-information.  I left Chapter 1 pretty much alone, but re-organized most of 
-the rest to incorporate things that have come to pass since this was 
-originally written.  I hope Bdale would approve of what I did.
+Editor's note: I must express my appreciation to Bdale for the work he put 
+into this document.  I certainly would have been unable to understand, and 
+be unable to manipulate the program suite as well as I have, without this 
+information.  I have been supplying beginners in my area with a collection 
+of files from other sources (and notes of things I discovered) to supple-
+ment this tome, and my collection was getting so large I felt that doing 
+some editing was in order to simplify other's search for information.  I 
+left Chapter 1 pretty much alone, but reorganized most of the rest to 
+incorporate things that have come to pass since this was originally writ-
+ten.  My interest in NET has been primarily to suit myself.  If someone 
+else finds use for the thing I am happy to share my work.
 
   Joe Buswell, K5JB, 44.78.0.2
   3312 N. Idylwild Dr.
   Midwest City OK 73110-1643
 
 .pa
-                                July 1991
+                   Initial Revision notes -- July 1991
+
 
 Chapter 1 was virtually unchanged.
 
-Chapter 2 was changed to add some of the information from the TAPR 
-"Plug'N'Play disk and to refer to the sample files that were added to the 
-kit.  Some changes were made to correct a few errors in file paths for the 
-MS-DOS computer, add information for tidying file placement, add 
-information on new functions, and include information on starting the Unix 
-version.
+Chapter 2 was changed to add some of the information from the TAPR "Plug-
+'N'Play disk and to refer to the sample files that were added to the kit.  
+Some changes were made to correct a few errors in file paths for the MS-
+DOS computer, add information for tidying file placement, add information 
+on new functions, and include information on starting the Unix version.
 
 Chapter 3 Was edited to add a few more examples of test driving net.
 
@@ -93,7 +94,8 @@ environmental variable information.
 
 Chapter 5, which was originally for advanced topics, and was empty, is now 
 used to explain NET/ROM, Finger, Mulport, Mbox, and a stray Datagram/VC 
-explanation from the commands chapter.
+explanation from the commands chapter.  It also discusses AX.25 Segmentat-
+ion and the relationships between paclen, tcp mss, interface mtu, etc.
 
 Chapter 6 was edited to add almost all available commands, particularly 
 for NET/ROM Finger and Mbox.
@@ -115,13 +117,13 @@ compiler directives that were originally in config.h.
                           March - November 1992
 
 Added ROSE information in Chapters 5 and 6.  Added ax25 mboxcall command 
-information.  Revised index in Chapter 0.  Revised Virtual Circuit support 
-(for ROSE) and made some changes to make NET and BM compile and work under 
-Coherent 386.  Added a few commands, fixed an error in the shell (!) 
-command. Revised the help command to permit reading any file with a .hlp 
-extension.  Default help files were renamed to net.hlp and helpbox.hlp.  
-Added an optional ax25 heard command.  Uploaded Unix and Coherent files to 
-UCSD.  Reworked latter files to free up processor time when running NET.
+information.  Revised Virtual Circuit support (for ROSE) and made some 
+changes to make NET and BM compile and work under Coherent 386.  Added a 
+few commands, fixed an error in the shell (!) command. Revised the help 
+command to permit reading any file with a .hlp extension.  Default help 
+files were renamed to net.hlp and helpbox.hlp.  Added an optional ax25 
+heard command.  Uploaded Unix and Coherent files to UCSD.  Reworked latter 
+files to free up processor time when running NET.
 
                                  April 1993
 
@@ -130,13 +132,55 @@ memory management.  Completed the Unix telunix code.  Caused incoming
 telnet, AX.25 and NET/ROM terminal sessions to automatically activate.  
 Added a send message command to communicate with mailbox users.
 
+                            July-December 1993
+
+Helped Bob Brose, N0QBJ, add OS9/OSK portability to the files.  Added NOS 
+type AX.25 segmentation, smoothed out the AX.25 LAPB process to eliminate 
+unnecessary frames by making T2 really work, corrected an error in MS-DOS 
+clock handling at midnight, corrected a couple of errors related to telnet 
+uploading and absent smtp directories.  Enabled ability to do AX.25 V1 
+protocol.  Replaced earlier "ROSE trap" with a simpler method of handling 
+spurious I frames. Wrote some advice in Chapter 5 for NOS users who can't 
+figure out how to use ROSE.  Incorporated in MS-DOS the Cute incoming 
+telnet session video available in the Unix version, while extending it to 
+the AX.25 and Netrom sessions.
+
+I made a special effort to modernize NET's look and simplify its 
+operation, for example:  Made several cosmetic changes to screen reports 
+and simplified some commands, specifically those that required typing 
+computer addresses, ugh!.  Made the trace command a little simpler and 
+maybe more useful by adding an "info only" switch to it.  Added message of 
+the day capability to telnet and mailbox chat sessions.  Added file system 
+checking, which reports information on incorrect setup, and even stops NET 
+if critical errors detected.  Made as many defaults as possible match 
+typical amateur radio requirements so NET can be started in a fully 
+functional state with only four configuration commands and six start 
+commands in autoexec.net.  (It only needs to know the AX.25 call sign, the 
+IP address, the host name, and have the serial port attached.)  Some 
+command changes that were made to improve consistency (e.g. yes|nos were 
+changed to on|offs) and might affect previous autoexec.nets.  Netrom 
+verbose is no longer included unless you compile a custom NET for a switch 
+application.  See Chapter 6 for current command syntax.
+
+In the Unix version, created some client-server stubs that users can apply 
+to custom applications.  Also made the shell command work by spawning a 
+child process for it while NET continues to run in the background.  I may 
+make some stub processes for the MS-DOS version in a future version.
+
+Reduced NET's executable size (MS-DOS) between k29 and k34 by 6200 bytes.  
+Did some general cleanup work on BM while modifying it to compensate for 
+flawed headers created by some other (un-named) mailers.
+
+
+.pa
+                            This Documentation
+
 In the interest of portability, (and to save file space) this is supplied 
 as a set of nine ASCII text files with no formatting information except 
-some explicit page breaks.  Some page breaks are marked with the string, 
-".pa" at the left margin.  Not all page breaks are so marked, but places 
-where there would be ungraceful breaks in tables, etc. are.  All text is 
-flush left margin except certain indented and centered lines.  Maximum 
-line length is 76 characters, which includes spaces at end of lines.
+some explicit page breaks (.pa in the left margin) where there would 
+otherwise be an ungraceful break in a table, etc.  All text is flush left 
+margin except certain indented and centered lines.  Maximum line length is 
+76 characters, which includes spaces at end of lines.
 
 A print formatting utility, pagenet.exe, is included if you want to use 
 it.  Pagenet strips trailing line spaces but your word processor print 
@@ -183,34 +227,43 @@ For a quick start, I suggest you only print the preface (chapter0) and
 Chapters 2 through 6.  You can print the others later to read while 
 sitting around a cozy fireplace some winter evening.
 
-.pa
+If you are fortunate to have Wordstar, you might try using it to print 
+this thing.  I print replacement pages by using .rm 74, .mt 1, .mb 4, 
+setting the printer to do letter gothic, and letting 'er rip.
+
                         Notes on Software Version
 
-There are all kinds of NOS and NET versions floating around.  This 
-information, and the files included in the kit, are based on NET that I 
-got at Dayton in 1989.  The only thing I did it was fix all the bugs I 
-could find, squeeze wasted space, and add some two-way functionality to 
-the AX.25 - NET/ROM Mailbox.  I wanted to keep it small so it could live 
-on my MS-DOS computer along with CBBS and other things running under 
-DESQview, and run under Unix on my AT&T 3b2 without maintaining two sets 
-of files .  Oh yeah, I got the DRSI PC*PA packet driver working correctly 
-for the MS-DOS version and I recently added a simple method for getting 
-on-line help without reaching for the book.  I kept the hardware specific 
-source files for Atari, Mac, non-System V Unix, Eagle, HAPN, and PacComm 
-PC-100 driver source separate, and excluded them from this kit.  I can 
-supply them if you want them.  There are some more software notes in this 
-kit related to the source code.  I flagged most of the things that I 
-changed with at least a remark, "/* K5JB */ wherever I made a change.  
-When you see it you will know why I did it.
+This NET is based on the kit that I got at Dayton in 1989.  Initially, the 
+only thing I did it was fix bugs that crashed it and add some two-way 
+functionality to the AX.25 - NET/ROM Mailbox.  I kept it small so it could 
+live on my MS-DOS computer along with CBBS and other things running under 
+DESQview, and run under Unix on my AT&T 3B2 without maintaining two sets 
+of files.  Subsequently, I added things to suit my particular station, 
+like the DRSI PC*PA packet driver (backed out of NOS and made to work 
+correctly) and corrected non-functional things like the packet driver.  I 
+added a simple method for getting on-line help without reaching for the 
+book.  I prepared this documentation with the first TAPR distribution.
 
 I understand that all current development work is being done on NOS, but 
 for my purposes, I was happier with a smaller and well behaved program 
+that would excel in its intended function (TCP/IP over amateur radio), 
 that would co-exist on the MS-DOS computer with other programs and run as 
 well on the Unix computer.  NET makes a fine (relatively) little IP engine 
 on these machines and though not designed as a Unix application works very 
-well, particularly on the Intel 386 versions of Unix.  A recent challange 
-to make IP available to the G8BPQ scheme was met very well with NET and I 
-tested it on an XT with two other applications running under Desqview.
+well.  A recent challange to make IP available to the G8BPQ scheme was met 
+very well with NET and I tested it on an XT with two other applications 
+running under Desqview.  Once it was apparent that no one else cared what 
+I did with NET, I felt free to re-organize and simplify things whenever I 
+saw an advantage.  There is now considerable internal difference between 
+current and original versions of NET, though the fundamental structure 
+remains unchanged.  NET is perhaps 30k smaller than when I started and has 
+enormously increased in performance.  I attribute this to my narrow design 
+requirements, and time to piddle with it.
+
+I have recently (11/93) made the observation that while NOS is a BBS with 
+incidental TCP/IP, NET is still TCP/IP with an incidental mailbox, heh!  I 
+strongly recommend NOS to those who suggest adding features NET that are 
+outside of my design goals.
 
 I am very conservative about modifying code and its possible side effects 
 so I give each modification a reasonable test before letting the local 
@@ -218,15 +271,15 @@ operators wring it out.  Each change, however minor, bumps the sub version
 number (e.g. from j67 to j68) so I can diagnose problems possibly caused 
 by changes.  Within each version there are compile time options that net 
 reports on the startup screen.  Current net version when I release this 
-will be k.  Current BM version is 3.3.1j.  On MS-DOS, I personally run the 
-Multiport code with the Kantronics KPC-4 driver and an experimental COMBIOS
+will be k.  Current BM version is 3.3.1m.  On MS-DOS, I personally run the 
+Multiport code with the multidrop KISS driver and an experimental COMBIOS
 driver, making a total of four logical asy ports, two of them provided by 
-the KPC-4 driver.
+the multidrop KISS driver.
 
-Source code for the Unix/Coherent version is being maintained on ucsd.edu 
-in /hamradio/packet/tcpip/k5jb directory.  Disks containing the MS-DOS 
-executables, some setup help files, and source code are maintained in the 
-Tucson Amateur Packet Radio (TAPR) library.
+Source code for the Unix/Coherent/OS9-68K version is being maintained on 
+ucsd.edu in /hamradio/packet/tcpip/k5jb directory.  Disks containing the 
+MS-DOS executables, some setup help files, and source code are maintained 
+in the Tucson Amateur Packet Radio (TAPR) library.
 
 Latest notes will be contained in a file, readme.1st, included with the 
 MS-DOS executables.  An LHA archive, etcfiles.lha, contains configuration 
@@ -241,7 +294,7 @@ effective to send me a floppy and mailer than to download files long
 distance.
 .pa
                                Crude Index
-                           Revised October 1992
+                           Revised December 1993
 
 (I quit trying to keep up with page numbers as I edited this thing, so 
 hopefully you can find your way from the paragraph numbering.)
@@ -277,10 +330,9 @@ hopefully you can find your way from the paragraph numbering.)
 2.2.3.  AEA PK-232 and PK-87
 2.2.4.  DRSI PC Packet Adapter
 2.2.5.  Kantronics TNC's
-2.2.5.1.  Optional kpc4 driver
-2.2.5.2.  KPC-4 explanation
-2.2.5.3.  KISS as applied by Kantronics
-2.2.6.  PacComm PC-100 Card, EAGLE, HAPN, etc.
+2.2.6.  Optional Multidrop KISS driver
+2.2.6.1.  Multidrop KISS explanation
+2.2.7.  PacComm PC-100 Card, EAGLE, HAPN, etc.
 2.3.  IBM PC and Clones
 2.3.1.  Serial Data Cable
 2.3.2.  MS-DOS Quick Start -- File Structure
@@ -296,11 +348,9 @@ hopefully you can find your way from the paragraph numbering.)
 2.4.  DESQview Setup
 2.5.  Unix
 2.5.1.  Telunix (remote login)
-2.5.2.  NET and Unix Multi-tasking
+2.5.2.  Telserv (general purpose server)
+2.5.3.  NET and Unix Multi-tasking
 2.6.  Macintosh
-2.7.  Atari ST
-2.8.  NEC PC-9801
-2.9.  Hewlett-Packard Portable Plus
 
 3.  Taking NET for a Test Drive
 3.1.  Trying out the AX.25 Support
@@ -314,55 +364,57 @@ hopefully you can find your way from the paragraph numbering.)
 
 4.  The Mail System
 4.1.  Installing and Using BM
-4.1.1.  Installation
-4.1.1.1.  Directory Structure
-4.1.1.2.  Configuration File
-4.1.1.2.1.  edit <path of your editor>
-4.1.1.2.2.  folder <directory name>
-4.1.1.2.3.  fullname <your full name>
-4.1.1.2.4.  host <your hostname>
-4.1.1.2.5.  maxlet <number of messages>
-4.1.1.2.6.  mbox <filename>
-4.1.1.2.7.  mqueue <path>
-4.1.1.2.8.  record <filename>
-4.1.1.2.9.  reply <return address>
-4.1.1.2.10.  screen [bios|direct]
-4.1.1.2.11.  smtp <path>
-4.1.1.2.12.  user <username>
-4.1.1.2.13.  zone <timezone>
-4.1.1.2.14.  Example BM.RC File
-4.1.1.3.  The alias File
-4.1.1.4.  \spool\mqueue\sequence.seq
-4.1.2.  Environment - Timezone
-4.2.  Commands
-4.2.1.  Main Menu Commands
-4.2.1.1.  m [userlist]
-4.2.1.2.  d [msglist]
-4.2.1.3.  h
-4.2.1.4.  u [msglist]
-4.2.1.5.  n [mailbox]
-4.2.1.6.  ! cmd
-4.2.1.7.  ?
-4.2.1.8.  s [msglist] [file]
-4.2.1.9.  p [msglist]
-4.2.1.10.  w [msglist] file
-4.2.1.11.  f [msg]
-4.2.1.12.  b [msg]
-4.2.1.13.  r [msg]
-4.2.1.14.  msg#
-4.2.1.15.  l
-4.2.1.16.  k [msglist]
-4.2.1.17.  $
-4.2.1.18.  x
-4.2.1.19.  q
-4.2.2.  Text Input Commands
-4.2.3.  Command Line Options BM may be invoked as follows:
-4.3.  Technical Information
-4.3.1.  Outbound Mail Queue File Formats
-4.3.2.  Standards Documents
-4.4.  Bug Reports
+4.1.1.  Directory Structure
+4.1.2.  Configuration File
+4.1.2.1.  edit <path of your editor>
+4.1.2.2.  folder <directory name>
+4.1.2.3.  fullname <your full name>
+4.1.2.4.  host <your hostname>
+4.1.2.5.  maxlet <number of messages>
+4.1.2.6.  mbox <filename>
+4.1.2.7.  mqueue <path>
+4.1.2.8.  record <filename>
+4.1.2.9.  reply <return address>
+4.1.2.10.  screen [bios|direct]
+4.1.2.11.  smtp <path>
+4.1.2.12.  user <username>
+4.1.2.13.  wordwrap
+4.1.2.14.  zone <timezone>
+4.1.2.15.  Example BM.RC File
+4.1.3.  The alias File
+4.1.4.  \spool\mqueue\sequence.seq
+4.2.  Environment - Timezone
+4.3.  Commands
+4.3.1.  Main Menu Commands
+4.3.1.1.  b [<msg>]
+4.3.1.2.  d [<msglist>]
+4.3.1.3.  f [<msg>]
+4.3.1.4.  h
+4.3.1.5.  k <job id>
+4.3.1.6.  l
+4.3.1.7.  m [<userlist>]
+4.3.1.8.  n [<mailbox>]
+4.3.1.9.  N
+4.3.1.10.  p <msglist>
+4.3.1.11.  q
+4.3.1.12.  r [<msg>]
+4.3.1.13.  s [<msglist>] [<file>]
+4.3.1.14.  u <msglist>
+4.3.1.15.  w <msglist> <file>
+4.3.1.16.  x
+4.3.1.17.  .
+4.3.1.18.  ! <cmd>
+4.3.1.19.  $
+4.3.1.20.  ?
+4.3.1.21.  msg#
+4.3.2.  Text Input Commands
+4.3.3.  Command Line Options BM may be invoked as follows:
+4.4.  Technical Information
+4.4.1.  Outbound Mail Queue File Formats
+4.4.2.  Standards Documents
 
-5.  Other Things: NET/ROM, Finger, Mulport, Mbox, Datagrams and VC
+5.  Other Things: NET/ROM, Finger, Mulport, Mbox, Datagrams, V Circuit
+    and AX.25 Segmentation
 5.1.  NET/ROM Services
 5.1.1  Setting up NET/ROM
 5.1.1.1  The NET/ROM Interface
@@ -390,7 +442,8 @@ hopefully you can find your way from the paragraph numbering.)
 5.4.2.  Mbox File placement.
 5.4.3.  Mbox user commands
 5.5.  Virtual Circuits and Datagrams
-5.6.  ROSE Transport over Virtual Circuits
+5.6.  ROSE Transport
+5.7.  AX.25 Segmentation
 
 6.  NET Command Reference
 6.1.  Startup
@@ -401,12 +454,13 @@ hopefully you can find your way from the paragraph numbering.)
 6.3.3.  !
 6.3.4.  #
 6.3.5.  arp
-6.3.5.1.  arp add <hostid> ether|ax25|netrom <ether addr|callsign>
-6.3.5.2.  arp drop <hostid> ether|ax25|netrom
-6.3.5.3.  arp publish <hostid> ether|ax25|netrom <ether addr|callsign>
+6.3.5.1.  arp add <hostid> ether|ax25|netrom|vax25 <ether addr|callsign>
+6.3.5.2.  arp drop <hostid> ether|ax25|netrom|vax25
+6.3.5.3.  arp publish <hostid> ether|ax25|netrom|vax25 <ether addr|callsign>
 6.3.6.  attach <hwtype> <I/O addr> <vector> <mode> <label> <bufsize> <mtu>
              <speed>"
-6.3.6.1.  G8BPQ and NET
+6.3.6.1.  Ethernet, G8BPQ and NET
+6.3.6.2.  axmotd [<message> | - ]
 6.3.7.  ax25
 6.3.7.1.  ax25 digipeat [on|off]
 6.3.7.1.1  ax25 heard [on|off|clear] (optional)
@@ -415,11 +469,14 @@ hopefully you can find your way from the paragraph numbering.)
 6.3.7.4.  ax25 mboxcall [<call>]
 6.3.7.5.  ax25 paclen [<val>]
 6.3.7.6.  ax25 pthresh [<val>]
-6.3.7.7.  ax25 reset <axcb>
+6.3.7.7.  ax25 reset <axcb#>
 6.3.7.8.  ax25 retry [<val>]
-6.3.7.9.  ax25 status [<axcb>]
-6.3.7.10.  ax25 t1|t2|t3|T4 [<val>]
-6.3.7.11.  ax25 window [<val>]
+6.3.7.8.1  ax25 segment [on | off]
+6.3.7.9.  ax25 status [<axcb#>]
+6.3.7.10.  ax25 t1|t2|t3|t4 [<val>]
+6.3.7.11.  ax25 vers [v1|v2]
+6.3.7.12.  ax25 vcipcall [<call>]
+6.3.7.13.  ax25 window [<val>]
 6.3.8.  cd [<directory path>]
 6.3.9.  close [<session #>]
 6.3.10.  connect <interface> <callsign> [<digipeater> ...  ]
@@ -429,7 +486,7 @@ hopefully you can find your way from the paragraph numbering.)
 6.3.14.  eol [unix|standard]
 6.3.15.  escape <char>
 6.3.16.  etherstat
-6.3.17.  exit
+6.3.17.  exit please
 6.3.18.  finger [<user|user@host|@host>]
 6.3.19.  ftp <hostid>
 6.3.19.1.  abort    {ftp command}
@@ -455,38 +512,38 @@ hopefully you can find your way from the paragraph numbering.)
 6.3.23.1.  ip address [<hostid>]
 6.3.23.2.  ip status [clear]
 6.3.23.3.  ip ttl [<val>]
-6.3.24.  kport [0|1] (deleted and replaced by attach kpc4, Sect. 6.3.6.)
-6.3.24.1.  mail [<hostname>] [<pages to skip>]
-6.3.25.  mbox [ y|n|?| s [<message>] ]
+6.3.24.  mailscan [<hostname>] [<pages to skip>]
+6.3.25.  mbox [ on | off | s [<message>] ]
+6.3.25.1.  motd [<message> | - ]
 6.3.26.  memstat
 6.3.27.  mode <interface> [vc|datagram]
 6.3.28.  mulport [on|off]
 6.3.29.  NET/ROM Commands
 6.3.29.1.  netrom acktime [<value>]
 6.3.29.2.  netrom bcnodes <iface name>
-6.3.29.2.1.  netrom bcstifle <iface name> 0|1
+6.3.29.2.1.  netrom bcstifle <iface name> on|off
 6.3.29.3.  netrom connect <alias|callsign>
 6.3.29.4.  netrom choketime [<value>]
 6.3.29.5.  netrom interface <iface name> <node alias> <qual>
 6.3.29.6.  netrom irtt [<value>]
-6.3.29.7.  netrom kick <&nrcb>
+6.3.29.7.  netrom kick <nrcb#>
 6.3.29.8.  netrom nodefilter [<add|drop> <call> <iface>]
 6.3.29.9.  netrom nodefilter mode [none|accept|reject]
 6.3.29.10.  netrom nodetimer [<value>]
 6.3.29.11.  netrom obsotimer [<value>]
 6.3.29.12.  netrom qlimit [<value>]
-6.3.29.13.  netrom reset <&nrcb>
+6.3.29.13.  netrom reset <nrcb#>
 6.3.29.14.  netrom retries [<value>]
 6.3.29.11.  netrom route
 6.3.29.12.  netrom route add <alias> <dest> <iface> <qual>
                           <neighbor> [<digi ... >]
 6.3.29.13.  netrom route drop <dest> <neighbor> <iface>
 6.3.29.14.  netrom route info <dest>
-6.3.29.15.  netrom status [<&nrcb.]
+6.3.29.15.  netrom status [<nrcb#>]
 6.3.29.16.  netrom ttl [<value>]
-6.3.29.17.  netrom verbose [<yes|no>]
+6.3.29.17.  netrom verbose [<on|off>]
 6.3.29.18.  netrom window [<value>]
-6.3.30.  param <interface> [<param>]
+6.3.30.  param <interface> [<param>] | mtu [<value>]
 6.3.31.  ping [ [<hostname> [<interval>] ] | clear ]
 6.3.32.  pwd [<dirname>]
 6.3.33.  record [<filename>|off]
@@ -494,7 +551,7 @@ hopefully you can find your way from the paragraph numbering.)
 6.3.35.  rosebash (obsolete)
 6.3.36.  route [add|drop]  (see below)
 6.3.36.1.  route add <dest addr>[/bits]|default <interface> 
-                [<gateway hostid> [<metric>]]
+                [<gateway hostid>|* [<metric>]]
 6.3.36.2.  route drop <dest hostid>
 6.3.37.  session [<session #>]
 6.3.38.  shell (also Unix shell layer manager, shl)
@@ -510,21 +567,19 @@ hopefully you can find your way from the paragraph numbering.)
 6.3.42.  stop <server name>
 6.3.43.  tcp
 6.3.43.1.  tcp irtt [<val>]
-6.3.43.2.  tcp kick <tcb_addr>
+6.3.43.2.  tcp kick <tcb#>
 6.3.43.3.  tcp mss [<size>]
-6.3.43.4.  tcp reset <tcb_addr>
-6.3.43.5.  tcp rtt <tcb_addr> <rttval>
-6.3.43.6.  tcp status [<tcb_addr>]
+6.3.43.4.  tcp reset <tcb#>
+6.3.43.5.  tcp rtt <tcb#> <rttval>
+6.3.43.6.  tcp status [<tcb#>]
 6.3.43.6.1.  tcp timertype [linear | exponential] [<max backoff minutes>]
 6.3.43.7.  tcp window [<val>]
 6.3.44.  telnet <hostid>
-6.3.45.  trace [<interface> [<flags>]|allmode|cmdmode]
+6.3.45.  trace [various - see below]
 6.3.46.  udp status
 6.3.47.  upload [<filename>]
-6.3.48.  vcircuit [add|drop|attach]
-6.3.48.1.  vcircuit add <remote IP call>
-6.3.48.2.  vcircuit drop <remote IP call>
-6.3.48.3.  vcircuit attach <VC iface> <asy iface>
+6.3.48.  vattrib bold|reverse|none|color <hex#>
+
 6.4.  AX.25 - Net/ROM Mailbox User Commands
 6.4.1.  Bye
 6.4.2.  Chat
@@ -553,7 +608,7 @@ hopefully you can find your way from the paragraph numbering.)
 7.9.  The Transmission Control Protocol (TCP)
 7.10.  The User Datagram Protocol (UDP)
 7.11.  Mulport
-7.12.  Other Add-Ons - Good BAD and __UGLY__
+7.12.  Other Add-Ons - Editorial Comments
 
 8.  KISS and FTP Packet Driver
 8.1.  The KISS Host to TNC Protocol

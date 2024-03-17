@@ -57,15 +57,10 @@ char *Nr4reasons[] = {
 	"Refused"
 } ;
 
-#ifdef NR_VERBOSE
-static int donrverbose();
-#endif
-
-static int dointerface(), dobcnodes(), donodetimer(), donrroute(),
-		   donrttl(), doobsotimer(), donodefilter(),
-		   donrconnect(), donrreset(), donrwindow(), donrirtt(),
-		   donracktime(), donrqlimit(), donrchoketime(), donrretries(),
-			donrstatus(), donrstifle(), donrkick() ;
+static int donrverbose(),dointerface(), dobcnodes(), donodetimer(),
+	donrroute(),donrttl(), doobsotimer(), donodefilter(),donrconnect(),
+	donrreset(), donrwindow(), donrirtt(),donracktime(), donrqlimit(),
+	donrchoketime(), donrretries(),donrstatus(), donrstifle(), donrkick();
 
 extern char notval[];
 extern char range[];	/* in smtpcli.c */
@@ -95,14 +90,12 @@ static struct cmds nrcmds[] = {
 	"ttl",		donrttl,	0,	NULLCHAR, "ttl must be between 2 and 20",
 #ifdef NR_VERBOSE
 	"verbose",	donrverbose,0, NULLCHAR, "netrom verbose [on|off]",
+#else
+	"verbose",	donrverbose,0, NULLCHAR, NULLCHAR,
 #endif
 	"window",	donrwindow,	0,	NULLCHAR, range,
-	NULLCHAR,	NULLFP,		0,
-#ifdef NR_VERBOSE
+	NULLCHAR,	NULLFP,0,
 	"netrom subcmds: acktime bcnodes bcstifle connect choketime interface irtt kick\n  nodefilter nodetimer obsotimer qlimit reset retries route status ttl verbose\n  window",
-#else
-	"netrom subcmds: acktime bcnodes bcstifle connect choketime interface irtt kick\n  nodefilter nodetimer obsotimer qlimit reset retries route status ttl window",
-#endif
 		NULLCHAR
 } ;
 
@@ -676,13 +669,13 @@ char *argv[] ;
 	return 0 ;
 }
 
-#ifdef NR_VERBOSE
-/* verbose route broadcast */
+/* verbose route broadcast - silently do nothing if NR_VERBOSE not enabled */
 static
 donrverbose(argc,argv)
 int argc ;
 char *argv[] ;
 {
+#ifdef NR_VERBOSE
 	if(argc > 1)
 		if(argv[1][1] == 'f' || argv[1][1] == 'n')
 			nr_verbose = argv[1][1] == 'n' ? 1 : 0;
@@ -690,9 +683,9 @@ char *argv[] ;
 			return -1;
 	else
 		printf("verbose is %s\n", nr_verbose ? "on" : "off" ) ;
+#endif
 	return 0;
 }
-#endif
 
 /* Initiate a NET/ROM transport connection */
 static int
@@ -877,7 +870,7 @@ struct nr4cb *cb ;
 int16 cnt;
 {
 	register struct mbuf *bp;
-	int term_recv();
+	void term_recv();
 #ifdef FLOW
 	extern int ttyflow;	/* k34 */
 #endif
@@ -892,7 +885,7 @@ int16 cnt;
 
 	if((bp = recv_nr4(cb,cnt)) == NULLBUF)
 		return;
-	term_recv(bp,current->record,0);
+	term_recv(bp,current->record);
 }
 
 /* Handle transmit upcalls. Used only for file uploading */

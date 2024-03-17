@@ -100,12 +100,12 @@ int argc;
 char *argv[];
 {
 	register struct tcb *tcb;
-	extern int closepending;	/* something we need to clean up prompts */
+	extern int noprompt;	/* something we need to clean up prompts */
 
 	if((tcb = simple_get(atoi(argv[1]))) == NULLTCB)
 		return -1;
 	cmdmode();	/* k35 */
-	closepending = 1;	/* to control prompts k35 */
+	noprompt = 1;	/* to control prompts k35 */
 	close_self(tcb,RESET);
 	return 0;
 }

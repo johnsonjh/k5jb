@@ -6,6 +6,8 @@
  * Before starting telserv, the server must be running with input key of
  * 1234 and output key of 5678.  This client will use the reverse of those
  * keys to establish communication.
+ * (See notes in src/msgs for message queue management utilities.)
+
  */
 #include "unixopt.h"
 #ifdef TELSERV	/* rest of module */
@@ -28,7 +30,7 @@
 #include <errno.h>
 
 #define MSGLEN 256	/* can tune this later */
-#define INKEY 5678	/* these complement keys in the server */
+#define INKEY 5678	/* these compliment keys in the server */
 #define OUTKEY 1234
 
 extern int exitval;

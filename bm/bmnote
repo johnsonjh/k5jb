@@ -1,18 +1,33 @@
 See send.c and unix.c for temporary fixes for Coherent related to missing
 function tmpfile().  Need to return and make provisions to remove temporary
 files when bm exits.
-
-(These are repackaged as a tape archive for Internet upload.  Ignore
-MS-DOS references, though this is a complete set of files for either
-MS-DOS or Unix.)
-
-See send.c and unix.c for temporary fixes for Coherent related to missing
-function tmpfile().  Need to return and make provisions to remove temporary
-files when bm exits.
-
 Never did return and make the above fixes.
 Incorporated changes to increase number of characters the word wrap looks back
 to find a space at end of line, and loosened test for correct date format
 in incoming mail.  Some systems don't strictly comply with RFC-822.
 Merged my changes with those made by Bob, N0QBJ, to make this code compile
 and run under OS9-OSK.  Bumped version up to 3.1.1l (ell)  Joe, K5JB
+v.3.1.1.m: Changed presentation of ELM's faulty dates and added capability to 
+dig into the From: line for <user@host> field.  Cleaned up compiler warnings.
+Functional differences: Disabled SETVBUF in the MS-DOS version, removed some 
+things (like direct video option), and non functional signal handling.  Made 
+a config.h to better manage things.
+
+Some memory requirements with BM in DESQview:
+Using Z, the Aztec editor, 150k DV window, BM with no vbuf, 13k file can be
+edited.  With 170k window, 33.5K file can be edited.
+
+Using Qedit, 180K DV window, 29K file can be edited; w/ 170K, 19K; with
+160K, 9K file.  In these tests we shut DV window on close.  If we want
+to leave it open while testing for error messages, editing file size is
+reduced about 3k.
+
+Qedit therefore takes about 14.5K more to work.  I didn't try to find minimum
+DV window size that would work with Qedit.
+
+1/29/94 Added quoting of imported messages (~M [<number>])
+6/6/94 Fixed error in record file, added -a <aliasfile> and -r (rcfile> to
+permit specifying alternate file names with starting command line.  BM
+looks for these files in the same directory where it would find the original
+defaults.
+

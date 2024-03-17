@@ -29,8 +29,8 @@ brian@ucsd.edu on the Internet.
 2.2.  Configuring a TNC for TCP/IP Operation
 
 This section describes the procedure for configuring various packet radio 
-Terminal Node Controller units (TNCs) for operation with the KA9Q 
-package.  Readers who will be using the package with only SLIP or Ethernet 
+Terminal Node Controller units (TNCs) for operation with the NET package.  
+Readers who will be using the package with only SLIP or Ethernet 
 (wired) connections can feel free to skip ahead to Chapter 3.
 
 With later versions of the TNC-2 code, simply issue the KISS ON code and 
@@ -71,7 +71,7 @@ installed you will need to exit KISS by using the "param ax0 255" command.
 Your TNC documentation contains more for more info.  
 
 From time to time, comments are heard about some versions of KISS being 
-better than others.  For the purpose of running net, any version of KISS 
+better than others.  For the purpose of running NET, any version of KISS 
 will work fine so don't go looking for any "magic" versions.  Some 
 versions don't do full duplex, but we don't do that anyway and none of 
 them have conventional hardware handshaking, which is inherent in the 
@@ -103,7 +103,7 @@ code in it.)
 
 If you are in a hurry, attach your TNC to your PC using the same cable 
 that you were using to connect your PC to your TNC.  Eventually, to make 
-sure net works correctly, check your cable against the requirements in 
+sure NET works correctly, check your cable against the requirements in 
 Section 2.3.1, or for Unix, Section 2.5.
 
 Now to verify that the TNC still works.  Apply power to the TNC and turn 
@@ -170,7 +170,7 @@ included however if you got it from me (K5JB) or TAPR.  In options.h,
 #define DRSI to include DRSI code, or contact me and I'll compile you one.  
 Backing this code out of NOS and making it work correctly was one of my 
 proud achievements!  N6TTO sent me his DRSI driver for NOS while he was 
-developing it and I finished it and adapted it to net.
+developing it and I finished it and adapted it to NET.
 
 Manufacturer's instructions for setting up DRSI hardware are adequate.  
 Parameter settings are included in Chapter 6.  The following is from notes 
@@ -178,7 +178,7 @@ I supplied to DRSI when I sent them the driver.
 
 The only suggestion I have about setting parameters on the PC*PA is to not 
 overdo the receive buffer size if you are running in restricted memory, 
-such as with DESQview, along with other processes.  This version of net 
+such as with DESQview, along with other processes.  This version of NET 
 runs in a 170k window OK unless you pick a large buffer size and let large 
 netrom route tables build.  With only limited testing I can advise that a 
 buffer size of 512 and two netrom nodefilter call entries work well.  With 
@@ -204,9 +204,9 @@ agree with the one you selected on the card.  You can attach a maximum
 of two DRSI cards.  Name the second one dr1.  (k30)
 
 If you try to attach a non-existent DRSI PC*PA with the attach command, 
-net will tell you of the errors in your ways.
+NET will tell you of the errors in your ways.
 
-If you run net in unrestricted memory you will have over 30k of memory 
+If you run NET in unrestricted memory you will have over 30k of memory 
 pool available.  I find it working well with 20k of space as left with the 
 Desqview window described above.
 
@@ -220,7 +220,7 @@ well.
 The PC*PA doesn't miss a lick at 1200 bps on the radio circuit but it may 
 not work as well at higher rates.  I haven't tested it yet.
 
-There are a couple of net commands that are peculiar to the PC*PA driver 
+There are a couple of NET commands that are peculiar to the PC*PA driver 
 implementation.  One of them, drsistat (or just drsi) shows a lot of stat-
 istical information that may not be of much use to you unless you read the 
 source code in drsi.c to see what all those numbers are.  It doesn't take 
@@ -244,9 +244,9 @@ ameter 0.  For example, to change TX delay on interface dr0a to 400 ms
 128, use the command, param dr0a 1 128.  See KISS, in Chapter 8, for 
 meaning of P-Persistence.
 
-2.2.5.  Kantronics TNC's
+2.2.5.  Kantronics TNCs
 
-Kantronics includes KISS support in their products.  See below for special 
+Kantronics includes KISS support in its products.  See below for special 
 features that may be compiled in your code to permit dual port operation 
 with the KPC-4 or KAM.
 
@@ -255,7 +255,7 @@ operation.  This will ensure that the computer, TNC, cabling, and radio
 are operating properly.  Use your terminal program to send the following 
 commands:
 
- ABAUD 4800 -- baud rate to what you will be using when net is running 
+ ABAUD 4800 -- baud rate to what you will be using when NET is running 
                (set by the attach command)
  DWAIT 0 -- disable DWAIT
  PERSIST 50 -- enable persistence and set it to about 20%
@@ -276,84 +276,78 @@ AX.25 mode by issuing the command:
 This command will work even if the PERM command has been used to make KISS 
 the default mode of operation.
 
-2.2.5.1.  Optional kpc4 driver
+2.2.6.  Optional multidrop KISS driver
 
-If compiled with KPCPORT compiler directive defined, the "attach kpc4" 
-command is available to enable both Kantronics KPC-4 radio ports to be 
-independently used.  The Kantronics KAM should work the same as the KPC-4, 
-though all references here are to the KPC-4.  You can tell if the KPC-4 
-driver was compiled into the executable from the net startup screen, or 
-you can issue the command, "attach kpc4", to see how net responds.  If you 
-want to compile a version with this driver, define KPCPORT in options.h 
-(Or contact K5JB to get one compiled).
+If compiled with MDKISSPORT compiler directive defined, the "attach asy" 
+command has an optional radio port quantity added to the end.  Setting 
+this port to a value other than 0 causes a number (in hex) to be appended 
+to the label you selected.  If the number of ports is two or more, you can 
+independently use additional radio ports.  For example, the Kantronics 
+KPC-4 (and KAM) have two ports.  You can tell if the multidrop KISS driver 
+was compiled into the executable from the NET startup screen.
 
 Syntax of this command is:
 
-     attach kpc4 <I/O addr> <vector> <label> <bufsize> <mtu> <speed>
+  attach asy <I/O addr> <vect> ax25|slip <label> <bufsize> <mtu> 
+     <speed> [<port>]
 
-Label is normally kp0, bufsize is the receiver buffer size, mtu is the 
-maximum packet size without fragmenting, and speed is the baud rate of the 
-asynchronous serial port.  The attach kpc4 command differs from the attach 
-command in one way.  Note that the mode argument is missing since only AX-
-25 mode is available.  An example of using it in MS-DOS, using com1, 2k 
-receive buffer, 256 byte max packet size, at 4800 bps on the serial port, 
+Label is normally something like "ax0", bufsize is the receiver buffer 
+size, mtu controls IP level fragmentation and AX.25 segmentation.  (See 
+Chapter 5.)  Speed is the baud rate of the asynchronous serial port.  With 
+the multidrop KISS driver, the attach asy command differs from the older 
+attach asy command in two ways.  Multidrop KISS will only be used if the 
+mode is ax25.  Note that the optional port quantity is added to the end.  
+An example of using it in MS-DOS, using com1, 2k receive buffer, 256 byte 
+max packet size, at 4800 bps on the serial port, and with two radio ports, 
 would be:
 
-     attach kpc4 0x3f8 4 kp0 2048 256 4800
+     attach asy 0x3f8 4 ax0 ax25 2048 256 4800 2
 
 The Unix version of the command, using /dev/tty14 at 4800 bps would be:
 
- attach kpc4 0 /dev/tty14 kp0 0 256 4800  (The "0"s are placeholders.)
+ attach asy 0 /dev/tty14 ax0 ax25 0 256 4800 2  (The "0"s are place-
+ holders.)
 
-(As in the drsi driver, subsequent commands will need reference to the 
-first port as kp0a and the second as kp0b.  Additional kpc4 drivers may be 
-attached to other serial ports by using labels such as kp1, kp2, etc.
+(The label will be cut to three characters, if necessary, and numbers 
+appended if you specified radio ports of one or more.  Similar to the drsi 
+driver, subsequent commands will need reference to the first port as ax00, 
+second as ax01, etc.  Additional asy drivers may be attached to other 
+serial ports by using labels such as ax1, ax2, etc.)
 
-2.2.5.2.  KPC-4 explanation
+2.2.6.1.  Multidrop KISS explanation
 
-This driver was developed by Steve, N5OWK, who provides the following 
-explanation of the Kantronics KISS used in the KPC-4 and KAM.
+This multidrop KISS driver replaced the KPC4 driver which was developed by 
+Steve, N5OWK.  That driver addressed two ports maximum and was independent 
+of the standard asychronous driver in NET.  By extending NET's existing 
+KISS driver, the KPC4 driver became unnecessary.
 
-The KPC-4 is a dual radio port TNC with the ports identified as port 1 and 
-port 2.  By using the attach kpc4 command you enable a special driver that 
-will later enable you to specify which port you want to use.  The ports 
-can be on two different frequencies or can be used at two different radio 
-baud rates (with equipment modification).  If the 2400 baud option board 
-is installed, and you have made suitable modifications, then kp0a would 
-refer to the 1200 bps port and kp0b to the 2400 bps port.
+See Chapter 8 for detailed explanation of standard KISS.  The multidrop 
+KISS driver differs only in the control byte sent to or received from the 
+TNC.  The upper half (four bits) of the control byte is used to identify 
+the virtual port used.  When it is zero the control byte is identical to 
+the standard KISS control byte.  When virtual port 1, for example is 
+selected for transmitting, the upper half of the control byte contains the 
+value 1.  Incoming packets are examined for a value in these four bits and 
+if it is not zero the driver checks the interface list for a corresponding 
+name (e.g. ax01) and enters the port number in the interface entry for 
+that serial port.  The rest of the code uses that port number to process 
+the data.
+
+In order to achieve backward compatibility with the older KISS driver, the 
+label is unchanged if the port number is not given, or is less than 1.  If 
+a port label of "ax" and a port quantity of "1" is used in the attach 
+command the attach process will add a "0" to the port number.  It is 
+possible therefore to inadvertently attach two ports with the same name.  
+If you use ax0 for the first name and ax, with port number other than 0 
+another ax0 will be created.
 
 Note: Use of the param command effects only the selected port, therefore 
 param command must be given for each port to give the desired result.
 
-.pa
-2.2.5.3.  KISS as applied by Kantronics
+This driver has not been tested with more than two ports.  I have only 
+used it on the KPC-4.  Joe, K5JB
 
-The KPC-4 kiss interface command type byte is used to multiplex to both 
-ports.  There are only 4 normal commands, and one special command.  These 
-are:
-
- TYPE    FUNCTION
- 0       Data to be transmitted
- 1       TXDELAY - second byte contains txdelay in 10ms increments
- 2       PERSISTENCE - second byte contains persistence value
- 3       SLOTTIME - second byte contains slot interval
-
- 255     Causes KPC-4 to exit the kiss mode
-
-Since these commands can be represented in the lower nibble (first 4 bits) 
-of the command byte, the upper nibble is used to signify which port is to 
-receive the command.  If the upper nibble is 0 then port 1 is selected.  
-Otherwise port 2 is selected.  (Bit 4, 0x10, is the bit in the command 
-byte that contains the port signal.)  Receive data is similarly identified 
-by the presence or absence of bit 4 in the command byte.  If this bit is 
-set, the data is coming from port 2; if clear, it is from port 1.
-
-Using the KPC-4, or KAM, in KISS mode therefore enables two radio ports 
-while using only one serial port on the computer.  Use these two ports as 
-though they were separate and distinct ports (kp0a and kp0b) when setting 
-up the IP operation of your station.
-
-2.2.6.  PacComm PC-100 Card, EAGLE, HAPN, etc.
+2.2.7.  PacComm PC-100 Card, EAGLE, HAPN, etc.
 
 The drivers for these cards are incomplete and are not included in this 
 release, it is unclear whether the available drivers work at all.  An 
@@ -366,7 +360,7 @@ ideas.
 2.3.1.  Serial Data Cable
 
 To prevent hard to diagnose problems, make sure your RS-232C data cable 
-from the PC and the TNC has the correct configuration to run net.  Net and 
+from the PC and the TNC has the correct configuration to run NET.  Net and 
 the KISS equipped TNC should only have Transmit Data, Receive Data, and 
 Signal Ground (TXD, pin 2; RXD, pin 3; and SG, pin 7 in the DB-25 
 connector) connected.  At the PC end, tie Request To Send (RTS, pin 4) to 
@@ -380,33 +374,43 @@ and SG is pin 5.  On PC/AT DE-9 connectors, TXD is pin 3, RXD is pin 2, SG
 is pin 5.  On the PC/AT end, Tie RTS, pin 7; to CTS, pin 8; and tie the 
 three lines, DSR, pin 6; DCD, pin 1; and DTR, pin 4 all together.
 
-.pa
 If you are using the Unix version, see Section 2.5. for data cable 
 requirements.
 
 2.3.2.  MS-DOS Quick Start -- File Structure
 
+Most of the recommended parameters are set when you start NET so it will 
+run with only a minimum of setup.  In fact, it only takes eleven commands 
+to start a fully functional NET.  Those commands are ax25 mycall, ip add-
+ress, hostname, attach (whatever serial port you will use), a route add 
+default (for that attached port), and the six start commands.  There are 
+certain essential requirements in the file structure or it would be use-
+less to run NET.  Most versions of NET.EXE contain tests for proper files 
+and directories and will give you notes, warnings and error messages, 
+depending on the severity of the problem.  NET will run after reporting 
+notes and warnings, but will stop after notifying you of any errors so you 
+can correct them before restarting.
+
 For users of MS-DOS, see the archive "etcfiles.lzh" which contains sample 
 files normally used.  Follow the instructions and edit these files with 
 your favorite text editor (one that can save files as ASCII), and then 
-you're ready to "Play".  Typically, the following four files are 
-considered minimum, but you can start with less.  You need autoexec.net to 
-do the basic set-up commands for you.  You need hosts.net to translate 
-host names to numbers.  You need ftpusers to try out FTP, and to do any 
-mailing with bm, you will need bm.rc.
+you're ready to "Play".  Typically, the following four files are consider-
+ed minimum, but you can start with less.  You need autoexec.net to do the 
+basic set-up commands for you.  You need hosts.net to translate host names 
+to numbers.  You need ftpusers to try out FTP, and to do any mailing with 
+bm, you will need bm.rc.
 
 Instructions on editing the files are embedded as comments in the files.  
 Brief summary on what these files do is included here.
 
 In case you didn't already know, there are two executable programs, 
-net.exe and bm.exe.  (Normally simply called "net" and "bm".)  Net is the 
+NET.EXE and BM.EXE.  (Normally simply called "NET" and "BM".)  Net is the 
 networking program (TCP/IP).  Bm is the mailer, Bdale's Mailer, which is 
 used to read and write messages.  You should use the versions supplied 
-with this documentation because they have both been house broken and both 
-use the same environmental variables to find their files (explained 
-below.)
+with this kit because they have both been house broken and both use the 
+same environmental variables to find their files (explained below.)
 
-There are various net versions available, depending on what options were 
+There are various NET versions available, depending on what options were 
 turned on during compile.  The one included with this kit is likely the 
 bare-bones version with only a few options included, the most notable 
 being NET/ROM interface.  Two options that are seldom used but can be 
@@ -414,15 +418,15 @@ compiled in are GRAPES Multiport code and DRSI Packet Adapter driver.  If
 you have a C compiler you can modify the options.h file and make your own 
 or contact me and I'll compile whatever version you want.
 
-These versions of net and bm permit you to organize your files better than 
-earlier versions.  They use "environmental variables" to tell net and bm 
+These versions of NET and BM permit you to organize your files better than 
+earlier versions.  They use "environmental variables" to tell NET and BM 
 where to find the required files.  Environmental variables are strings 
 tucked away in the operating system that let you pass information to run-
 ning programs.  The environmental variables we use are, NETHOME, NETSPOOL, 
 and (if you want to enable the mbox) PUBLIC.  (You should also use TZ to 
 establish time zone information on mail messages.)  You put lines in your 
 autoexec.bat file, like those that follow, and reboot the computer, or 
-make a batch file that sets these variables and then executes net.  (If 
+make a batch file that sets these variables and then executes NET.  (If 
 you get a message like, "Out of environment space", then I presume you are 
 already savvy of the environment and know where in your MS-DOS manual to 
 look to see how to expand the environment.  Hint:  Look under "Command".)
@@ -478,7 +482,7 @@ even yourself if it missing.  You will need to at least have yourself in
 hosts.net or you won't be able to use your user name in commands.  You 
 would have to use the IP address number where host is called for.
 
-(2) The files marked "*" are created by net or bm when they run.  The name 
+(2) The files marked "*" are created by NET or BM when they run.  The name 
 for your logging file, and its placement is set in autoexec.net.  You can 
 leave out the optional files until you figure out what they are for.
 
@@ -490,27 +494,27 @@ copy of BM included in this kit handles this timezone thing correctly.  If
 you don't do this, it will use UTC for time stamping and you will need to 
 set your computer clock accordingly.
 
-You can add your net home directory (\net in this example) to your path 
-command and you will be able to execute net or bm from any current direct-
-ory on the disk(s).  Alternatively, you can put net and bm wherever you 
+You can add your NET home directory (\net in this example) to your path 
+command and you will be able to execute NET or BM from any current direct-
+ory on the disk(s).  Alternatively, you can put NET and BM wherever you 
 keep executables (e.g. \bin) and the environmental variables will seek out 
 the files they need.
 
 If you chose to follow the file placement instructions that come with 
-other versions of net and bm, (scattered all over the place) the supplied 
-versions of net and bm will find them if you don't use the environmental 
-variables.
+other versions of NET and bm, (scattered all over the place) the supplied 
+versions of NET and BM likely will find them if you don't use the environ- 
+mental variables.
 
 Examine the sample files I included, edit them to fit your situation, 
 following the file notes that follow.  In Chapter 6 all of the commands 
 are explained.  When you have your files edited, you will be ready to go.  
-You just start net and see if it upchucks some error messages.  At the 
+You just start NET and see if it upchucks some error messages.  At the 
 command prompt, type "host".  If it doesn't respond with your host name, 
 re-read the above.  If it looks good at this point, jump ahead to Chapter 
 3 and take it for a test drive.  If you are more cautious, read on before 
 launching the thing.
 
-Note:  Commands for net and bm are case sensitive.  "host" works.  "Host" 
+Note:  Commands for NET and BM are case sensitive.  "host" works.  "Host" 
 or "HOST" doesn't.  You only have to type enough of a command to make it 
 unambiguous to the list of commands.  In either program, command, "?" 
 shows the command list.  The program scans this list from the top and 
@@ -529,13 +533,17 @@ Chapter 6, it is.
 
 2.3.2.1.  The AUTOEXEC.NET File
 
-The AUTOEXEC.NET file (called STARTUP.NET under Unix, and other things 
+The AUTOEXEC.NET file (called startup.net under Unix, and other things 
 elsewhere) works a lot like the AUTOEXEC.BAT file in DOS, hence the name.  
 When NET first starts up, it reads AUTOEXEC.NET and executes all of the 
 commands as if they had been typed in to the program from the keyboard.  
 This provides an easy mechanism for setting up the initial system config-
 uration, including setting the hostname, AX.25 parameters, interfaces 
 used, servers to start, and protocol variables.
+
+Keep in mind that most commands have been defaulted to reasonable values 
+for you and what follows is much more than what you need to get NET 
+running correctly.  As mentioned above, it only takes eleven commands!
 
 I recommend not messing with NET/ROM until you know how to do it properly, 
 and have decided to keep your computer on all the time.  You can mess up 
@@ -555,18 +563,21 @@ ax25 mycall command, because it is often the only thing that you need to
 change to share an autoexec.net with a neighbor.
 
 hostname (e.g. k5jb.ampr.org, necessary but order not important)
-ip address (e.g. [44.78.0.2], used by start commands, )
-smtp gate (e.g. 44.78.0.2, order umportant but here is convenient)
+ip address (e.g. 44.78.0.2, used by start commands, )
+smtp gate (e.g. 44.78.0.2, defaults to your ip address.  Order unimportant 
+but here is convenient)
 
 Then use the ax25 commands:
 ax25 mycall (e.g. k5jb-10, used by attach and netrom commands)
-ax25 mboxcall (e.g. k5jb-9, necessary to enable mailbox but order 
-unimportant)
+ax25 mboxcall (e.g. k5jb-9, optional but necessary to enable mailbox.  
+Order unimportant)
+
+ax25 vcipcall (e.g. k5jb-8) optional IP-only VC call, order unimportant.
 
 (Now add the rest of the ax25 commands.  If you are using NET/ROM, and if 
 you want too make netrom reduce size of link layer packets put a reduced 
 ax25 paclen here, e.g. ax25 paclen 128, then restore normal value after 
-attach netrom, below.)  (Netrom mss is paclen - 20, max 236, min 44.)
+attach netrom, below.)  (Netrom mtu is paclen - 20, max 236, min 44.)
 
 Add attach (asy and other) commands
 
@@ -576,12 +587,6 @@ Add any param commands that are needed to change kiss timing, e.g.:
 param ax1 3 1
 # txtail
 param ax1 4 2
-
-If you enable Virtual Circuit (ROSE) interface, make this attachment 
-after all interface parameters set and before the virtual circuit is 
-referred to, e.g.
-
-vcircuit attach rosa kp0a
 
 Now you can add Netrom stuff that doesn't hurt anything, even if you 
 aren't using netrom, e.g.
@@ -597,15 +602,15 @@ Here are examples of additional and typical "benign" netrom commands:
 
 netrom interface ax0 #IPJB 170
 netrom bcstifle ax0 1
-netrom interface rosa MWC 193
-netrom bcstifle rosa 1
-netrom interface rosb 4E0002 80
+netrom interface ax10 MWC 193
+netrom bcstifle ax10 1
+netrom interface ax11 4E0002 80
 
 netrom nodefilter mode accept
-netrom nodefilter add wb5fwe-1 rosb
+netrom nodefilter add wb5fwe-1 ax11
 netrom obsotimer 3600
-netrom qlimit 100
-netrom verbose no
+netrom qlimit 256
+netrom verbose off
 netrom ttl 16
 
 Add Netrom commands that you enable if you are using the netrom transport 
@@ -614,7 +619,7 @@ route add wb5fwe netrom
 arp add wb5fwe netrom wb5fwe-6
 
 netrom nodetimer 1740
-netrom bcnodes rosb
+netrom bcnodes ax11
 
 (For netrom off, set netrom nodetimer 0)
 
@@ -623,12 +628,12 @@ Add your arp add and route add commands, e.g.
 route add default ax0
 
 arp add n5owk ax25 n5owk-2
-route add n5owk ax1
+route add n5owk ax10
 
-If you are using VC, add stations reachable only by ROSE network, e.g.
-vc add w5gfe-10
-arp add w5gfe ax25 w5gfe-10 k5jb-5 405771 ada
-route add w5gfe rosa
+If you are using VC, for example to reach stations by ROSE network, use 
+the hardware type vax25, e.g.
+arp add w5gfe vax25 w5gfe-10 k5jb-5 405771 ada
+route add w5gfe ax0
 
 Add any desired IP commands, e.g.
 ip ttl 16
@@ -642,10 +647,11 @@ tcp timer linear 5
 Add any desired smtp commands, e.g.
 smtp timer 1800
 smtp maxclients 10
+(Note that smtp timer starts at 1800 when you do the smtp start, below.)
 
 Possibly add miscellaneous commands:
 log \net\1net
-mbox y
+mbox on
 
 If you are using Grapes Mulport code (It uses the attached port names):
 mulport on
@@ -660,6 +666,13 @@ start echo
 start discard
 start telnet
 start finger
+
+Add an optional message of the day for incoming telnet sessions:
+motd Hi!  I may not be here but your typing may be displayed on my screen.
+
+If you want to use something other than the default message that is sent 
+to someone who wants to chat with you on AX.25, or Netrom session:
+axmotd Hi!  If I don't respond, send me a message.  73
 
 (I think I caught the necessary order.  Think of it in terms of the 
 protocol layers.  Set layer 1 things before you set layer 2, etc.)
@@ -719,20 +732,21 @@ subject to the path name prefix restrictions.  Permissions may be combined
 by adding bits, for example, 0x3 (= 0x2 + 0x1) means that the user is 
 given read and create permission, but not overwrite/delete permission.
 
-For example, suppose ftpusers on machine "pc.ka9q.ampr" contains the line
+For example, suppose ftpusers on machine "k5jbspook" contains the line
 
  friendly test \testdir 7
 
 A session using this account would look like this:
 
- net> ftp pc.ka9q.ampr
- SYN Sent
+ NET> ftp k5jbspook
+ SYN sent
  Estab.
- 220 pc.ka9q.ampr FTP version 871225.5 ready at Wed Jan 20 16:27:18 1988
- Enter user name: friendly 
+ 220 k5jbspook FTP version K5JB.k34 ready at Mon Nov 29 15:48:56 1993
+ Enter user name: joe
  331 Enter PASS command
- Password: test  (doesn't echo to screen)
- 331 Logged in
+ Password: (not echoed to screen)
+ 230 Logged in
+ FTP> (ready for an ftp command)
 
 (If you get user or pass wrong, your program will loop until you get it 
 right, or escape with a F-10 (or escape in Unix) and close the session.)
@@ -799,7 +813,7 @@ first simply strings them along a line:
  44.78.0.2  k5jb k5jb.okla.ampr k5jb.ampr.org
 
 I can mail to k5jb by using the short form, and if I get mail from him 
-that has a longer form in its header, I can reply and net can find his 
+that has a longer form in its header, I can reply and NET can find his 
 address in hosts.net.  Sometimes someone on the network will try a 
 different version of TCP/IP and inadvertently change his host name in 
 bm.rc.  You can add the variation in hosts.net to deal with it.
@@ -812,13 +826,12 @@ distinguish them by prefixing a familiar name followed by a period, as in
 "winfree.n3eua" or "at.n0ccz".
 
 (If the code is compiled with SOKNAME defined in sokname.h, when a stat 
-command is issued, or at other times when net reports that someone is 
+command is issued, or at other times when NET reports that someone is 
 playing with you, the IP address will be replaced with the information 
 from the third, or the last, field in the hosts.net line containing that 
 IP address.  For the above example, it would show "k5jb.okla.ampr" instead 
 of 44.78.0.2 in such reports.)
 
-.pa
 The second way to have alternates is:
 
  44.78.0.2  k5jb
@@ -842,13 +855,13 @@ Net will run without alias and bm.rc but bm, the mailer, must have bm.rc.
 2.3.3.2.  The net.hlp file.
 
 This file (see samples in etcfiles.lzh) can contain anything you want.  At 
-the net command prompt, if you need a refresher on a command or a 
+the NET command prompt, if you need a refresher on a command or a 
 procedure, you can type "help" ("h" for short) and net.hlp will be 
 displayed a screen at a time until it is finished, or you hit the F-10 (in 
-Unix, the defined escape) key.  If the file is missing, net will tell you 
+Unix, the defined escape) key.  If the file is missing, NET will tell you 
 so when you hit "h".  Net.hlp is kept in the NETHOME directory (\net in 
 these examples).  You can create any help files you want by naming them 
-(subject).hlp and putting them in the net home directory.  Call them up by 
+(subject).hlp and putting them in the NET home directory.  Call them up by 
 following the help command with the name of the file.  For example, help 
 ftp, would display \net\ftp.hlp.
 
@@ -872,7 +885,7 @@ have assigned addresses.  A finger file for k5jb is called k5jb.txt.
 Files that do not have the .txt extension are invisible to the finger 
 server.  Finger files go in the "finger" directory, off of NETHOME.  In 
 these examples, finger files would be in \net\finger.  With other versions 
-of net, the finger directory is right off of root.
+of NET, the finger directory is right off of root.
 
 2.3.3.5.  Mulport files - digilist and exlist
 
@@ -882,81 +895,81 @@ Chapter 5 for more on mulport.
 
 2.4.  DESQview Setup
 
-The MS-DOS version of net is a natural to run under DESQview and has been 
+The MS-DOS version of NET is a natural to run under DESQview and has been 
 specifically cleaned up to be a good neighbor under that environment.  
-When net starts, it grabs all the memory available so it doesn't have to 
+When NET starts, it grabs all the memory available so it doesn't have to 
 make a request from DOS when it later runs short.  All allocations are 
-made from that pool that is grabbed on startup.  If a minimum size version 
-of net is permitted to run unrestrained the memory status command ("m") 
+made from that pool that is grabbed on start.  If a minimum size version 
+of NET is permitted to run unrestrained the memory status command ("m") 
 will show a little under 35k available if nothing has been loaded from 
-autoexec.net.  A DESQview window size of around 180k allows net to run 
-unrestrained.  It is not necessary to provide this much space for net to 
-run in typical applications.  If memory space is a problem, you can cut 
-the DESQview window size until the available memory reported by net, after 
-loading commands from autoexec.net, is around 15k and there will be space 
-to run several sessions concurrently without problem.  With a moderate 
-number of arp entries, and one neighbor NET/ROM feeding the program with 
-NET/ROM route information, DESQview window of 164k is adequate.  (It will 
-vary with program size but with the current version, this size of window 
-leaves over 14k in the memory pool on startup, after reading autoexec.net.  
-This is satisfactory with medium amount of user and NET/ROM activity.)
+autoexec.net.  A DESQview window size of around 180k allows NET to run 
+unrestrained.  It is not necessary to provide this much space for NET to 
+run in typical applications.  If your computer is short on memory to do 
+all you want, you can cut the DESQview window size until the available 
+memory reported by NET, after loading commands from autoexec.net, is 
+around 15k and there will be space to run several sessions concurrently 
+without problem.  With a moderate number of arp entries, and one neighbor 
+NET/ROM feeding the program with NET/ROM route information, DESQview 
+window of 165k is adequate.  (It will vary with program size but with the 
+current version, this size of window leaves over 14k in the memory pool on 
+startup, after reading autoexec.net.  This is satisfactory with medium 
+amount of user and NET/ROM activity.)
 
 If you are using the DRSI driver, memory requirements are about 8k 
 greater (maybe more if multiple connections are expected -- the DRSI 
 driver gobbles memory when it is handling packets).  If you are using the 
-Mulport code, allow 4k more.  If you are using the optional KPC-4 driver, 
-allow 2k more.
+Mulport code, allow 4k more.
 
 The defaults presented by DESQview create a window option need only minor 
-changes to be acceptable.  Be certain that you specify "net.exe", and not 
-simply "net" as the program name, or it will cost you 4096 bytes for the 
+changes to be acceptable.  Be certain that you specify "NET.EXE", and not 
+simply "NET" as the program name, or it will cost you 4096 bytes for the 
 portion of command.com that will also be loaded.
 
 Net does not write directly to screen so you can answer that question, 
 "N".  It does use serial ports, so you can answer that question with a "Y" 
-or specify the port.  To permit net to run in the background, and not be 
+or specify the port.  To permit NET to run in the background, and not be 
 swapped out, answer the question in the advanced screen, "Runs in 
 background?" with "Y".  Note that answering either of these last two 
-questions will probably be all that is necessary to make sure net runs 
+questions will probably be all that is necessary to make sure NET runs 
 when you wander off to run bm, or something else.
 
-Bm, the mailer, runs in a 50k DESQview window, perhaps less, but it will 
+BM, the mailer, runs in a 50k DESQview window, perhaps less, but it will 
 fail ungracefully if you have a lot of messages and insufficient memory.  
-Be sure and specify the program name, "bm.exe" and not "bm" for the same 
+Be sure and specify the program name, "BM.EXE" and not "BM" for the same 
 reason as above.  In this memory space, you will not be able to shell out 
 to run your favorite editor on a message.  If you want to do this, 
 increase window size to whatever it takes.
 
-Net and BM should also work fine under DoubleDOS, another multi-tasker 
+NET and BM should also work fine under DoubleDOS, another multi-tasker 
 shell that permits two windows to run concurrently.
 
 2.5.  Unix
 
 To run NET under Unix, you'll need to compile the program from sources and 
 first you have to get the source.  If it is not included with this kit, 
-contact K5JB to get the one used for AT&T System V and Coherent.  Normally 
-the modules are kept in a set of Lharc archives for MS-DOS and Lharc, 
-cpio.Z or tar.Z files for Unix.
+contact K5JB to get the one used for AT&T System V, Coherent and OS9/68K.  
+Normally the modules are kept in a set of Lharc archives for MS-DOS and 
+Lharc, cpio.Z or tar.Z files for Unix.
 
 Unpack the common source archives and the Unix archive into a directory, 
 edit the Makefile to pick your Unix variant, edit config.h and options.h 
 to enable the appropriate interface hardware (slip and kiss are probably 
-all that will work), then run 'make'.  (Extract the bm source files in a 
-separate directory because some of the files have the same name as net 
-files but are different.)
+all that will work), edit unixopt.h if necessary, then run 'make'.  
+(Extract the BM source files in a separate directory because some of the 
+files have the same name as NET files but are different.)
 
-If you have Internet access, you will find the Unix/Coherent source code 
-on ucsd.edu, in /hamradio/packet/tcpip/k5jb.  They will be in compressed 
-tar archives.  See the associated .txt files for information.
+If you have Internet access, you will find the Unix-Coherent-OS9/68K 
+source code on ucsd.edu, in /hamradio/packet/tcpip/k5jb.  They will be in 
+compressed tars.  See the associated .txt files for information.
 
 It is important that the serial port on the Unix computer have the Data 
 Carrier Detect (DCD) asserted and that it not be connected to the DCD 
 signal from the TNC.  At the computer end, connect DCD to the Data 
 Terminal Ready (DTR) signal coming from the computer.
 
-The basic requirements are that the serial ports to be used by net must 
+The basic requirements are that the serial ports to be used by NET must 
 have their permissions set so that they are read-write for the userid that 
-will run net.  For a two port example, you can define a user named 'net' 
+will run NET.  For a two port example, you can define a user named 'net' 
 and make that user own /dev/tty11 and /dev/tty12.  The permissions for the 
 ttys should be at least crw------- (600).  (A more flexible, method if you 
 are the only one on the machine and you use the port for other things, is 
@@ -971,9 +984,9 @@ is now the tty name.  For example:
 
  attach asy 0 /dev/tty12 ax25 ax1 0 256 4800
 
-The zeroes are currently place holders in the attach asy command.  If the 
-optional KPC-4 driver is installed, omit the "ax25" argument in the attach 
-kpc4 command.  (See 2.2.5.1.)
+The zeroes are currently place holders in the attach asy command.  If you 
+wish to use the optional multidrop kiss driver, add the number of pseudo 
+ports to the end of this command.  (See 2.2.6.)
 
 The Unix version of Net can use up to three environment variables, NETHOME 
 NETSPOOL, PUBLIC and TZ.  PUBLIC is optional with the use of the AX.25 
@@ -990,7 +1003,7 @@ In this example, the directories needed are /usr/net, /usr/net/finger,
 and optional files in the same home directories as described for MS-DOS.
 
 The Unix version of NET currently supports only serial ports, with the 
-KISS and SLIP protocols.  You can run this version of net in the 
+KISS and SLIP protocols.  You can run this version of NET in the 
 background, redirecting it's output to a file so you can check on its 
 welfare from time to time.  It uses the quit signal to toggle its input 
 scanning so it won't block on input.
@@ -999,21 +1012,21 @@ scanning so it won't block on input.
 
 Telunix provides remote login via telnet.  Telnet in amateur radio is 
 different from telnet on wire line TCP/IP networks.  (See Para. 6.3.44.)  
-If your computer has pseudo terminals (pty) on it, you can compile net 
+If your computer has pseudo terminals (pty) on it, you can compile NET 
 with the option, TELUNIX, set in unixopt.h and the telunix server will be 
 available for attachment.  (There is no failure mechanism built into the 
 telunix start procedure so if you don't have pty slaves prepared for 
 logins, the start telunix command will appear to work, but users who try 
 to login will just get their commands echoed back to them.)
 
-I don't have ptys on my Unix machine so I could only test this thing under 
-Coherent.  I added three pseudo (slave) terminals to /etc/ttys, like this:
+For an example, here is the Coherent setup.  I added three pseudo (slave) 
+terminals to /etc/ttys, like this:
 
    1lPttyp0
    1lPttyp1
    1lpttyp2
 
-And issued a kill quit 1 command before starting net.
+And issued a kill quit 1 command before starting NET.
 
 To enable the login server, use the command (either from command prompt or 
 from startup.net) start telunix.  It has an optional argument.  Default 
@@ -1040,17 +1053,37 @@ cd /usr/public  # or whatever you want to do with him...
 
 What you do with this guy after he logs on to your machine is up to you.
 
-2.5.2.  NET and Unix Multi-tasking
+The Unix machine I use (AT&T 3B2) has an after-market pseudo terminal 
+setup that is difficult to work with.  The master port (e.g. ptyp0) blocks 
+on a read, and I have been unable to anticipate it.  My solution was to 
+create a child process that blocks on the read and when data is available 
+sends it via pipe to the parent process.  If you need this code, contact 
+me.  This difficulty lead me to develop the following.
+
+2.5.2.  Telserv (general purpose server)
+
+Telserv.c provides a stub client that can communicate with a separate 
+server running on the machine.  It uses interprocess communications (IPC) 
+messages.  Telserv can be started in addition, or as a replacement to 
+telunix.  For the user to get any benefit out of the server, it must also 
+be running on the machine.  Default socket number can be changed at 
+compile time to reflect the actual server function.  As supplied, the 
+default socket number is 87, the one used by NOS ttylink.  If you don't 
+know how to create a companion server, I can provide the simple one I 
+built for testing as a basis for your application.  It is not included in 
+the Unix file kit.
+
+2.5.3.  NET and Unix Multi-tasking
 
 NET is designed as an MS-DOS application, so does not make full use of 
 Unix's multi-tasking ability but runs quite well in Unix.  You can use it 
 in a Unix windowing environment (or in shell layers) but you must prevent 
-blocking on input if you make the window session inactive.  See the 3.8. 
-on how to do use shell layer manager.  In Coherent 4.0, use the virtual 
-terminal capability.  You shouldn't shell out of NET for an extended 
-period of time, as NET suspends operation during shell escapes.  If you 
-operate a heavily used machine, use your system's background methods and 
-switch to another terminal session to do other things.
+blocking on input if you make the window session inactive.  See Chapter 
+3.8. on how to do use shell layer manager.  In Coherent 4.0, use the 
+virtual terminal capability.  You shouldn't shell out of NET for an 
+extended period of time, as NET suspends operation during shell escapes.  
+If you operate a heavily used machine, use your system's background 
+methods and switch to another terminal session to do other things.
 
 2.6.  Macintosh
 
@@ -1062,21 +1095,3 @@ Installation documentation for the Mac is included with the Mac version of
 the software.  Check with Compuserve's Hamnet for source of Mac versions 
 of the software.  Current TCP/IP work for the Mac is based on NOS, the 
 suite that replaced NET, the subject of this manual.
-
-2.7.  Atari ST
-
-Installation for the Atari version of NET is not yet available.  Your best 
-bet is to stare at the sources, in config.h and files.h, as well as st.c 
-and st.h.
-
-2.8.  NEC PC-9801
-
-Installation on the NEC PC-98 family is the same as for the IBM PC and 
-clones, except that you need to have the version of NET.EXE that includes 
-handling for the serial port(s) in the NEC machine.
-
-2.9.  Hewlett-Packard Portable Plus
-
-Installation on the Portable Plus is the same as for the IBM PC and 
-clones, except that you need to have the version of NET.EXE that is 
-designed for the Portable Plus.

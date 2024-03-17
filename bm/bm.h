@@ -19,9 +19,6 @@
 
 #ifdef UNIX
 #define WWRAP 5	/* command added for wordwrap in Unix */
-#define	RUNCOM	".bmrc"		/* config file */
-#else
-#define	RUNCOM	"bm.rc"		/* config file */
 #endif
 
 #define WORK	"*.wrk"		/* work file type */
@@ -85,7 +82,15 @@ extern int change;		/* mail file changed */
 extern FILE *mfile;		/* mail data file pointer */
 extern int tty;			/* is standard in a tty ? */
 extern int qflag;		/* just queue no headers */
-extern int mlock(), rmlock();
+extern int mlock();
+extern void rmlock(),displaymsg(),free(),rip(),filedir(),loadconfig(),
+	setsignals(),listnotes(),getcommand(),setvideo(),catchit();
+extern void dohelp(),msgtofile(),savemsg(),writemsg(),bmexit(),reply(),
+	bouncemsg(),listqueue(),killjob(),mboxnames(),reinit(),delmsg();
+extern void printnext(),setcookedmode(),screen_clear();
+extern int readnotes(),dosmtpsend(),getopt(),lockit(),initnotes(),
+	rc_line_type(),closenotes();
+extern int getrch(), setrawmode(), isnewmail();
 extern struct addr *make_tolist();
 extern long get_msgid();
 extern char *mqueue;
@@ -100,7 +105,6 @@ extern void *malloc(),*calloc();
 #endif
 extern void exit(),perror();
 extern int parse(),htype();
-extern int getrch(), screen_clear(), setrawmode(), setcookedmode(), isnewmail();
 
 /* General purpose NULL - Note that Unix, Turbo C agree with this, Coherent
  * defined NULL as (char *)0, this code defined it as (void *)0 - K5JB

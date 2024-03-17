@@ -6,6 +6,9 @@
 #include "iface.h"
 #include "kiss.h"
 #include "trace.h"
+#ifdef COH386
+#undef __ARGS /* avoid a redefinition */
+#endif
 #include <stdio.h>
 #include <string.h>
 
@@ -13,7 +16,7 @@
 #include "8250.h"
 #endif
 
-#ifndef EKISSPORT
+#ifndef MDKISSPORT
 /* Send raw data packet on KISS TNC */
 void
 kiss_raw(interface,data)
@@ -77,7 +80,7 @@ struct mbuf *bp;
 		freeps++;	/* remove after test - K5JB */
 	}
 }
-#endif /* EKISSPORT
+#endif /* MDKISSPORT */
 
 /* Perform device control on KISS TNC by sending control messages */
 kiss_ioctl(interface,argc,argv)
@@ -111,7 +114,7 @@ char *argv[];
 		interface->name[strlen(interface->name) - 1] == 'b')
 			*cp |= 0x10;
 #endif
-#ifdef EKISSPORT	/* watch out for sign extensions here if we start using */
+#ifdef MDKISSPORT	/* watch out for sign extensions here if we start using */
 						/* upper parts of this number */
 	if(interface->kissport)
 		*cp |= interface->kissport << 4;

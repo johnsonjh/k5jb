@@ -25,6 +25,7 @@
 #endif
 
 #include "bm.h"
+#include "config.h"
 
 struct addr *addrecip();
 char *ptime();
@@ -33,10 +34,11 @@ char *ptime();
 #define MAXWRAP 23	/* maximum characters it will back up looking for space */
 #ifdef UNIX
 extern int wflag;	/* wordwrap flag for Unix */
-int getrch();
-int setrawmode();
-int setcookedmode();
 #endif	/* UNIX */
+
+#ifdef QUOTING
+int quoting;
+#endif
 
 /* a word wrapping line getter, returns without an EOL - K5JB */
 
@@ -64,19 +66,7 @@ int maxline;
 	wrp = wordwrap;
 	*wrp = '\0';
 	for(;i<maxline;i++){
-#ifdef UNIX
-#ifdef COH386
-	while((*tlp = (char)getrch()) == -1)
-#else
-	while((*tlp = (char)getrch()) == 0xff)
-#endif
-		;	/* in the Unix and Coherent, idle keyboard returns -1 and
-	there appears to be a sign extension problem here */
-		switch(*tlp)
-#else
-		switch(*tlp = (char)getch())
-#endif
-		{
+		switch(*tlp = (char)getch()) {
 			case '\b':
 				if(i){
 					i -= 2;
@@ -94,6 +84,9 @@ int maxline;
 				printf("%c",*tlp);
 				tlp++;
 		}	/* switch */
+#ifdef UNIX
+		fflush(stdout);	/* because we messed with I/O to get that key */
+#endif
 	} /* i == maxline */
 	*tlp = '\0';
 	tlp -= 1;	/* back up to last character typed */
@@ -116,12 +109,14 @@ int maxline;
 	printf("\n");
 	*tlp = '\0';
 	wordwrap[0] = '\0';
+#ifdef UNIX	/* just for good measure */
+	fflush(stdout);
+#endif
 	return(i+1);
 }
 
 /* some declarations to remove warnings */
 void del_addrlist();
-int msgtofile();
 int queuejob();
 int recordmsg();
 void rip();
@@ -135,17 +130,17 @@ char *subject;
 {
 
 	char	smtp_subject[LINELEN],tstring[WRAP_AT + 2],wordwrap[MAXWRAP + 1];
-#ifdef OLD
-	char	smtp_subject[LINELEN],tstring[LINELEN];
-#endif
 	char	*tmpnam();
 	FILE 	*fpin;
 	char	*p;
-#ifdef COH386
-/*	FILE *tmpfile(); */
+#if defined(COH386) && !defined(COH4)
+/*	FILE *tmpfile(); We need a file name to hand to the editor, so we use
+ * mktmp() instead.  Earlier Coherent doesn't have mktmp(), but later
+ * Coherent, does.
+ */
 	char *tf;
 #else
-	char 	*tf = "bmXXXXXX";		/* temp file name */
+	char *tf = "bmXXXXXX";		/* temp file name */
 #endif
 	int	c;
 	int	n;
@@ -153,6 +148,20 @@ char *subject;
 	struct	addr *tolist,*tp;
 	register FILE	*tfile;
 	time_t	t;
+	int done;
+
+static char *morehelp[] = {
+	"~e - Invoke Editor",
+	"~p - Display message buffer",
+	"~q - Abort this message",
+	"~r file - Read file into buffer",
+	"~m msg - message into buffer",
+#ifdef QUOTING
+	"~M msg - do, with quoting",
+#endif
+	"~~ - Enter a ~ into message",
+	""
+	};
 
 	if (nargs == 0) {
 		printf("No recpients\n");
@@ -167,9 +176,9 @@ char *subject;
 	sequence = get_msgid();
 
 	time(&t);
-#ifdef COH386
+#if defined(COH386) && !defined(COH4)
 	/* we need to return to this to remove the temp file if we can't
-	get mktemp to work */
+	get mktemp to work, no need in later Coherent */
 	if((tf = (char *)malloc(L_tmpnam)) == 0)
 		return 1;
 	tmpnam(tf);
@@ -218,6 +227,7 @@ char *subject;
 			/* prompt and get Subject: */
 			printf("Subject: ");
 			fgets(smtp_subject,LINELEN,stdin);
+			rip(smtp_subject);	/* K5JB m */
 		} else {
 			strcpy(smtp_subject,subject);
 			if(tty) printf("Subject: %s\n",smtp_subject);
@@ -242,17 +252,17 @@ char *subject;
 		/* sending a message not from a file */
 		/* copy text from console to the file */
 #ifdef UNIX
-		printf("\nType message text.  Enter a '.' in column one to end.");
-#else
-		printf("\nType message text.  Enter a '.' or ctrl/D in column one to end.");
+		printf("\nWordwrap is %s.",wflag ? "on" : "off");
 #endif
+		printf("\nEditor is %s.  Type message text.  Enter a '.' in column one to end.",
+			editor == NULLCHAR ? "none" : editor);
 		printf("\nCommands: ~p - redisplay msg, ~e - invoke editor, ~? - help\n\n");
 		*wordwrap = '\0';
 #ifdef UNIX
 		if(wflag)
 			setrawmode();
 #endif
-		for(;;) {
+		for(done = 0;!done;) {
 			/* read line from console  ie stdin */
 #ifdef UNIX
 			if(wflag)
@@ -274,34 +284,35 @@ char *subject;
 				break;
 			if (*tstring == '~' ) {
 				switch(tstring[1]) {
+				case '.':	/* compatible with mailx */
+					done = 1; /* only place we need done */
+					break;
 				case 'p':
 					/* Print the message so far */
 					fseek(tfile,0L,0);
 					while (fgets(tstring,sizeof(tstring),tfile) != NULLCHAR)
 						fputs(tstring,stdout);
 					break;
+				case 'v':	/* compatible with mailx */
 				case 'e':
 					/* Drop into editor */
-					(void) fclose(tfile);
 					if (editor == NULLCHAR) {
 						printf("No editor defined\n");
-						tfile = fopen(tf,"a+");
-#ifdef UNIX
-						if(wflag)
-							setrawmode();
-#endif
 						break;
 					}
+					/* looks like this was in wrong place... */
+					(void) fclose(tfile);
 					sprintf(tstring,"%s %s",editor,tf);
 					/* call editor to enter message text */
 #ifdef UNIX
 					if(wflag)
 						setcookedmode();
-#endif
-					if (system(tstring))
-#ifdef UNIX	/* vi reports all kinds of errors in return value */
-					;
+					/* vi reports all kinds of errors in return value */
+					(void)system(tstring);
+					if(wflag)
+						setrawmode();
 #else
+					if (system(tstring))
 						printf("unable to invoke editor\n");
 #endif
 					tfile = fopen(tf,"a+");
@@ -345,6 +356,10 @@ char *subject;
 
 						break;
 					}
+#ifdef QUOTING
+				case 'M':	/* want to add quoting */
+					quoting = 1;	/* then fall thru */
+#endif
 				case 'm':
 					{
 						int	msg;
@@ -367,17 +382,17 @@ char *subject;
 					fprintf(tfile,"%s\n",&tstring[1]);
 					break;
 				case '?':
-					printf("~e - Invoke Editor\n");
-					printf("~p - Display message buffer\n");
-					printf("~q - Abort this message\n");
-					printf("~r file - Read file into buffer\n");
-					printf("~m msg - message into buffer\n");
-					printf("~~ - Enter a ~ into message\n");
+					{
+					int i;
+					for(i=0;*morehelp[i];i++)
+						printf("%s\n",morehelp[i]);
 					break;
+					}
 				default:
 					printf("Unknown ~ escape. ~? for help\n");
 				}
-				printf("(continue)\n");
+				if(!done)
+					printf("(continue)\n");
 			} else
 				fprintf(tfile,"%s\n",tstring);
 		}
@@ -396,6 +411,7 @@ char *subject;
 }
 
 /* forward a message in its orginal form */
+void
 bouncemsg(mfp,toargs,nargs)
 FILE *mfp;
 char *toargs[];
@@ -412,7 +428,6 @@ int nargs;
 		queuejob(mfp,list,sequence);
 		del_addrlist(list);
 	}
-	return 0;
 }
 
 /* Return Date/Time in Arpanet format in passed string */
@@ -480,13 +495,15 @@ long *t;
 
 /* save copy in the record file */
 int
-recordmsg(dfile,to)
+recordmsg(dfile,unused)
 FILE *dfile;
-char *to;
+char *unused;
 {
 	register int c;
 	FILE 	*fp;
+#ifdef notdef /* we don't need this -- K5JB */
 	time_t	t;
+#endif
 
 	if (record == NULLCHAR)
 		return 1;
@@ -494,8 +511,10 @@ char *to;
 	if ((fp = fopen(record,"a")) == NULLFILE) {
 		printf("Unable to append to %s\n",record);
 	} else {
+#ifdef notdef
 		(void) time(&t);
-		fprintf(fp,"From %s %s",to,ctime(&t));
+		fprintf(fp,"Queued to %s %s",to,ctime(&t)); /* K5JB 3.3.1n */
+#endif
 		while((c = getc(dfile)) != EOF)
 			if(putc(c,fp) == EOF)
 				break;
@@ -503,6 +522,7 @@ char *to;
 			(void) fclose(fp);
 			return 1;
 		}
+		putc('\n',fp);	/* K5JB */
 		(void) fclose(fp);
 	}
 	return 0;
@@ -578,7 +598,7 @@ long sequence;
 #define SKIPWORD(X) while(*X && *X!=' ' && *X!='\t' && *X!='\n' && *X!= ',') X++;
 #define SKIPSPACE(X) while(*X ==' ' || *X =='\t' || *X =='\n' || *X == ',') X++;
 
-/* check for and alias and expand alais into a address list */
+/* check for and alias and expand alias into a address list */
 struct addr *
 expandalias(head, user)
 struct addr **head;

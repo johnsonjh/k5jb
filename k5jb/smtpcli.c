@@ -10,6 +10,8 @@
  * It also has simplified eom handling which on short messages will cause
  * an extra packet containging eom to be sent.  Definately a low performance
  * smtp.
+ * 8/20/94, after posting k35 for Unix, and before releasing MS-DOS, found
+ * interesting problems with null To: and From: fields.  Marked with k35a
  */
 /*
  *	Client routines for Simple Mail Transfer Protocol ala RFC821
@@ -834,6 +836,7 @@ struct smtp_cb *cb;
 	register int c;
 	FILE *infile,*tmpfile();
 	char *host,*to;
+	char *from;	/* k35a */
 	time_t t,time();
 #ifdef SMTPTRACE
 	if (smtptrace > 5) {
@@ -841,7 +844,10 @@ struct smtp_cb *cb;
 		fflush(stdout);
 	}
 #endif
-	/* A null From<> so no looping replys to MAIL-DAEMONS */
+	/* A null From<> so no looping replys to MAIL-DAEMONS -- Wrong!
+	 * NET won't mail a message with a null From<> field.  k35a
+	 */
+
 	to = cb->jobq->from;
 	if (*to == '\0')
 		return;
@@ -849,16 +855,23 @@ struct smtp_cb *cb;
 		host = hostname;
 	else
 		host++;
+#ifdef MSDOS	/* k35a */
+	if ((infile = fopen(cb->tname,"rt")) == NULLFILE)
+#else
 	if ((infile = fopen(cb->tname,"r")) == NULLFILE)
+#endif
 		return;
 	if ((tfile = tmpfile()) == NULLFILE) {
 		fclose(infile);
 		return;
 	}
+	if ((from = malloc((unsigned)strlen(hostname)+15)) == NULLCHAR)
+		return;
+	sprintf(from,"MAILER-DAEMON@%s",hostname);
 	time(&t);
 	fprintf(tfile,"Date: %s",ptime(&t));
 	fprintf(tfile,"Message-Id: <%ld@%s>\n",get_msgid(),hostname);
-	fprintf(tfile,"From: MAILER-DAEMON@%s\n",hostname);
+	fprintf(tfile,"From: %s\n",from);
 	fprintf(tfile,"To: %s\n",to);
 	fprintf(tfile,"Subject: Failed mail\n\n");
 	fprintf(tfile,"  ===== transcript follows =====\n\n");
@@ -874,14 +887,15 @@ struct smtp_cb *cb;
 	fclose(infile);
 	fseek(tfile,0L,0);
 	if ((smtpmode & QUEUE) != 0)
-		router_queue(cb->tcb,tfile,"",to);
+		router_queue(cb->tcb,tfile,from,to);	/* had null "from" k35a */
 	else
-		queuejob(cb->tcb,tfile,host,to,"");
+		queuejob(cb->tcb,tfile,host,to,from);	/* ditto */
 #if (defined(_OSK) && !defined(_UCC))
 	tmpclose(tfile);
 #else
 	fclose(tfile);
 #endif
+	free(from);
 }
 
 /* look to see if a smtp control block exists for this ipdest */

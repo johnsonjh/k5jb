@@ -6,6 +6,8 @@
 * It seems they all do it their own way but here it goes
 */
 
+#include "config.h"
+
 /* directory search utility for DOS */
 #if	defined(MICROSOFT)
 #include <sys/types.h>
@@ -41,6 +43,7 @@ struct dirent {
 	long fsize;
 	char fname[13];
 };
+
 /* wildcard filename lookup */
 filedir(name,times,ret_str)
 char *name;
@@ -60,7 +63,7 @@ char *ret_str;
 	regs.x.dx = (unsigned int) name;
 	regs.x.cx = (unsigned int) REGFILE;
 	intdos(&regs,&regs);
-	if (regs.x.cflag) 
+	if (regs.x.cflag)
 		sbuf.fname[0] = '\0';
 #else
 	/* Find matching file */
@@ -74,62 +77,7 @@ char *ret_str;
 	*cp = '\0';
 }
 
-#ifdef DEAD
-/* This function should put the tty in a mode such that signgle characters
-* can be read without waiting for a complete line. Echo should be on.
-*/
-setrawmode()
-{}
-
-/* This function should restore the tty modes back to cooked mode */
-setcookedmode()
-{}
-#endif
-
-/* This function return one charater form the keyboard. It will wait
-* for a character to be input. This function will echo the character.
-* This funtion will return afer each character is typed if rawmode is set
-*/
-#ifdef RAW
-int
-getrch()
-{
-	int	c;
-#if	defined(AZTEC) || defined(MICROSOFT) || defined(__TURBOC__)
-	c = bdos(1,0,0);
-#endif
-	return(c & 0xff);
-}
-#endif
-#ifdef DEAD
-/* This function show clear screen and put cursor at top of screen */
-screen_clear()
-{
-#ifdef AZTEC
-	extern	int	scr_clear();
-	scr_clear();	/* from lib S */
-#endif
-#if	defined(MICROSOFT) || defined(__TURBOC__)
-	/* clear screen using window scroll up */
-	union REGS regs;
-	regs.h.ah = 6;
-	regs.h.al = 0;
-	regs.h.ch = 0;
-	regs.h.cl = 0;
-	regs.h.dh = 24;
-	regs.h.dl = 79;
-	regs.h.bh = 7;
-	int86(0x10,&regs,&regs);
-	/* home the cursor */
-	regs.h.ah = 2;
-	regs.h.bh = 0;
-	regs.h.dh = 0;
-	regs.h.dl = 0;
-	int86(0x10,&regs,&regs);
-#endif
-}
-#endif /* DEAD */
-#ifdef AZTEC
+#ifdef AZTEC	/* if anybody uses Aztec, check config.h */
 /* This is the aztec specific setvbuf since the Aztec lib doesnt have one */
 setvbuf(stream,buffer,type,size)
 register FILE *stream;
@@ -159,16 +107,19 @@ setsignals()
 }
 #endif
 
-#if	defined(__TURBOC__)
+#ifdef SIGNALS
 /* dummy do nothing */
 int catchit() {}
 
+void
 setsignals()
 {
 	ctrlbrk(catchit);	/* this doesn't make sense K5JB */
 }
+#endif
 
-
+#ifdef VIDEO
+void
 setvideo(s)
 char *s;
 {
@@ -179,42 +130,3 @@ char *s;
 }
 #endif
 
-#if	defined(__TURBOC__) && defined(DV)
-/* I use my own gets to get around the desqview raw mode bug
-   which causes gets not to work right.
-   I am doing it only for turbo C right now since its a pain to
-   get it right for them all.
-   it reads straight from console not via stdin.
-   Further mucked with it because it looked bad on the Desqview screen,
-   and earlier versions of DV have a bug in gets all right.  K5JB
-*/
-char *
-gets(s)
-char *s;
-{
-	register char *p;
-/*	register int c;*/
-	register char c;
-	p = s;
-/*	while ((c = getrch()) != EOF){*/
-	while(1){
-	   while(!kbhit())
-	   ;
-	   c = (char)getch();
-	   if ( c == '\b' && p > s) {
-		p--;
-		printf("\b \b");
-	   }
-		else if ( c == '\n' || c == '\r') {
-			break;
-		} else {
-			*p++ = c;
-			printf("%c",c);
-		}
-	}
-	*p = '\0';
-/*	putch('\r');*/	/* try adding this */
-	printf("\n");
-	return(s);
-}
-#endif

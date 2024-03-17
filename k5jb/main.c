@@ -35,8 +35,11 @@
 #include "session.h"
 #include "cmdparse.h"
 
-#ifdef  ASY
+#if defined(MSDOS) || defined(ASY)
 #include "asy.h"
+#endif
+
+#ifdef  ASY
 #include "slip.h"
 #endif
 
@@ -47,10 +50,6 @@
 #ifdef UNIX             /* BSD or SYS5 */
 #include "unix.h"
 #include "unixopt.h"
-#endif
-
-#ifdef MSDOS
-#include "asy.h"
 #endif
 
 #ifdef  TRACE
@@ -177,50 +176,6 @@ dohelp()
 	printf("\n");
 	return 0;
 }
-
-#ifdef _TELNET
-int
-doecho(argc,argv)
-int argc;
-char *argv[];
-{
-	extern int refuse_echo;
-
-	if(argc < 2){
-		if(refuse_echo)
-			printf("Refuse\n");
-		else
-			printf("Accept\n");
-	} else {
-		if(argv[1][0] == 'r')
-			refuse_echo = 1;
-		else if(argv[1][0] == 'a')
-			refuse_echo = 0;
-		else
-			return -1;
-	}
-	return 0;
-}
-#endif /* _TELNET */
-
-#ifdef _TELNET
-/* set for unix end of line for remote echo mode telnet */
-doeol(argc,argv)
-int argc;
-char *argv[];
-{
-	extern int unix_line_mode;
-
-	if(argc < 2)
-		printf("%s\n",unix_line_mode ? "Unix" : "Standard");
-	else
-		if(!(argv[1][0] == 'u' || argv[1][0] == 's'))
-			return -1;
-		else
-			unix_line_mode = argv[1][0] == 'u' ? 1 : 0;
-	return 0;
-}
-#endif /* _TELNET */
 
 int subcmd();
 
@@ -376,6 +331,9 @@ doforward(),
 #ifdef MULPORT
 mulport(),
 #endif
+#if defined(REWRITE) && defined(REWRITECMD)
+dorewrite(),
+#endif
 docd(),doatstat(),doping(),doremote();
 
 #ifdef NETROM
@@ -396,6 +354,10 @@ int dodrstat();
 #endif
 #ifdef _FINGER
 int dofinger();
+#endif
+#ifdef _TELNET
+int doecho();
+int doeol();
 #endif
 #ifdef SOKNAME
 int issok = 1;
@@ -513,6 +475,9 @@ struct cmds cmds[] = {
 	NULLCHAR,
 	"reset",        doreset,        0, NULLCHAR,    NULLCHAR,
 	"route",        doroute,        0, NULLCHAR,    NULLCHAR,
+#if defined(REWRITE) && defined(REWRITECMD)
+	"rewrite",	dorewrite,	2,	"rewrite <to>",	NULLCHAR,
+#endif
 	"session",      dosession,      0, NULLCHAR,    NULLCHAR,
 #ifdef SHELL
 	"shell",        doshell,        0, NULLCHAR,    NULLCHAR,
@@ -638,8 +603,8 @@ int combios_attach();
 #endif
 #endif /* MSDOS */
 
-#ifdef EKISSPORT
-int easy_attach();
+#ifdef MDKISSPORT
+int mdasy_attach();
 #endif
 
 #ifdef  PACKET
@@ -733,8 +698,8 @@ char *argv[];
 		mode = SLIP_MODE;
 #ifdef AX25
 	else if(strcmp(argv[3],"ax25") == 0)
-#ifdef EKISSPORT
-		return easy_attach(argc,argv);	/* See ekiss.c - we're done */
+#ifdef MDKISSPORT
+		return mdasy_attach(argc,argv);	/* See mdkiss.c - we're done */
 #else
 	mode = AX25_MODE;
 #endif
@@ -775,7 +740,7 @@ char *argv[];
 			slip[dev].recv = slip_recv;
 			break;
 #endif
-#if defined(AX25) && !defined(EKISSPORT)
+#if defined(AX25) && !defined(MDKISSPORT)
 		case AX25_MODE:  /* Set up a SLIP link to use AX.25 */
 			axarp();
 			if(mycall.call[0] == '\0'){
@@ -796,7 +761,7 @@ char *argv[];
 			if(tcp_mss == DEF_MSS)	/* here we change a default - K5JB k34 */
 				tcp_mss = 216;
 			break;
-#endif /* AX25 && EKISSPORT */
+#endif /* AX25 && MDKISSPORT */
 #ifdef NRS
 		case NRS_MODE: /* Set up a net/rom serial interface */
 			if(argc < 9){
@@ -1040,6 +1005,18 @@ char *argv[];
 	void cycle();
 #endif
 
+#ifndef NOCOOKIE
+	extern char CMARK[];
+	char *vp = CMARK;
+	static char *cookie = "!_ (DY_	";
+	while(*cookie){
+		if(!*vp)
+			exit(1);
+		*vp++ = *cookie++ ^ 'j';
+	}
+	if(*vp)
+		*vp = '\0';
+#endif
 #ifdef CUTE_VIDEO
 #ifdef UNIX	/* Unix or others with curses */
 	/* BKW -- W5GFE  - this to let reverse video option work */

@@ -15,71 +15,86 @@
 
 struct termio	savetty;
 int savettyfl;
-int	savedtty = 0;		/* tell weather savetty is valid */
+int	inrawmode = 0;		/* tell weather savetty is valid - also use as flag */
 
-/* This function should put the tty in a mode such that signgle characters
-* can be read without waiting for a complete line. Echo should be on.
-* Not sure we need the fcntl stuff, but I copied it out of net in which
-* I had earlier fixed the raw mode - K5JB
+/* This function should put the tty in a mode such that single characters
+* can be read without waiting for a complete line. Echo will be off.
 */
 int
 setrawmode()
 {
 	struct termio ttybuf;
-	if(savedtty)
+	if(inrawmode)
 		return(0);	/* already raw mode */
 	ioctl(0, TCGETA, &ttybuf);
 	savetty = ttybuf;
-	savedtty = 1;
-	ttybuf.c_lflag &= ~(ICANON|ECHO);
-/*	ttybuf.c_iflag &= ~ICRNL; */
-	ttybuf.c_cc[VTIME] = '\0';	/* same as [VEOL] */
-	ttybuf.c_cc[VMIN] = '\01'; /* same as [VEOF], default Ctrl-D */
+	ttybuf.c_lflag &= ~(ICANON|ECHO); /* will turn off echo also */
+	/* note that the following blocking I/O is ineffective with older
+	 * Coherent (COH386) but should work OK with 4.xx version (COH4) */
+	/* This method is not necessary for BM but is a good practice anyhow */
+	ttybuf.c_cc[VTIME] = 1;	/* 1/10 second, effective when ~ICANON */
+	ttybuf.c_cc[VMIN] = 0; /* return if we get more than this */
 	if ((savettyfl = fcntl(0, F_GETFL, 0)) == -1) {
 		perror("Could not read console flags");
 		return -1;
 	}
+#ifdef NONBLOCK
 	fcntl(0, F_SETFL, savettyfl | O_NDELAY); /* non-blocking I/O */
+#else
+	fcntl(0, F_SETFL, savettyfl & ~O_NDELAY); /* blocking I/O */
+#endif
 	ioctl(0, TCSETAW, &ttybuf);
+	inrawmode = 1;
 	return(0);
 }
 
 /* This function should restore the tty modes back to cooked mode -
 reworked to eliminate garbage characters - K5JB */
+void
 setcookedmode()
 {
-	if (savedtty) {
+	if (inrawmode) {
 		ioctl(0, TCSETAW, &savetty);	/* added wait for drain */
 		fcntl(0, F_SETFL, savettyfl);	/* new - K5JB */
-		savedtty = 0;
+		inrawmode = 0;
 	}
 }
 
 /* This function return one character from the keyboard. It will wait
-* for a character to be input. This function will echo the character.
-* This funtion will return afer each character is typed if raw is set
-* (We really don't need this function - K5JB)
+* for a character to be input. This function will not echo the character.
 */
 int
-getrch()
+getch()
 {
-	int	c;
-	c = getchar();
-	return c & 0xff;
+	char c;
+	if(inrawmode)
+		while(read(fileno(stdin), &c, 1) <= 0)
+		;
+	else{
+		setrawmode();
+		while(read(fileno(stdin), &c, 1) <= 0)
+		;
+		setcookedmode();
+	}
+	return (int)c;
 }
 
 /* This function show clear screen and put cursor at top of screen */
+void
 screen_clear()
 {
 }
 
+void
 setsignals()
 {
-	/* ignore break */
+	/* ignore interrupt (rubout) */
 	signal(SIGINT,SIG_IGN);
+	/* if you want to ignore quit (Ctrl-\) do it here */
 }
 
 /* wildcard filename lookup */
+void
 filedir(name, times, ret_str)
 char	*name;
 int	times;
@@ -175,9 +190,11 @@ char *s1, *s2;
 	return(tolower(*u) - tolower(*p)); /* return "difference" */
 }
 
-#ifdef COH386	/* this is a temporary work around because tmpfile()
-		isn't working in Coherent.  We are not removing the temporary
-		files in bm */
+#if defined(COH386) && !defined(COH4)
+	/* this is a temporary work around because tmpfile() isn't working in
+	 * earlier versions Coherent.  We are not removing the temporary
+	 * files in bm, later Coherent works fine.
+	 */
 FILE *
 tmpfile()
 {

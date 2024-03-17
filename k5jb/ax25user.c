@@ -7,6 +7,9 @@
 #include "iface.h"
 #include "ax25.h"
 #include "lapb.h"
+#ifdef COH386 /* avoid a redefinition */
+#undef __ARGS
+#endif
 #include <ctype.h>
 
 void free_q(),lapb_output(),est_link();

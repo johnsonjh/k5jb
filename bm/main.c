@@ -9,6 +9,10 @@
  *	this notice is retained.
  *
  * revision history:
+ *  3.3.1n Corrected error in line printed to record file before message.
+ *  Added -r switch to specify rc file from command line
+ *  3.3.1m Altered display of ELM messages will ill formatted date.  Swept
+ *  through files doing general cleanup.  Added a config.h
  *  Combined N0QBJ's and my changes and revised version to 3.3.1l - K5JB
  *  changed writefile so it defaults to the folder dir (for osk only) N0QBJ
  *   930130
@@ -74,6 +78,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
+
 #ifdef	_OSK
 #include <strings.h>
 #include <dir.h>
@@ -83,16 +88,54 @@ char *strpbrk();
 #endif
 #else
 #include <string.h>
+#endif	/* _OSK */
+
+#ifdef MSDOS
+#include <io.h>
+#include <stdlib.h>
 #endif
 #include "bm.h"
-
-#undef PRINTER
+#include "config.h"
 
 extern char version[];
 static char copyright1[] =
 "Copyright 1987 Garbee N3EUA";
 static char copyright2[] =
 "Copyright 1988 Trulli NN2Z";
+char *margin = "          ";
+
+char *helpmsgs[] = {
+	"b [msg]        bounce message (remail)",
+	"d [msg]        delete message(s)",
+	"f [msg]        forward message",
+	"h              display message headers",
+	"k [job id]     kill unsent messages",
+	"l              list unsent messages",
+	"m userlist     mail a message",
+	"n [file]       display or change notesfile",
+#ifdef SWITCHUSER
+	"N              switch to same name as notesfile",
+#endif
+#ifdef PRINTER
+	"p [msg]        print message(s) on printer",
+#endif
+	"q              quit (see also x)",
+	"r [msg]        reply to a message",
+	"s [msg] [file] save message(s) in file (default mbox)",
+	"u [msg]        undelete message(s)",
+	"w [msg] file   save message(s) in file no header",
+	"x              quit without changing mail file",
+	".              read current message",
+	"#              read message number #",
+#ifdef	_OSK
+	"! cmd          OS9 shell command",
+#else
+	"! cmd          run dos/unix command",
+#endif
+	"$              sync the notefile",
+	"?              print this help screen",
+	""	/* mark the end */
+	};
 
 /* commands valid in bm.rc */
 
@@ -106,7 +149,7 @@ struct token rccmds[] = {
 	"maxlet", MAXLET,
 	"mbox", MBOX,
 	"record", RECORD,
-	"screen", SCREEN,
+	"screen", SCREEN,	/* leaving it to avoid error messages */
 	"zone",TIMEZONE,	/* Added to Unix version K5JB */
 	"folder", FOLDER,
 	"mqueue", MQUEUE,
@@ -140,12 +183,22 @@ int	qflag = 0;		/* true if bm is used just to queue files */
 unsigned maxlet = NLET+1;	/* max number of messages in mailbox */
 int	tty = 0;		/* tells if stdin is a tty */
 struct let *mbox;		/* pointer to the array of messages */
+#ifdef UNIX
 int wflag = FALSE;
+#endif
 
-char usage[] = "Usage: bm [-u user] [-f file] \n  or bm [-s subject] [-q] addr .. addr\n";
+#ifdef OPTALIAS
+char usage[] = "Usage: (read) bm [-u user] [-f file]\n    or (send) bm [-a aliasfile] [-r rcfile] [-s subject] [-q] addr .. addr\n";
+#else
+char usage[] = "Usage: (read) bm [-u user] [-f file]\n    or (send) bm [-r rcfile] [-s subject] [-q] addr .. addr\n";
+#endif
 char badmsg[] = "Invalid Message number %d\n";
 char nomail[] = "No messages\n";
 char noaccess[] = "Unable to access %s\n";
+char *runcom;	/* .rc file K5JB 3.3.1n */
+#ifdef OPTALIAS
+char *alias;	/* 3.3.1n */
+#endif
 
 main(argc,argv)
 int argc;
@@ -166,13 +219,51 @@ char *argv[];
 	(void) fclose(stdprn);
 #endif
 
+	while ((c = getopt(argc,argv,"u:f:s:r:a:q?")) != -1) {
+		switch(c) {
+		case 'f':
+			fflag++;
+			mfilename = optarg;
+			break;
+		case 'q':
+			qflag++;
+			break;
+		case 's':
+			subjectline = optarg;
+			break;
+		case 'u':
+			strncpy(notename,optarg,8);
+			break;
+		case 'r':	/* K5JB 3.3.1n */
+			runcom = optarg;
+			break;
+#ifdef OPTALIAS
+		case 'a':	/* K5JB 3.3.1n */
+			alias = optarg;
+			break;
+#endif
+		case '?':
+			printf(usage);
+			exit(1);
+		}
+	}
 	loadconfig();
+
+	if(!*notename)
+		strncpy(notename,username,8);
+
 	if (qflag == 0 && isatty(fileno(stdin))) {
 		/* announce ourselves */
 #if	!defined(UNIX) && defined(CLEAR)
 		screen_clear();
 #endif
-		printf(" %s\n%s -- %s\n\n",version,copyright1,copyright2);
+#ifdef C386
+		printf("      %s%s 80386 (K5JB)\n%s%s -- %s\n\n",margin,version,margin,
+				copyright1,copyright2);
+#else
+		printf("%s%s%s (K5JB)\n%s %s -- %s\n\n",margin,margin,version,margin,
+				copyright1,copyright2);
+#endif
 		tty = 1;
 	}
 
@@ -202,33 +293,11 @@ char *argv[];
 		printf(noaccess,mqueue);
 		exit(1);
 	}
-	strncpy(notename,username,8);
-	notename[8] = '\0';
 
-	while ((c = getopt(argc,argv,"u:f:s:q")) != -1) {
-		switch(c) {
-		case 'f':
-			fflag++;
-			mfilename = optarg;
-			break;
-		case 'q':
-			qflag++;
-			break;
-		case 's':
-			subjectline = optarg;
-			break;
-		case 'u':
-			strncpy(notename,optarg,8);
-			notename[8] = '\0';
-			break;
-		case '?':
-			printf(usage);
-			exit(1);
-		}
-	}
-
+#ifdef SIGNALS
 	/* set any signal handlers to catch break */
 	setsignals();
+#endif
 
 	if(optind < argc){
 		dosmtpsend(NULLFILE,&argv[optind],argc-optind,subjectline);
@@ -240,7 +309,7 @@ char *argv[];
 	/*
 	* Since we are in the dos small model make sure that we
 	* don't overflow a unsigned short on the number bytes
-	* need for mallloc. If not checked malloc will
+	* need for malloc. If not checked malloc will
 	* succeed and we will be trashing ourself in no time.
 	*/
 	if ((tmp & 0xffff0000l) ||
@@ -254,10 +323,6 @@ char *argv[];
 		    maxlet);
 		(void) exit(1);
 	}
-	/* This is useful for desqview tuning */
-#ifdef MSDOS
-	printf("Coreleft: %u\n",coreleft());
-#endif
 
 	/* there is slight risk of array over-write here, and elsewhere when
 	sprintf is used.  I'm may cut LINELEN to 88 (malloc does things by
@@ -266,8 +331,9 @@ char *argv[];
 	if (!fflag && lockit())
 		exit(1);
 	ret = initnotes();
-#ifdef MSDOS
-	printf("After initnotes, coreleft is %u\n",coreleft());
+#if defined(MSDOS) && defined(DVREPORT)
+	printf("%s%sDV and Windows users: coreleft is %u\n\n",
+		margin,margin,coreleft());
 #endif
 	if (!fflag)
 		rmlock(maildir,notename);
@@ -279,44 +345,61 @@ char *argv[];
 	return 0;
 }
 
+void
 loadconfig()
 {
 	FILE	*rcfp;	/* handle for the configuration file */
 	char	rcline[LINELEN]; /* buffer for config file reading */
 	register char *s,*p;
-/*
-	char q[40];
-	char *q;
-*/
-	extern char *alias;
 	extern char *mailspool;
 	extern char *mailqdir;
 	extern char *spool;
+#ifdef OPTALIAS
+	extern char *default_alias;
+#endif
+	extern char *alias;	/* could be defined in this file, or in files.c */
+	extern char *default_runcom;
 	int line = 0;
-	char *runcom;
 	char *getenv();
    extern char timez[];	/* made available to Unix too - K5JB */
 
-	/* first try $NETHOME/RUNCOM 	K5JB */
-	if ((p = getenv("NETHOME")) == NULLCHAR)
-#ifdef UNIX
-		sprintf(rcline, "./%s", RUNCOM);
-#else
-		sprintf(rcline, "/%s", RUNCOM);
+	/* if either of these is set at command line, we use it - K5JB */
+	if(!*runcom)
+		runcom = default_runcom;
+#ifdef OPTALIAS
+	if(!*alias)
+		alias = default_alias;
 #endif
-		else
-			sprintf(rcline, "%s/%s", p, RUNCOM);
+
+#ifdef UNIX
+	/* first try $NETHOME/runcom.  We give it two shots.  K5JB */
+	if ((p = getenv(HOMEDIR)) != NULLCHAR || (p = getenv("HOME")) != NULLCHAR)
+#else
+	if ((p = getenv(HOMEDIR)) != NULLCHAR)
+#endif
+		sprintf(rcline, "%s/%s", p, runcom);
+	else
+#ifdef UNIX
+		/* if neither is defined we use current dir for Unix */
+		sprintf(rcline, "./%s", runcom);
+#else
+		/* only in MS-DOS would we use root */
+		sprintf(rcline, "/%s", runcom);
+#endif
 	runcom = savestr(rcline);
+
+	/* and also locate our alias file */
 	if(p == NULLCHAR)
 #ifdef UNIX
 		sprintf(rcline,"./%s",alias);
 #else
 		sprintf(rcline,"/%s",alias);
 #endif
-		else
-			sprintf(rcline,"%s/%s",p,alias);
+	else
+		sprintf(rcline,"%s/%s",p,alias);
 
 	alias = savestr(rcline);
+
 	if ((rcfp = fopen(runcom,"r")) == NULLFILE) {	/* open config file */
 		printf("Cannot open '%s', check your installation\n",runcom);
 		(void) exit(1);
@@ -376,7 +459,7 @@ loadconfig()
          strcpy(timez,p);
          break;
 		case SCREEN:
-#if	defined(__TURBOC__)
+#ifdef VIDEO
 			setvideo(p);
 #endif
 			break;
@@ -399,7 +482,7 @@ loadconfig()
 		}
 	}
 	(void) fclose(rcfp);
-	if ((p = getenv("NETSPOOL")) == NULLCHAR)	/* Blush!  I hate this! */
+	if ((p = getenv("NETSPOOL")) == NULLCHAR)	/* K5JB NET compatibility */
 		p = spool;
 	if(maildir == NULLCHAR){
 		sprintf(rcline, "%s/%s", p,mailspool);
@@ -436,6 +519,7 @@ register char *s;
 }
 
 /* replace terminating end of line marker(s) with null */
+void
 rip(s)
 register char *s;
 {
@@ -460,40 +544,22 @@ char *s;
 	return p;
 }
 
+
+void
 dohelp()
 {
+	int i;
+
 #if	!defined(UNIX) && defined(CLEAR)
 	screen_clear();   /* I REALLY DON'T like screen clearing - K5JB */
 #endif
-	printf("\n\n");
-	printf(" d [msglist]           delete a message\n");
-	printf(" m userlist            mail a message\n");
-	printf(" s [msglist] [file]    save message in file (default mbox)\n");
-	printf(" w [msglist] file      save message in file no header\n");
-	printf(" f [msg]               forward message\n");
-	printf(" b [msg]               bounce message (remail)\n");
-	printf(" r [msg]               reply to a message\n");
-	printf(" u [msglst]            undelete a message\n");
-	printf(" p [msglst]            print message on printer (DOS only)\n");
-	printf(" .                     display current message\n");
-	printf(" h                     display message headers in notefile\n");
-	printf(" l                     list unsent messages\n");
-	printf(" k                     kill unsent messages\n");
-	printf(" n [file]              display or change notesfile\n");
-	printf(" #                     where # is the number of message to read\n");
-	printf(" x                     quit without changing mail file\n");
-	printf(" q                     quit\n");
-#ifdef	_OSK
-	printf(" ! cmd				   OS9 shell command\n");
-#else
-	printf(" ! cmd                 run dos/unix command\n");
-#endif
-	printf(" $                     sync the notefile\n");
-	printf(" ?                     print this help screen\n");
+	for(i=0;*helpmsgs[i];i++)
+		printf("%s%s\n",margin,helpmsgs[i]);
 }
 
 
 /* save a message list in a file in mailbox format */
+void
 savemsg(argc,argv)
 int argc;
 register char *argv[];
@@ -574,6 +640,7 @@ char *argv[];
 }
 #endif
 
+void
 writemsg(argc,argv)
 int argc;
 char *argv[];
@@ -622,6 +689,7 @@ char *argv[];
 	printf("%s appended\n",writefile);
 }
 
+void
 bmexit(x)
 int x;
 {
@@ -633,7 +701,23 @@ int x;
 	exit(x);
 }
 
+/* correct most common keyboard mistake - 3.3.1n1 */
+int
+checkformat(nargs,args)
+int nargs;
+char *args[];
+{
+	int i;
+	for(i=0;i<nargs;i++)
+		if(args[i][0] == '@' || args[i][strlen(args[i]) - 1] == '@'){
+			printf("Don't put spaces in user@host\n");
+			return -1;
+		}
+	return 0;
+}
+
 /* this is the main command processing loop */
+void
 getcommand()
 {
 	FILE *tfile, *tmpfile();
@@ -650,10 +734,6 @@ getcommand()
 	while(1) {
 		printf("\"%s\"> ",notename);
 		fgets(command,LINELEN,stdin);
-#ifdef OLD	/* this has undesirable side effects */
-		if (feof(stdin))		/* someone hit ^Z! */
-			strcpy(command,"q");	/* treat it like 'q' */
-#endif
 		rip(command);
 		if(*command == '!') {
 			if (system(&command[1]))
@@ -675,7 +755,8 @@ getcommand()
 				rip(command);
 				nargs = parse(command,args,MAXARGS);
 			}
-			dosmtpsend(NULLFILE,args,nargs,NULLCHAR);
+			if(!checkformat(nargs,args))
+				dosmtpsend(NULLFILE,args,nargs,NULLCHAR);
 			break;
 
 		case 's':		/* save current msg to file */
@@ -692,13 +773,11 @@ getcommand()
 			/* NOTREACHED */
 			break;
 
-		case 'p':		/* print message */
 #ifdef PRINTER
+		case 'p':		/* print message */
 			printmsg(nargs,args);
-#else
-			printf("Command not available in this version\n");
-#endif
 			break;
+#endif
 
 		case 'r':			/* reply */
 			if (nargs == 0)
@@ -729,7 +808,8 @@ getcommand()
 				fgets(command,LINELEN,stdin);
 				rip(command);
 				nargs = parse(command,args,MAXARGS);
-				dosmtpsend(tfile,args,nargs,NULLCHAR);
+				if(!checkformat(nargs,args))
+					dosmtpsend(tfile,args,nargs,NULLCHAR);
 #if defined(_OSK) && !defined(_UCC)
 				tmpclose(tfile);
 #else
@@ -756,7 +836,8 @@ getcommand()
 				fgets(command,LINELEN,stdin);
 				rip(command);
 				nargs = parse(command,args,MAXARGS);
-				bouncemsg(tfile,args,nargs);
+				if(!checkformat(nargs,args))
+					bouncemsg(tfile,args,nargs);
 #if defined(_OSK) && !defined(_UCC)
 				tmpclose(tfile);
 #else
@@ -792,6 +873,11 @@ getcommand()
 		case 'n': 	/* display or change notefiles */
 			mboxnames(nargs,args);
 			break;
+#ifdef SWITCHUSER
+		case 'N':	/* switch to same name as notename */
+			username = notename;
+			break;
+#endif
 		case 'q':		/* quit */
 			if (isnewmail()) {
 				printf("New mail has arrived\n");
@@ -818,7 +904,6 @@ getcommand()
 			break;
 
 		case 'h':		/* list message headers in notesfile */
-
 			listnotes();
 			break;
 
@@ -851,6 +936,7 @@ getcommand()
 }
 
 /* list or change mbox */
+void
 mboxnames(argc,argv)
 int argc;
 char *argv[];
@@ -875,7 +961,9 @@ char *argv[];
 				fflag = 0;
 				mfilename = notefile;
 				strncpy(notename,argv[0],8);
+#ifdef notdef
 				notename[8] = '\0';
+#endif
 				sprintf(notefile,"%s/%s.txt",maildir,notename);
 			}
 			if (!fflag && lockit()) {
@@ -902,6 +990,7 @@ char *argv[];
 		}
 }
 
+void
 reinit()
 {
 	int ret;

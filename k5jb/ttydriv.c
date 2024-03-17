@@ -98,7 +98,6 @@ extern char escape;
 extern int mode;
 int Keyhit = -1;
 int noprompt;	/* things to control prompts */
-int closepending; /* k35 */
 
 /* Process any keyboard input - removed from main() to make accessable
  * by other processes - K5JB
@@ -177,10 +176,9 @@ check_kbd()
 		if(mode == CMD_MODE)
 #endif
 		{
-			if(noprompt || closepending){	/* k35 */
+			if(noprompt)	/* k35 */
 				noprompt = 0;
-				closepending = 0;
-			}else{
+			else{
 				printf(prompt);
 				fflush(stdout);
 			}
@@ -258,6 +256,7 @@ char **buf;
 	int erase = FALSE;
 	char *rp ;
 	int cnt;
+	extern int unix_line_mode;	/* k35c */
 
 #ifdef EDIT
 	if(*lastline == '\0')	/* only happens first time through */
@@ -280,9 +279,20 @@ char **buf;
 #endif
 			break;
 		case TTY_RAW:
-			*kbcp++ = c;
-			cnt = kbcp - linebuf;
-			kbcp = linebuf;
+			/* special problem with sending password when telnetting to a
+			 * station that turns echo off.  We need to keep cnt = 0 until
+			 * we finish line.  We must complete password without changing
+			 * sessions, etc.  Not worrying about buffer overwrite, etc. k35c
+			 */
+			if(c == '\015' || c == '\012'){	/* k35a telnet password needs */
+				printf("\n");						/* newline.  FTP cli doesn't */
+				*kbcp++ = '\015';
+				if(!unix_line_mode)
+					*kbcp++ = '\012';
+				cnt = (kbcp - linebuf);	/* now can tell world about it */
+				kbcp = linebuf;
+			}else
+				*kbcp++ = c;
 			break;
 		case TTY_COOKED:
 			/* Perform cooked-mode line editing */

@@ -706,7 +706,7 @@ FILE *fd;		/* timer daemon.  Abort sensed in mbx_line() */
 static int				/* this queues things to a temporary file.  Return */
 showlist(m,full)		/* is not currently tested.  Full is zero on connect */
 struct mbx *m; 		/* "full" can contain number of messages we want to */
-int full;				/* list. */
+int full;				/* list.  Added list header k35 */
 {
 	int i,new = 0,rtn = 0;
 	struct mhdr *mhdr;
@@ -726,18 +726,20 @@ int full;				/* list. */
 				new++;
 			mhdr = mhdr->next;
 		}
-		sprintf(tmpbuf,"You have %d message%s  %d unread.",
+		sprintf(tmpbuf,"You have %d message%s  %d unread.\015",
 			m->msgs,m->msgs > 1 ? "s." : ".", new);
-		if(!full && new){
-			strcat(tmpbuf,"  Unread one");
-			strcat(tmpbuf,new == 1 ? " is:" : "s are:");
-		}
-		strcat(tmpbuf,"\015");
+		if(!full)
+			if(new){
+				strcat(tmpbuf,"Unread one");
+				strcat(tmpbuf,new == 1 ? " is:\015" : "s are:\015");
+			}else{
+				mbx_msg(m,tmpbuf);
+				do_prompt(m);
+				return(0);
+			}
+		strcat(tmpbuf,
+			"  Nr: From:                  Date & Time:    Size: Subject:\015");
 		mbx_msg(m,tmpbuf);
-		if(!full && !new){
-			do_prompt(m);
-			return(0);
-		}
 
 		/* prepare a temp file.  read_fd will do m->upload = m->upload */
 		if ((m->upload = tmpfile()) == NULLFILE)
@@ -746,14 +748,16 @@ int full;				/* list. */
 		new = 0;	/* reuse for first message to show */
 #ifdef LLCMD
 		if(full && (full != m->msgs)){ /* user used ll # command */
+#ifdef OLD	/* eliminated with the header thing above */
 			fprintf(m->upload,"The last %d %s:\015",full,full > 1 ? "are" : "is");
+#endif
 			for(i=m->msgs;i>full;i--,new++)
 				mhdr = mhdr->next;
 		}
 #endif
 		for(i=new;i<m->msgs;i++,mhdr = mhdr->next)
 			if(!(mhdr->status & STATREAD) || full)
-				fprintf(m->upload,"%s%s%3d %-22s %-16s%4d %s\015",
+				fprintf(m->upload,"%s%s%3d %-22s %-16s%5d %s\015",
 				mhdr->status & STATREAD ? "R" : " ",
 				mhdr->status & STATKILL ? "K" : " ",mhdr->msgnr,
 					mhdr->from,mhdr->date,mhdr->size,mhdr->subj);
@@ -1724,10 +1728,10 @@ struct mbx *m;
 {
 	char *host;
 
-	if (m->line[0] == 0x1a ||
-		strcmp(m->line, "/ex") == 0 ||
-		strcmp(m->line, "/EX") == 0){
-		if ((host = strchr(m->to,'@')) == NULLCHAR)
+	if(m->line[0] == 0x1a ||
+			strcmp(m->line, "/ex") == 0 ||
+			strcmp(m->line, "/EX") == 0){
+		if((host = strchr(m->to,'@')) == NULLCHAR)
 			host = hostname;		/* use our hostname */
 		else
 			host++;				/* use the host part of address */
@@ -1750,6 +1754,9 @@ struct mbx *m;
 		return(0);
 	}
 	/* otherwise, ordinary line */
+	/* prevent dot only from getting into mail stream (rare) - k35 */
+	if(m->line[0] == '.' && m->line[1] == '\0')
+		strcat(m->line," ");
 	fprintf(m->tfile,"%s\n",m->line);
 	return(0);
 }

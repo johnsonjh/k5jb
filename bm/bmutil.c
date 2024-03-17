@@ -2,12 +2,18 @@
 /* setrawmode and setcookedmode were causing characters to be
  * scrambled on my terminal so they were undefed out for UNIX.
  * (fixed this 12/16/91, while doing some other cosmetic things.)
+ * But, cooked and raw only used in Unix for wordwrap and haktc().
  * took out the screen_clear while I was at it since there is
  * an empty function for that...don't think I want screen clearing
  * cutsies anyway - K5JB
+ * Fixed some file reading errors 1/94 and cleaned up some more while
+ * adding Ctrl-Z filter in 6/94 - K5JB
  */
 
 #include <stdio.h>
+#include <ctype.h>
+#include <time.h>
+
 #ifdef	_OSK
 #include <modes.h>
 #include <strings.h>
@@ -16,13 +22,8 @@
 #else
 #include <string.h>
 #endif
-#include <ctype.h>
-#include <time.h>
 
-#if !defined(COH386) && !defined(_OSK)
-#define		SETVBUF
-#endif
-#if	(defined(UNIX) || defined(MICROSOFT)) && !defined(_OSK) 
+#if	(defined(UNIX) || defined(MICROSOFT)) && !defined(_OSK)
 #include	<sys/types.h>
 #endif
 #if	(defined(UNIX) || defined(MICROSOFT) || defined(__TURBOC__)) && !defined(_OSK)
@@ -34,8 +35,15 @@
 #ifndef	_OSK
 #include <fcntl.h>
 #endif
+#ifdef __TURBOC__
+#include <conio.h>
+#include <stdlib.h>
+#include <io.h>
+#endif
+
 #include "bm.h"
 #include "header.h"
+#include "config.h"
 
 char *getname();
 static unsigned long	mboxsize;
@@ -58,11 +66,16 @@ initnotes()
 
 	if (!stat(mfilename,&mstat))
 		mboxsize = mstat.st_size;
-	if ((ifile = fopen(mfilename,"r")) == NULLFILE) {
+#ifdef MSDOS	/* to deal with files containing ^Z -- 061894 */
+	if ((ifile = fopen(mfilename,"rb")) == NULLFILE)
+#else
+	if ((ifile = fopen(mfilename,"r")) == NULLFILE)
+#endif
+	{
 		printf(nomail);
 		mfile = NULLFILE;
 		return 0;
-	} 
+	}
 #ifdef	SETVBUF
 	if (inbuf == NULLCHAR)
 		inbuf = (char *)malloc(MYBUF);
@@ -112,42 +125,87 @@ haktc(percent)
 int percent;
 {
 	int c;
-#ifdef MSDOS
 	printf("- q to quit, any other key for more ");
-#else
-	printf("- q to quit, any other key, plus rtn, for more ");
-#endif
 	if(percent)
 		printf("(%d%%) - ",percent);
 		else
 		printf("- ");
+#ifdef UNIX
+	fflush(stdout);
+#endif
 #ifdef MSDOS
 	while(!kbhit())
 	;
 	c = (char)getch();
-	printf("%c\n",c == '\n' || c == '\r' ? '\0' : c);
 #else
-	/* this getrch() doesn't do what it is supposed to, should replace
-		it with getchar() */
-	while((c = getchar()) == 0xff)
-	;
-	if(c != '\n')
-		while(getchar() != '\n')        /* flush input */
-		;
+	/* getch() will wait until a character is hit */
+	c = (char)getch();
 #endif
+	/* getch will not  echo whatever key was hit, so */
+	printf("%c\n", c == '\r' || c == '\n' ? '\0' : c);
 	if( c == EOF || c == 'q')
 		return(-1);
-#if	!defined(UNIX) && defined(CLEAR)
+#ifdef CLEAR
 	screen_clear();	/* K5JB */
 #endif
 	return(0);
 }
+
+#ifdef MSDOS
+/* like fgets, except does binary read so not stopped by ^Z in file.
+ * s must have n+1 char spaces, n must be greater than zero, and stream
+ * must be a file opened in binary mode - K5JB
+ */
+char *
+bfgets(s,n,stream)
+char *s;
+int n;
+FILE *stream;
+{
+	int temp,linedone;
+	char *lineptr;
+
+	s[--n] = '\0';
+	for(;;){
+		linedone = FALSE;
+		lineptr = s;
+		while(n--){
+			temp = getc(stream);
+			switch(temp){
+				case '\n':
+					*lineptr++ = (char)temp;
+				case EOF:
+					*lineptr = '\0';
+					linedone = TRUE;
+					break;
+				case 26:
+				case 13:
+					n++;
+					break;
+				default:
+					*lineptr++ = (char)temp;
+					break;
+			}
+			if(linedone)
+				break;
+		}
+		if(temp == EOF)
+			return(NULLCHAR);
+		else
+			return(s);
+	}
+}
+#endif
 
 /* readnotes assumes that ifile is pointing to the first
  * message that needs to be read.  For initial reads of a
  * notesfile, this will be the beginning of the file.  For
  * rereads when new mail arrives, it will be the first new
  * message.
+ * 011495 rearranged because this was tacking extra line to end of
+ * mailfile, 061894 added bfgets() to handle mail with imbedded Ctrl-Z.
+ * File is opened in binary and bfgets fixes end of lines as well as
+ * zapping Ctrl-Zs.
  */
 readnotes(ifile)
 FILE *ifile ;
@@ -160,8 +218,13 @@ FILE *ifile ;
 
 	cmsg = (struct let *)0;
 	line = tstring;
-	while(!feof(ifile)) {
-		fgets(line,LINELEN,ifile);
+	for(;;){
+#ifdef MSDOS
+		if(bfgets(line,LINELEN,ifile) == NULLCHAR)
+#else
+		if(fgets(line,LINELEN,ifile) == NULLCHAR || feof(ifile))
+#endif
+			break;	/* 011494 was tacking extra line to end of mailfile */
 		/* scan for begining of a message */
 		if(strncmp(line,"From ",5) == 0) {
 			cpos = ftell(mfile);
@@ -180,8 +243,12 @@ FILE *ifile ;
 			cmsg->start = cpos;
 			cmsg->status = 0;
 			cmsg->size = strlen(line);
-			while (!feof(ifile)) {
-				if (fgets(line,LINELEN,ifile) == NULLCHAR)
+			for(;;){
+#ifdef MSDOS
+				if(bfgets(line,LINELEN,ifile) == NULLCHAR)
+#else
+				if (fgets(line,LINELEN,ifile) == NULLCHAR || feof(ifile))
+#endif
 					break;
 				if (*line == '\n') { /* done header part */
 					cmsg->size++;
@@ -214,6 +281,7 @@ FILE *ifile ;
 }
 
 /* list headers of a notesfile a message */
+void
 listnotes()
 {
 	register struct	let *cmsg;
@@ -232,9 +300,6 @@ listnotes()
 #ifdef CLEAR
 	screen_clear();		/* K5JB */
 #endif
-#if   !defined(UNIX) && !defined(MSDOS)
-	setrawmode();
-#endif
 	printf("Mailbox %s - %d messages %d new\n\n",mfilename,nmsgs,newmsgs);
 	lines = 2;
 	for (cmsg = &mbox[1],i = 1; i <= nmsgs; i++, cmsg++) {
@@ -243,8 +308,9 @@ listnotes()
 		*smtp_subject = '\0';
 		fseek(mfile,cmsg->start,0);
 		size = cmsg->size;
-		while (!feof(mfile) && size > 0) {
-			fgets(tstring,sizeof(tstring),mfile);
+		while(size > 0){
+			if(fgets(tstring,sizeof(tstring),mfile) == NULLCHAR)
+				break;
 			if (*tstring == '\n')	/* end of header */
 				break;
 			size -= strlen(tstring);
@@ -297,7 +363,11 @@ listnotes()
 					p++;
 				/* copy time */
 				*s++ = *p++;	/* space */
-				*s++ = *p++;	/* hour */
+				/* Wonderful ELM will do 1:00 - K5JB */
+				if (atoi(p) < 10 && *p != '0')
+					*s++ = ' ';	/* Don't put a '0' in there */
+				else				/* Show the booger */
+					*s++ = *p++;	/* hour */
 				*s++ = *p++;
 				*s++ = *p++;	/* : */
 				*s++ = *p++;	/* min */
@@ -320,13 +390,10 @@ listnotes()
 			lines = 0;
 		}
 	}
-#if !defined(UNIX) && !defined(MSDOS)  /* an anachronism - K5JB */
-	setcookedmode();	/*  K5JB  */
-#endif
 }
 
 /*  save msg on stream - if noheader set don't output the header */
-int
+void	/* nobody looked at return */
 msgtofile(msg,tfile,noheader)
 int msg;
 FILE *tfile;   /* already open for write */
@@ -334,10 +401,12 @@ int noheader;
 {
 	char	tstring[LINELEN];
 	long 	size;
-
+#ifdef QUOTING
+	extern int quoting;
+#endif
 	if (mfile == NULLFILE) {
 		printf(nomail);
-		return -1;
+		return;
 	}
 	fseek(mfile,mbox[msg].start,0);
 	size = mbox[msg].size;
@@ -348,27 +417,36 @@ int noheader;
 
 	if (noheader) {
 		/* skip header */
-		while (!feof(mfile) && size > 0) {
-			fgets(tstring,sizeof(tstring),mfile);
+		while (size > 0) {
+			if(fgets(tstring,sizeof(tstring),mfile) == NULLCHAR)
+				break;
 			size -= strlen(tstring);
 			if (*tstring == '\n')
 				break;
 		}
 	}
-	while (!feof(mfile) && size > 0) {
-		fgets(tstring,sizeof(tstring),mfile);
+	while (size > 0) {
+		if(fgets(tstring,sizeof(tstring),mfile) == NULLCHAR)
+			break;
 		size -= strlen(tstring);
+#ifdef QUOTING	/* may add another pp directive if I like this */
+		fprintf(tfile,"%s%s",quoting ? ">" : "",tstring);	/* add quoting */
+#else
 		fputs(tstring,tfile);
+#endif
 		if (ferror(tfile)) {
 			printf("Error writing mail file\n");
 			(void) fclose(tfile);
-			return -1;
+			return;
 		}
 	}
-	return 0;
+#ifdef QUOTING
+	quoting = 0;
+#endif
 }
 
 /*  delmsg - delete message in current notesfile */
+void
 delmsg(msg)
 int msg;
 {
@@ -381,6 +459,7 @@ int msg;
 }
 
 /*  reply - to a message  */
+void
 reply(msg)
 int msg;
 {
@@ -399,8 +478,8 @@ int msg;
 	*subject = '\0';
 	fseek(mfile,mbox[msg].start,0);
 	size = mbox[msg].size;
-	while (!feof(mfile) && size > 0) {
-		fgets(tstring,sizeof(tstring),mfile);
+	while (size > 0) {
+		if(fgets(tstring,sizeof(tstring),mfile) == NULLCHAR);
 		size -= strlen(tstring);
 		if (*tstring == '\n') 	/* end of header */
 			break;
@@ -419,10 +498,11 @@ int msg;
 			*to = '\0';
 			strncat(to,s,sizeof(to));
 		} else if (htype(tstring) == SUBJECT) {
-			if (strncmp(&tstring[9], "Re:", 3))  /* No Re: yet? */
-				sprintf(subject,"Re: %s\n",&tstring[9]);
-			else	/* there's an Re:, let's not add another */
-				sprintf(subject,"%s\n",&tstring[9]) ;
+			if (!strncmp(&tstring[9], "Re:", 3) ||
+				!strncmp(&tstring[9], "re:", 3))  /* Has Re: or re: */
+				sprintf(subject,"%s",&tstring[9]) ;
+			else	/* let's add one */
+				sprintf(subject,"Re: %s",&tstring[9]);
 		}
 	}
 	if (*to == '\0')
@@ -460,7 +540,11 @@ closenotes()
 	line = tstring;
 	fseek(mfile,0L,2);
 	if (isnewmail()) {
+#ifdef MSDOS	/* 061894 */
+		if ((nfile = fopen(mfilename,"rb")) == NULLFILE)
+#else
 		if ((nfile = fopen(mfilename,"r")) == NULLFILE)
+#endif
 			perror(mfilename);
 		else {
 			/* seek to end of old msgs */
@@ -487,8 +571,9 @@ closenotes()
 		if ((cmsg->status & DELETE))
 			continue;
 		/* copy the header */
-		while (!feof(mfile) && size > 0) {
-			fgets(line,LINELEN,mfile);
+		while (size > 0) {
+			if(fgets(line,LINELEN,mfile) == NULLCHAR)
+				break;
 			size -= strlen(line);
 			if (*line == '\n') {
 				if ((cmsg->status & READ) != 0)
@@ -498,8 +583,9 @@ closenotes()
 			}
 			fputs(line,nfile);
 		}
-		while (!feof(mfile) && size > 0) {
-			fgets(line,LINELEN,mfile);
+		while (size > 0) {
+			if(fgets(line,LINELEN,mfile) == NULLCHAR)
+				break;
 			fputs(line,nfile);
 			size -= strlen(line);
 			if (ferror(nfile)) {
@@ -530,7 +616,7 @@ closenotes()
 }
 
 /* get a message id from the sequence file */
-long 
+long
 get_msgid()
 {
 	char sfilename[SLINELEN];
@@ -589,7 +675,7 @@ char *id;
 	sprintf(lockname,"%s/%.8s.lck",dir,id);
 #ifdef	_OSK
 	if((fd = create(lockname,_WRITE,S_IWRITE+S_IREAD)) == -1)
-#else 
+#else
 	if((fd = open(lockname, O_WRONLY|O_EXCL|O_CREAT,0600)) == -1)
 #endif
 		return -1;
@@ -598,7 +684,7 @@ char *id;
 }
 
 /* remove mail lockfile */
-int
+void
 rmlock(dir,id)
 char *dir;
 char *id;
@@ -679,6 +765,7 @@ lockit()
 }
 
 /* print the next message or the current on of new */
+void
 printnext()
 {
 	if (mfile == NULLFILE)
@@ -698,6 +785,7 @@ printnext()
 }
 
 /*  display message on the crt given msg number */
+void
 displaymsg(msg)
 int msg;
 {
@@ -716,11 +804,8 @@ int msg;
 		printf(badmsg,msg);
 		return;
 	}
-#if !defined(UNIX) && !defined(MSDOS)
-	setrawmode();
 #ifdef CLEAR
 	screen_clear();		/* K5JB */
-#endif
 #endif
 	fseek(mfile,mbox[msg].start,0);
 	size = mbox[msg].size;
@@ -734,7 +819,7 @@ int msg;
 	}
 	lines = 1;
 	col = 0;
-	while (!feof(mfile) && size > 0) {
+	while (!feof(mfile) && size > 0){
 		for (col = 0;  col < MAXCOL;) {	/* MAXCOL is 80 */
 			c = getc(mfile);
 			size--;
@@ -757,19 +842,11 @@ int msg;
 						break;
 					}
 		}
-#ifdef __TURBOC__
-#ifdef PUTC
-		buf[col++] = '\r';   /* sigh! K5JB */
-		buf[col++] = '\n';
-		buf[col] = '\0';     /* this is the only use of cputs in the */
-		cputs(buf);          /* whole thing - dropped it - K5JB */
-#else
 		buf[col] = '\0';
-		printf("%s\n",buf);
-#endif
-#else
-		buf[col] = '\0';
+#ifdef OLD
 		puts(buf);	/* only place puts() appears in bm */
+#else
+		printf("%s\n",buf);
 #endif
 		col = 0;
 		if ((++lines == (MAXROWS-1))) {
@@ -778,12 +855,10 @@ int msg;
 			lines = 0;
 		}
 	}
-#if !defined(UNIX) && !defined(MSDOS)
-	setcookedmode();	/*  K5JB */
-#endif
 }
 
 /* list jobs waiting to be sent in the mqueue */
+void
 listqueue()
 {
 	char tstring[80];
@@ -839,6 +914,7 @@ listqueue()
 }
 
 /* kill a job in the mqueue */
+void
 killjob(j)
 char *j;
 {

@@ -1,77 +1,61 @@
-Preface:  When I uploaded k5jb.k34c.tar.Z, I included the wrong copy of
-telunix.c, the one I use on my 3B2.  Rather than upload a replacement
-I will upload k5jb.telu.lzh, which contains ALL the versions of
-telunix.c that I have played with, including a note.  It is archived
-with lharc.  Sorry for the inconvenience.  Joe, K5JB
 
-                                unix.note
+                    k5jb.k35.txt and preface to unix.note
 
-When Bob, N0QBJ, provided the changes necessary to compile version k34
-on OS9/68K I incorporated them into my current files.  Since there have
-been numerous file changes since the k34 upload, I am uploading a new
-source code kit, k5jb.k34c.tar.Z.  Most of the changes were cosmetic but
-two programming errors were fixed.  This .tar.Z replaces k5jb.k34.tar.Z.
-None of the other files have changed sufficiently for replacement.  This
-text is contained in k5jb.k34c.txt, and as a preface to note.unix,
-contained in the source code kit.
+Version k35 was uploaded to ftp.ucsd.edu as a complete kit.  Previous files
+are irrlevant.  The complete kit consists of:
 
-Version k34 was uploaded to ucsd.edu as a complete kit.  Previous files
-were irrlevant.  Now, the complete kit --  with new files marked with
-(*) -- consists of:
-
-
-k5jb.k34c.txt   -- This file (*)
-k5jb.k34upd.usr -- File for users.  Contains recent changes.
-k5jb.k34c.tar.Z -- Source code for Unix KA9Q NET (*)
-k5jb.dock34.tar.Z -- Complete user documentation for same.
-k5jb.bmk34.tar.Z  -- Source code for BM v.3.3.1m, mailer.  Updated a little.
+k5jb.k35.txt   -- This file
+k5jb.k35upd.usr -- File for users.  Contains recent changes.
+k5jb.k35.tar.Z -- Source code for Unix KA9Q NET
+k5jb.k35doc.tar.Z -- Complete user documentation for same.
+k5jb.k35bm.tar.Z  -- Source code for BM v.3.3.1n, mailer.  Updated a little.
 k5jb.samp.tar.Z -- Optional, Sample startup files for beginners.
 
-(These files on ucsd.edu are either in /hamradio/packet/tcpip/incoming, or in
-/hamradio/packet/tcpip/k5jb.)
+(These files on ftp.ucsd.edu are either in /hamradio/packet/tcpip/incoming,
+or in /hamradio/packet/tcpip/k5jb.)
 
                         Brief description of Unix NET
 
-NET is designed as an MS-DOS application, so does not make full use of Unix's
-multi-tasking ability but runs quite well in Unix.  You can use it in a Unix
+NET is designed as an MS-DOS application, so does not make full use of Unix's 
+multi-tasking ability but runs quite well in Unix.  You can use it in a Unix 
 windowing environment (or in shell layers), or you can shell out and leave
 NET running in the background.  If you choose to use shell layers you must
 prevent blocking on input if you make the window session inactive.  See the
 doc on how to do this.
 
-If you are unfamiliar with NET (the TCP/IP suite, written by Phil Karn, KA9Q,
-and preceding his current project, NOS), you need to break out the files in
-k5jb.dock33.tar.Z and browse them.  k5jb.k31.tar.Z contains a file,
+If you are unfamiliar with NET (the TCP/IP suite, written by Phil Karn, KA9Q, 
+and preceding his current project, NOS), you need to break out the files in 
+k5jb.k35doc.tar.Z and browse them.  k5jb.k35.tar.Z contains a file,
 source.note, which has modification information.
 
                           Brief description of kit
 
 More detail on files contained in this set:
 
-k5jb.k34c.tar.Z
-Contains files needed to compile NET under various System V, Release 3
-versions of Unix (I use AT&T); under Coherent, version 4.0.1; and under
-OS9-68K.  This file also contains source.note, a collection of revision notes,
-an os9osk.note, and unix.note for information specific to Unix, Coherent and
-OS9-68K that I not yet included in the main documentation.  (This .txt file is
-also the preface to unix.note.)  W5GFE compiled NET and BM under SCO Unix
-(80386) Sys V, release 3, both with the native compiler and with GNU.  Others
-report compiling it under various versions of Unix, but were not specific on
+k5jb.k35.tar.Z
+Contains files needed to compile NET under various System V, Release 3 
+versions of Unix (I use AT&T); under Coherent, and under OS9-68K.  This file
+also contains source.note, a collection of revision notes, an os9osk.note,
+and unix.note for information specific to Unix, Coherent and OS9-68K that I
+not yet included in the main documentation.  (This .txt file is also the
+preface to unix.note.)  W5GFE compiled NET and BM under SCO Unix (80386)
+Sys V, release 3, both with the native compiler and with GNU.  Others report
+compiling it under various versions of Unix, but were not specific on
 versions used.
 
-k5jb.bmk34.tar.Z
-Contains source for Bdale's Mailer (BM).  Works with same environmental
-variables as K5JB version of NET.  Has been sanitized to prevent memory
-violations.  Version in this kit is 3.3.1m, modified to deal with some
+k5jb.k35bm.tar.Z
+Contains source for Bdale's Mailer (BM).  Works with same environmental 
+variables as K5JB version of NET.  Has been sanitized to prevent memory 
+violations.  Version in this kit is 3.3.1n, modified to deal with some
 non-RFC-822 compliant mailers (like ELM), and to correct some errors in
 file reading.
 
-k5jb.k34upd.usr
+k5jb.k35upd.usr
 Contains changes made to NET.  Written for the user.  Some of the
 changes affect composition of startup.net.
 
-k5jb.dock34.tar.Z
-Contains NET and BM user's documentation.  Targeted for MS-DOS users, but
+k5jb.k35doc.tar.Z
+Contains NET and BM user's documentation.  Targeted for MS-DOS users, but 
 contains essential Unix information.
 
 k5jb.samp.tar.Z
@@ -87,4 +71,10 @@ serial ports attached (like if you have no startup.net file), and issue
 a quit signal to ignore keyboard input, NET will become a CPU hog,
 consuming an enormous amount of the machine's resources.
 
-(End of k5jb.k34c.txt)
+The Coherent problems described in earlier NET releases are now fixed with
+completion of some functions by the time version 4.0.1 was released.  Block-
+ing reads with timed releases, finer time granualarity, and normal creation
+of temporary files makes this the Coherent version almost the same as the
+regular Unix version of NET.
+
+(End of k5jb.k35.txt)

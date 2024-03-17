@@ -243,14 +243,14 @@ char *argv[];
 	int disc_ax25(),reset_ax25();
 #endif
 	int kick_tcp();
-	extern int closepending;	/* something we need to clean up prompts */
+	extern int noprompt;	/* something we need to clean up prompts */
 
 	if((s = sessptr(argc > 1 ? argv[1] : NULLCHAR)) == NULLSESSION){
 		printf(badsess);
 		return -1;
 	}
 	cmdmode();	/* k35 */
-	closepending = 1;	/* to control prompts k35 */
+	noprompt = 1;	/* to control prompts k35 */
 
 	switch(s->type){
 #ifdef _TELNET
@@ -285,13 +285,13 @@ int argc;
 char *argv[];
 {
 	struct session *s;
-	extern int closepending;
+	extern int noprompt;
 
 	if((s = sessptr(argc > 1 ? argv[1] : NULLCHAR)) == NULLSESSION){
 		printf(badsess);
 		return -1;
 	}
-	closepending = 1;	/* to control prompts k35 */
+	noprompt = 1;	/* to control prompts k35 */
 	switch(s->type){
 #ifdef _TELNET
 	case TELNET:
@@ -497,45 +497,57 @@ char *argv[];
 			printf("Uploading on FTP control channel not supported\n");
 			return 1;
 		}
-		if(strcmp(argv[1],"stop") == 0 && current->upload != NULLFILE){
-			/* Abort upload */
+		/* arg here was "stop" (inconsistent).  Also added _OSK ifdef. - k35
+		 * Could just as well eliminate this and just disconnect to abort
+		 * an upload.  Would save a few bytes
+		 */
+		if(strcmp(argv[1],"off") == 0 && current->upload != NULLFILE){
+			/* Abort upload - see note in ax25cmd.c on how to handle pipes
+			 * if such process is added to any of the interactive sessions.
+			 * Don't know if the following is needed for OSK but it was used
+			 * in ax25cmd.c */
+#if defined(_OSK) && !defined(_UCC)
+			tmpclose(current->upload);
+#else
 			fclose(current->upload);
+#endif  /* _OSK */
 			current->upload = NULLFILE;
 			if(current->ufile != NULLCHAR){
 				free(current->ufile);
 				current->ufile = NULLCHAR;
 			}
-		}
-		/* Open upload file */
-		if((current->upload = fopen(argv[1],"r")) == NULLFILE){
-			printf("Can't read %s\n",argv[1]);
-			return 1;
-		}
-		current->ufile = malloc((unsigned)strlen(argv[1])+1);
-		strcpy(current->ufile,argv[1]);
-		/* All set, kick transmit upcall to get things rolling */
-		switch(current->type){
+		}else{	/* this else was missing! */
+			/* Open upload file */
+			if((current->upload = fopen(argv[1],"r")) == NULLFILE){
+				printf("Can't read %s\n",argv[1]);
+				return 1;
+			}
+			current->ufile = malloc((unsigned)strlen(argv[1])+1);
+			strcpy(current->ufile,argv[1]);
+			/* All set, kick transmit upcall to get things rolling */
+			switch(current->type){
 #ifdef	AX25
-		case AX25TNC:
-			(*axp->t_upcall)(axp,axp->paclen * axp->maxframe);
-			break;
+			case AX25TNC:
+				(*axp->t_upcall)(axp,axp->paclen * axp->maxframe);
+				break;
 #endif
 #ifdef NETROM
-		case NRSESSION:
-			(*cb->t_upcall)(cb, NR4MAXINFO) ;
-			break ;
+			case NRSESSION:
+				(*cb->t_upcall)(cb, NR4MAXINFO) ;
+				break ;
 #endif
 #ifdef _TELNET
-		case TELNET:
-			/* this caused some interesting crashing! K5JB k34
-			 * Note that FTP also uses tcb->window, which is may not be best
-			 */
-			/* (*tcb->t_upcall)(tcb,tcb->snd.wnd - tcb->sndcnt); */
-			(*tcb->t_upcall)(tcb,tcb->window - tcb->sndcnt);
-			break;
+			case TELNET:
+				/* remarked line below caused some interesting crashing! K5JB k34
+				 * Note that FTP also uses tcb->window, which is may not be best
+				 */
+				/* (*tcb->t_upcall)(tcb,tcb->snd.wnd - tcb->sndcnt); */
+				(*tcb->t_upcall)(tcb,tcb->window - tcb->sndcnt);
+				break;
 #endif
-		}
-	}
+			}	/* switch */
+		}	/* ! "off" */
+	}	/* if argc > 1 */
 #ifdef _TELNET
 	if(current->ufile != NULLCHAR)
 		printf("Uploading %s\n",current->ufile);
@@ -624,7 +636,7 @@ int argc;
 char *argv[];
 {
 	if(argc < 2)
-		printf("Usage: attrib bold|reverse|none|color <hex#>\n");
+		printf("Usage: vattrib bold|reverse|none|color <hex#>\n");
 	else{
 		switch(argv[1][0]){
 			case 'b':
@@ -673,13 +685,12 @@ FILE *fp;
 	}
 }
 
-/* used by ax25cmd, nrcmd, and telnet.  Only telnet uses return value */
+/* used by ax25cmd, nrcmd, and telnet. */
 
-int
-term_recv(bp,fp,telnet)
+void
+term_recv(bp,fp)
 struct mbuf *bp;
 FILE *fp;	/* possible session recording */
-int telnet;	/* called by telnet? */
 {
 	char c;
 
@@ -687,10 +698,6 @@ int telnet;	/* called by telnet? */
 	and CR/LF.  text_write handles this if recording.
 	 */
 	while(bp != NULLBUF){
-#ifdef _TELNET
-		if(telnet && memchr(bp->data,IAC,bp->cnt) != NULLCHAR)
-			return 1;
-#endif
 		if(fp)
 			text_write(bp->data,bp->cnt,fp);
 		while(bp->cnt--){
@@ -728,7 +735,6 @@ int telnet;	/* called by telnet? */
 #if !(defined(MSDOS) && defined(CUTE_VIDEO))
 	fflush(stdout);
 #endif
-	return 0;
 }
 
 void
