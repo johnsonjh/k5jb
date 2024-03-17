@@ -91,6 +91,7 @@ int *n;
 		del_ax25(axp);
 }
 
+#ifdef notdef /* this function replaced by dlapb_out() */
 /* T2 has expired, we can't delay an acknowledgement any further */
 void
 send_ack(n)
@@ -109,6 +110,7 @@ int *n;
 		break;
 	}
 }
+#endif
 
 /* Send a poll (S-frame command with the poll bit set) */
 void

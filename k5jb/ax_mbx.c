@@ -93,14 +93,8 @@ extern char *public;
 extern char *mailspool;
 
 /* miscellaneous declarations */
-int queuejob();
-int validate_address();
-int start_timer();
-int stop_timer();
-int pax25();
-int disc_ax25();
-int send_ax25() ;
-void rip(),free(),genlog();
+int queuejob(),validate_address(),start_timer(),stop_timer(),pax25(),disc_ax25();
+void rip(),free(),genlog(),send_ax25();
 #ifdef NETROM
 int send_nr4() ;
 #endif
@@ -214,9 +208,9 @@ char msg[] ;
 				return(-1);
 			}
 			bp->cnt = len + 1 ;
-			*bp->data = PID_FIRST | PID_LAST | PID_NO_L3 ;
+			*bp->data = PID_NO_L3 ;
 			memcpy(bp->data+1, msg, len) ;
-			send_ax25(axp,bp) ;
+			send_ax25(axp,bp);
 			break ;
 #ifdef NETROM
 		case MBX_NETROM:
@@ -894,7 +888,7 @@ int16 cnt ;
 		return ;
 	}
 
-	*bp->data = PID_FIRST | PID_LAST | PID_NO_L3 ;	/* pid */
+	*bp->data = PID_NO_L3 ;	/* pid */
 	(void)sprintf(bp->data+1,mbbanner,hostname) ;
 	bp->cnt = strlen(bp->data+1) + 1 ;
 	send_ax25(axp,bp) ;					/* send greeting message and menu */

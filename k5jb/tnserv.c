@@ -46,7 +46,7 @@ char old,new;
 {
 	struct telnet *tn;
 	struct session *s,*newsession();
-	void t_state(),sndmsg();
+	void tn_tx(),t_state(),sndmsg();
 	char *a, *psocket();
 #ifdef SOKNAME
 	char *puname();
@@ -107,6 +107,8 @@ char old,new;
 #endif
 		fflush(stdout);
 		tcb->s_upcall = t_state;
+		tcb->t_upcall = tn_tx;	/* oops, was missing k33 */
+
 #ifdef AUTOSESSION	/* testing for current == NULLSESSION to avoid butt-in */
 	/* causes 2nd and subsequent sessions, without kb activity, not to print */
 		current = s;

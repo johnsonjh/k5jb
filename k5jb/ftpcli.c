@@ -1,10 +1,13 @@
 /* added "dele" for file deletion.  It was already available in
 frpserv.c, performed general cleanup, added loop in login process, then
 added help to escape from a problem login. 9/2/91 - K5JB */
+/* Re-read RFC 959 and modified the logon helper 11/9/93 */
+
 /* FTP client (interactive user) code */
 #define LINELEN 128     /* Length of command buffer */
 #include <stdio.h>
 #include <string.h>
+#include "options.h"
 #include "config.h"
 #include "global.h"
 #include "mbuf.h"
@@ -32,7 +35,10 @@ extern char badhost[];
 char notsess[] = "Not an FTP session!\n";
 char cantwrite[] = "Can't write %s\n";
 char cantread[] = "Can't read %s\n";
-char helpesc[] = "(Escape this with \"close\" from command mode.)\n";
+#ifdef CUTE_FTP
+char helpesc[] = "(Abort with \"close\" from command mode.)\n";
+char *userprompt = "Enter user name: ";
+#endif
 
 int donothing(),doftpcd(),dolist(),doget(),dols(),doput(),dotype(),doabort(),
         domkdir(),dormdir(),dodele(); /* K5JB */
@@ -119,13 +125,19 @@ int16 len;
 			fflush(stdout);
 			break;
 		case STARTUP_STATE:             /* Starting up autologin */
+#ifdef CUTE_FTP
 			printf("%sNot connected yet, ignoring: %s",helpesc,line);
+#else
+			printf("Not connected yet, ignoring: %s",line);
+#endif
 			fflush(stdout);
 			break;
+#ifdef CUTE_FTP
 		case USER_STATE:                /* Got the user name */
 			return sndftpmsg(current->cb.ftp,"USER %s",line);
 		case PASS_STATE:                /* Got the password */
 			return sndftpmsg(current->cb.ftp,"PASS %s",line);
+#endif
 	}
 	return(0);	/* satisfy the compiler */
 }
@@ -606,40 +618,47 @@ register struct ftp *ftp;
 
 	fwrite(ftp->buf,1,(unsigned)ftp->cnt,stdout);
 	fputc('\n', stdout);
-	if (ftp->cnt < 3) return;
-	ftp->buf[3] = '\0';
+	if (ftp->cnt < 4) return;	/* note that space after 3 numbers is rqd */
+	ftp->buf[4] = '\0';
 	switch(ftp->state){
 		case SENDING_STATE:
 		case RECEIVING_STATE:
 			if (ftp->buf[0] == '5')
 				doabort();
 			break;
+#ifdef CUTE_FTP
 		case STARTUP_STATE:
-			if (!strcmp(ftp->buf, "220")){
+			if (!strcmp(ftp->buf, "220 ")){	/* note required space */
 				ftp->state = USER_STATE;
-				printf("Enter user name: ");
+				printf(userprompt);
 				fflush(stdout);
-			} else
-				ftp->state = COMMAND_STATE;
-			break;
+			}
+			break;	/* other strings are legal too */
 		case USER_STATE:	/* revised this part to loop the login - K5JB */
-			if (!strcmp(ftp->buf, "331")) {
+			if (!strcmp(ftp->buf, "331 ")) {
 				ftp->state = PASS_STATE;
 				noecho();
 				printf("Password: ");
 				fflush(stdout);
-			} else
-				ftp->state = COMMAND_STATE;
-				break;
+			}else
+				ftp->state = COMMAND_STATE;	/* something's wacko */
+			break;
 		case PASS_STATE:
 			echo();
-			if (!strcmp(ftp->buf, "550")){
+			if (!strcmp(ftp->buf, "550 ")){
 				ftp->state = USER_STATE;
-				printf("%sTry your user name again: ",helpesc);
+				printf("%s%s",helpesc,userprompt);
 				fflush(stdout);
 			}else
-					ftp->state = COMMAND_STATE;
+					ftp->state = COMMAND_STATE;	/* probably made it in */
 			break;
+#else
+		case STARTUP_STATE:
+				printf("\nEnter \"user\" followed by your username and later when requested, send \"pass\"\n");
+				printf("followed by your password: ");
+				ftp->state = COMMAND_STATE;
+			break;
+#endif
 	}
 }
 

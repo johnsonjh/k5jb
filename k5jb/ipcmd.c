@@ -213,6 +213,7 @@ int16 freeps;	/* can be removed after test, see various ax_recv() calls */
 extern int16 sliphiwater;	/* maybe remove after test */
 #if defined(MSDOS) && defined(SERIALTEST)
 int16 serial_err;
+int32 tot_rframes;
 #endif
 
 
@@ -234,12 +235,14 @@ char *argv[];
 		freeps = 0;
 #if defined(SERIALTEST) && defined(MSDOS)
 		serial_err = 0;
+		tot_rframes = 0;
 #endif
 		return 0;
 	}
 #if defined(SERIALTEST) && defined(MSDOS)
-	printf("SLIP: TX balks %u, (hi water %u/%u); Bad KISS hdrs: %u, RX ORuns: %u\n",
-		slipbalks,sliphiwater,maxslipq,freeps,serial_err);
+	printf(
+	"SLIP: TX balks %u, (hi water %u/%u); Bad KISS hdrs: %u, RX ORuns: %u/%lu\n",
+		slipbalks,sliphiwater,maxslipq,freeps,serial_err,tot_rframes);
 #else
 	printf("SLIP: TX slip balks %u, (hi water %u/%u); Bad KISS hdrs: %u\n",
 		slipbalks,sliphiwater,maxslipq,freeps);

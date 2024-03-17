@@ -50,7 +50,10 @@ struct mbuf *bp;
  * set in the async handler
  */
 	extern int16 serial_err;        /* defined in ipcmd.c */
+	extern int32 tot_rframes;
 	struct fifo *fp;
+
+	tot_rframes++;
 	fp = &asy[interface->dev].fifo;
 	if(fp->error){  /* contains 8250 line status register */
 		serial_err++;

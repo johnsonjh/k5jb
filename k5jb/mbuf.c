@@ -4,6 +4,7 @@
  * freed acked data.  This was preferable to using copy_p in tcpout.c 0 K5JB
  */
 
+#include "config.h"
 #include "global.h"
 #include "mbuf.h"
 
@@ -312,7 +313,7 @@ int16 cnt;
 		cnt -= n;
 		bp->data += n;
 		bp->cnt -= n;
-#ifndef MAYBE_LATER	/* this original code is satisfactory for NET */
+#ifndef SEGMENT	/* From NOS. the original code is ok if no segmentation */
 		if(bp->cnt == 0)
 			*bph = free_mbuf(bp);
 

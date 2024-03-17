@@ -1,6 +1,9 @@
 /* Link Access Procedures Balanced (LAPB) - with changes for rational
  * behavior over packet radio
+ * Added segmentation and deferred frame delivery to correct LAPB errors
+ * from queued transmit frames already gone to the TNC. k33 - K5JB
  */
+#include "options.h"
 #include "config.h"
 #ifdef AX25
 #include "global.h"
@@ -9,9 +12,14 @@
 #include "ax25.h"
 #include "lapb.h"
 #include "iface.h"
-#include "options.h"
+#ifdef MSDOS
+#include <mem.h>
+#endif
 
 void free_q();
+void procdata(),clr_ex(),est_link(),enq_resp(),inv_rex(),lapb_output();
+int sendframe(),start_timer(),stop_timer();	/* latter 2 should have been void */
+int sendctl(),ackours(),frmr();
 
 #ifdef VCKT
 	int check_vcircuit();
@@ -19,6 +27,9 @@ void free_q();
 	extern int rose_bash;
 #endif
 
+#if defined(SEGMENT) && defined(SEG_CMD)
+int rx_segment = 1;	/* also used in ax25cmd.c */
+#endif
 /* Process incoming frames */
 int
 lapb_input(axp,cmdrsp,bp)
@@ -37,6 +48,7 @@ struct mbuf *bp;		/* Rest of frame, starting with ctl */
 	int nr;			/* ACK number of incoming frame */
 	int ns;			/* Seq number of incoming frame */
 	char tmp;
+	int recovery;
 
 	if(bp == NULLBUF || axp == NULLAX25){
 		free_p(bp);
@@ -69,8 +81,9 @@ struct mbuf *bp;		/* Rest of frame, starting with ctl */
 		break;
 	}
 	/* This section follows the SDL diagrams by K3NA fairly closely */
+	recovery = 0;
 	switch(axp->state){
-	case DISCONNECTED:
+	case DISCONNECTED:	/* need to revisit this... */
 		switch(type){
 		case SABM:	/* Initialize or reset link */
 			sendctl(axp,RESPONSE,UA|pf);	/* Always accept */
@@ -80,15 +93,17 @@ struct mbuf *bp;		/* Rest of frame, starting with ctl */
 			start_timer(&axp->t3);
 			start_timer(&axp->t4);
 			break;
-/* note that NOS has a case DISC here */
+/* note that NOS has a case DISC here but it has same effect as default */
 		case DM:	/* Ignore to avoid infinite loops */
 			break;
 		default:	/* All others get DM */
-			sendctl(axp,RESPONSE,DM|pf);
+			if(poll)	/* suggested from NOS */
+				sendctl(axp,RESPONSE,DM|pf);
 			break;
 		}
 		break;
-/* note that NOS has a test for state == DISCONNECTED here */
+/* note that NOS has a test for state == DISCONNECTED here but we avoid
+ * spaghetti code by doing it later */
 	case SETUP:
 		switch(type){
 		case SABM:	/* Simultaneous open */
@@ -133,68 +148,102 @@ struct mbuf *bp;		/* Rest of frame, starting with ctl */
 			break;
 		}
 		break;
+
+	case RECOVERY:	/* revised following saved 800 bytes - K5JB */
+		recovery = 1;	/* fall through */
 	case CONNECTED:
 		switch(type){
 		case SABM:
 			sendctl(axp,RESPONSE,UA|pf);
 			clr_ex(axp);
-			free_q(&axp->txq);
+			if(!recovery)
+				free_q(&axp->txq); /* remarked out in GRI NOS */
 			stop_timer(&axp->t1);
 			start_timer(&axp->t3);
 			axp->unack = axp->vr = axp->vs = 0;
-			lapbstate(axp,CONNECTED); /* Purge queues */
+			lapbstate(axp,CONNECTED); /* remarked out in NOS *//* Purge queues */
+			if(recovery && !run_timer(&axp->t4))
+					start_timer(&axp->t4);
 			break;
 		case DISC:
 			free_q(&axp->txq);
 			sendctl(axp,RESPONSE,UA|pf);
 			stop_timer(&axp->t1);
 			stop_timer(&axp->t3);
+#ifdef notdef	/* won't be used if we do NO_T2 */
+			if(recovery)
+				axp->response = UA;
+#endif
 			lapbstate(axp,DISCONNECTED);
 			break;
+
 /* This code is cribbed from the NOS version, in order to make a */
 /* temporary fix to a pathological looping behavior during connect (dmf) */
 		case DM:
 			lapbstate(axp,DISCONNECTED);
 			break;
 		case UA:
-			est_link(axp);
-			lapbstate(axp,SETUP);	/* Re-establish */
-			break;
-/* End of cribbed code (dmf) */			
 		case FRMR:
 			est_link(axp);
 			lapbstate(axp,SETUP);	/* Re-establish link */
 			break;
-		case RR:
-		case RNR:
-			axp->remotebusy = (control == RNR) ? YES : NO;
-			if(poll)
-				enq_resp(axp);
-			ackours(axp,nr);
-			break;
 		case REJ:
-			axp->remotebusy = NO;
-			if(poll)
-				enq_resp(axp);
-			ackours(axp,nr);
-			stop_timer(&axp->t1);
-			start_timer(&axp->t3);
-			/* This may or may not actually invoke transmission,
-			 * depending on whether this REJ was caused by
-			 * our losing his prior ACK.
-			 */
-			inv_rex(axp);
+		case RNR:
+		case RR:
+			axp->remotebusy = (type == RNR) ? YES : NO;
+			if(recovery){
+				if(axp->proto == V1 || final){
+					stop_timer(&axp->t1);
+					ackours(axp,nr);
+					if(axp->unack != 0)
+						inv_rex(axp);
+					else{
+						start_timer(&axp->t3);
+						lapbstate(axp,CONNECTED);
+						if(!run_timer(&axp->t4))
+							start_timer(&axp->t4);
+					}
+				}else{
+					if(poll)
+						enq_resp(axp);
+					ackours(axp,nr);
+					if(type == REJ && axp->unack != 0)
+						inv_rex(axp);	/* This is certain to trigger output */
+					if(!run_timer(&axp->t1))
+						start_timer(&axp->t1);
+				}
+			}else{ /* not recovery */
+				if(poll)
+					enq_resp(axp);
+				ackours(axp,nr);
+				if(type == REJ){
+					stop_timer(&axp->t1);
+					start_timer(&axp->t3);
+				/* This may or may not actually invoke transmission,
+				 * depending on whether this REJ was caused by
+				 * our losing his prior ACK.
+				 */
+					inv_rex(axp);
+				 }
+			}
 			break;
 		case I:
-			ackours(axp,nr); /** == -1) */
-			start_timer(&axp->t4);
+			ackours(axp,nr);
+			if(recovery){
+				if(!run_timer(&axp->t1))
+				/* Make sure timer is running, since an I frame
+				 * cannot satisfy a poll
+				 */
+					start_timer(&axp->t1);
+			}else
+				start_timer(&axp->t4);
 			if(len_mbuf(axp->rxq) >= axp->window){
 				/* Too bad he didn't listen to us; he'll
 				 * have to resend the frame later. This
 				 * drastic action is necessary to avoid
 				 * deadlock.
 				 */
-				if(poll)
+				if(recovery || poll)
 					sendctl(axp,RESPONSE,RNR|pf);
 				free_p(bp);
 				bp = NULLBUF;
@@ -206,157 +255,32 @@ struct mbuf *bp;		/* Rest of frame, starting with ctl */
 					axp->rejsent = YES;
 					sendctl(axp,RESPONSE,REJ | pf);
 				}
+				else
+				 if(poll)
+					enq_resp(axp);	/* suggested from NOS */
 				axp->response = 0;
-				stop_timer(&axp->t2);
+#ifdef notdef
+				stop_timer(&axp->t2);	/* not in NOS - see note below */
+#endif
 				break;
 			}
 			axp->rejsent = NO;
 			axp->vr = (axp->vr+1) & MMASK;
 			tmp = len_mbuf(axp->rxq) >= axp->window ? RNR : RR;
-			if(poll){
+			if(poll)
 				sendctl(axp,RESPONSE,tmp|PF);
-			} else {
-				axp->response = tmp;
-				start_timer(&axp->t2);
+			else{
+				axp->response = tmp;	/* will take care of after lapb_output */
+#ifdef notdef
+				start_timer(&axp->t2); /* not in NOS - if we don't do this, */
+				/* if not polled, and no TX in queue, no RR frames sent */
+#endif
 			}
 			procdata(axp,bp);
 			bp = NULLBUF;
 			break;
 		default:	/* All others ignored */
 			break;
-		}
-		break;
-	case RECOVERY:
-		switch(type){
-		case SABM:
-			sendctl(axp,RESPONSE,UA|pf);
-			clr_ex(axp);
-			stop_timer(&axp->t1);
-			start_timer(&axp->t3);
-			axp->unack = axp->vr = axp->vs = 0;
-			lapbstate(axp,CONNECTED); /* Purge queues */
-			if(!run_timer(&axp->t4))
-				start_timer(&axp->t4);
-			break;
-		case DISC:
-			free_q(&axp->txq);
-			sendctl(axp,RESPONSE,UA|pf);
-			stop_timer(&axp->t1);
-			stop_timer(&axp->t3);
-			axp->response = UA;
-			lapbstate(axp,DISCONNECTED);
-			break;
-/* This code is cribbed from the NOS version, in order to make a */
-/* temporary fix to a pathological looping behavior during connect (dmf) */
-		case DM:
-			lapbstate(axp,DISCONNECTED);
-			break;
-		case UA:
-			est_link(axp);
-			lapbstate(axp,SETUP);	/* Re-establish */
-			break;
-/* End of cribbed code (dmf) */			
-		case FRMR:
-			est_link(axp);
-			lapbstate(axp,SETUP);	/* Re-establish link */
-			break;
-		case RR:
-		case RNR:
-			axp->remotebusy = (control == RNR) ? YES : NO;
-			if(axp->proto == V1 || final){
-				stop_timer(&axp->t1);
-				ackours(axp,nr);
-				if(axp->unack != 0){
-					inv_rex(axp);
-				} else {
-					start_timer(&axp->t3);
-					lapbstate(axp,CONNECTED);
-					if(!run_timer(&axp->t4))
-						start_timer(&axp->t4);
-				}
-			} else {
-				if(poll)
-					enq_resp(axp);
-				ackours(axp,nr);
-				/* Keep timer running even if all frames
-				 * were acked, since we must see a Final
-				 */
-				if(!run_timer(&axp->t1))
-					start_timer(&axp->t1);
-			}
-			break;
-		case REJ:
-			axp->remotebusy = NO;
-			/* Don't insist on a Final response from the old proto */
-			if(axp->proto == V1 || final){
-				stop_timer(&axp->t1);
-				ackours(axp,nr);
-				if(axp->unack != 0){
-					inv_rex(axp);
-				} else {
-					start_timer(&axp->t3);
-					lapbstate(axp,CONNECTED);
-					if(!run_timer(&axp->t4))
-						start_timer(&axp->t4);
-				}
-			} else {
-				if(poll)
-					enq_resp(axp);
-				ackours(axp,nr);
-				if(axp->unack != 0){
-					/* This is certain to trigger output */
-					inv_rex(axp);
-				}
-				/* A REJ that acks everything but doesn't
-				 * have the F bit set can cause a deadlock.
-				 * So make sure the timer is running.
-				 */
-				if(!run_timer(&axp->t1))
-					start_timer(&axp->t1);
-			}
-			break;
-		case I:
-			ackours(axp,nr); /** == -1) */
-			/* Make sure timer is running, since an I frame
-			 * cannot satisfy a poll
-			 */
-			if(!run_timer(&axp->t1))
-				start_timer(&axp->t1);
-			if(len_mbuf(axp->rxq) >= axp->window){
-				/* Too bad he didn't listen to us; he'll
-				 * have to resend the frame later. This
-				 * drastic action is necessary to avoid
-				 * memory deadlock.
-				 */
-				sendctl(axp,RESPONSE,RNR | pf);
-				free_p(bp);
-				bp = NULLBUF;
-				break;
-			}
-			/* Reject or ignore I-frames with receive sequence number errors */
-			if(ns != axp->vr){
-				if(axp->proto == V1 || !axp->rejsent){
-					axp->rejsent = YES;
-					sendctl(axp,RESPONSE,REJ | pf);
-				}
-				axp->response = 0;
-				stop_timer(&axp->t2);
-				break;
-			}
-			axp->rejsent = NO;
-			axp->vr = (axp->vr+1) & MMASK;
-			tmp = len_mbuf(axp->rxq) >= axp->window ? RNR : RR;
-			if(poll){
-				sendctl(axp,RESPONSE,tmp|PF);
-			} else {
-				axp->response = tmp;
-				start_timer(&axp->t2);
-			}
-			procdata(axp,bp);
-			bp = NULLBUF;
-			break;
-		default:
-			break;		/* Ignored */
 		}
 		break;
 	case FRAMEREJECT:
@@ -386,15 +310,21 @@ struct mbuf *bp;		/* Rest of frame, starting with ctl */
 		break;
 	}
 	free_p(bp);	/* In case anything's left */
-
+	/* Empty the trash */
+	if(axp->state == DISCONNECTED){
+		del_ax25(axp);
+		return 0;
+	}
 	/* See if we can send some data, perhaps piggybacking an ack.
 	 * If successful, lapb_output will clear axp->response.
 	 */
 	lapb_output(axp);
-
-	/* Empty the trash */
-	if(axp->state == DISCONNECTED)
-		del_ax25(axp);
+#ifdef notdef	/* this doesn't appear to be necessary */
+	if(axp->response != 0){
+		sendctl(axp,RESPONSE,axp->response);
+		axp->response = 0;
+	}
+#endif
 	return 0;
 }
 /* Handle incoming acknowledgements for frames we've sent.
@@ -405,7 +335,7 @@ static int
 ackours(axp,n)
 struct ax25_cb *axp;
 char n;
-{	
+{
 	struct mbuf *bp;
 	int acked = 0;	/* Count of frames acked by this ACK */
 	int oldest;	/* Seq number of oldest unacked I-frame */
@@ -446,6 +376,7 @@ char n;
 }
 
 /* Establish data link */
+void
 est_link(axp)
 struct ax25_cb *axp;
 {
@@ -456,6 +387,7 @@ struct ax25_cb *axp;
 	start_timer(&axp->t1);
 }
 /* Clear exception conditions */
+void
 clr_ex(axp)
 struct ax25_cb *axp;
 {
@@ -465,17 +397,19 @@ struct ax25_cb *axp;
 	stop_timer(&axp->t3);
 }
 /* Enquiry response */
+void
 enq_resp(axp)
 struct ax25_cb *axp;
 {
 	char ctl;
 
-	ctl = len_mbuf(axp->rxq) >= axp->window ? RNR|PF : RR|PF;	
+	ctl = len_mbuf(axp->rxq) >= axp->window ? RNR|PF : RR|PF;
 	sendctl(axp,RESPONSE,ctl);
 	axp->response = 0;
 	stop_timer(&axp->t3);
 }
 /* Invoke retransmission */
+void
 inv_rex(axp)
 struct ax25_cb *axp;
 {
@@ -483,6 +417,7 @@ struct ax25_cb *axp;
 	axp->vs &= MMASK;
 	axp->unack = 0;
 }
+
 /* Generate Frame Reject (FRMR) response
  * If reason != 0, this is the initial error frame
  * If reason == 0, resend the last error frame
@@ -523,11 +458,11 @@ char cmdrsp,cmd;
 	return sendframe(axp,cmdrsp,cmd,NULLBUF);
 }
 /* Start data transmission on link, if possible
- * Return number of frames sent
+ * Return number of frames sent -- This is called on T2 expiration
  */
-int
-lapb_output(axp)
-register struct ax25_cb *axp;
+void
+dlapb_output(axp)
+struct ax25_cb *axp;
 {
 	register struct mbuf *bp;
 	struct mbuf *tbp;
@@ -535,10 +470,13 @@ register struct ax25_cb *axp;
 	int sent = 0;
 	int i;
 
+	/* wait until now for this in case something went bad before t2 timed
+	 * out
+	 */
 	if(axp == NULLAX25
 	 || (axp->state != RECOVERY && axp->state != CONNECTED)
 	 || axp->remotebusy)
-		return 0;
+		return;
 
 	/* Dig into the send queue for the first unsent frame */
 	bp = axp->txq;
@@ -547,6 +485,7 @@ register struct ax25_cb *axp;
 			break;	/* Nothing to do */
 		bp = bp->anext;
 	}
+
 	/* Start at first unsent I-frame, stop when either the
 	 * number of unacknowledged frames reaches the maxframe limit,
 	 * or when there are no more frames to send
@@ -556,7 +495,7 @@ register struct ax25_cb *axp;
 		axp->vs &= MMASK;
 		dup_p(&tbp,bp,0,len_mbuf(bp));
 		if(tbp == NULLBUF)
-			return sent;	/* Probably out of memory */
+			return;	/* Probably out of memory */
 		sendframe(axp,COMMAND,control,tbp);
 		start_timer(&axp->t4);
 		axp->unack++;
@@ -564,7 +503,6 @@ register struct ax25_cb *axp;
 		 * delayed ack
 		 */
 		axp->response = 0;
-		stop_timer(&axp->t2);
 		if(!run_timer(&axp->t1)){
 			stop_timer(&axp->t3);
 			start_timer(&axp->t1);
@@ -572,8 +510,24 @@ register struct ax25_cb *axp;
 		sent++;
 		bp = bp->anext;
 	}
-	return sent;
+	if(axp->response != 0)
+		sendctl(axp,RESPONSE,axp->response);
+	axp->response = 0;
+
+	return;
 }
+
+/* put the real lapb_output on a timer queue */
+
+void
+lapb_output(axp)
+register struct ax25_cb *axp;
+{
+	/* function installed in ax25subr.c */
+	axp->t2.arg = (char *)axp;
+	start_timer(&axp->t2);
+}
+
 /* Set new link state.
  * If the new state is disconnected, also free the link control block.
  */
@@ -598,41 +552,64 @@ int s;
 		(*axp->s_upcall)(axp,oldstate,s);
 }
 /* Process a valid incoming I frame */
-static
+static void
 procdata(axp,bp)
 struct ax25_cb *axp;
 struct mbuf *bp;
 {
-	char pid;
+	unsigned char pid;
+#ifdef SEGMENT
+	int seq;
+#endif
 	int ip_route();
-
+#ifdef NETROM
+	void nr_route();
+#endif
 	/* Extract level 3 PID */
 	if(pullup(&bp,&pid,1) != 1)
 		return;	/* No PID */
 
-	switch(pid & (PID_FIRST|PID_LAST)){
-	case PID_FIRST:
-		/* "Shouldn't happen", but flush any accumulated frags */
-		free_p(axp->rxasm);
-		axp->rxasm = NULLBUF;
-	case 0:	/* Note fall-thru */
-		/* Beginning or middle of message, just accumulate */
-		append(&axp->rxasm,bp);
-		return;
-	case PID_LAST:
-		/* Last frame of multi-frame message; extract it */
-		append(&axp->rxasm,bp);
-		bp = axp->rxasm;
-		axp->rxasm = NULLBUF;
-		break;
-	case PID_FIRST|PID_LAST:
-		/* Do nothing with reassembly queue, allowing single-frame
-		 * messages to be interspersed with fragments of multi-frame
-		 * messages
-		 */
-		break;
-	}
-	pid &= PID_PID;	/* mask the 6 pid bits */
+#ifdef SEGMENT	/* Karn's "segmentation" scheme -- uses its own PID */
+#ifdef SEG_CMD
+	if(pid == PID_SEGMENT && rx_segment){	/* if turned off we will trash it */
+#else
+	if(pid == PID_SEGMENT){
+#endif
+		seq = pullchar(&bp);
+		if(axp->segremain == 0){	/* Probably first segment of a set */
+			/* Start reassembly */
+			if(!(seq & SEG_FIRST)){
+				free_p(bp);     /* How in the hell did we get this from ax25? */
+				return;
+			}
+			/* Put first segment on list */
+			axp->segremain = seq & SEG_REM;
+			axp->rxasm = bp;
+			return; /* will handle it later */
+		}else{
+			/* Reassembly in progress; continue */
+			if((seq & SEG_REM) != axp->segremain - 1){
+				/* Error! How in hell did it get out of order? */
+				free_p(axp->rxasm);
+				axp->rxasm = NULLBUF;
+				axp->segremain = 0;
+				free_p(bp);
+				return;
+			}
+
+			/* Correct, in-order segment */
+			append(&axp->rxasm,bp);
+			if((axp->segremain = (seq & SEG_REM)) != 0)
+				return; /* will handle it later */
+
+			/* Else, done; process it */
+			bp = axp->rxasm;
+			axp->rxasm = NULLBUF;
+			pid = pullchar(&bp); /* tumble to switch below */
+		}	/* else */
+	}	/* if SEGMENT */
+#endif /* SEGMENT */
+
 #ifdef VCKT
 	/* if applicable, check for exception handling.  With later ROSE we don't
 	 * need to do rosebash.  Note that netrom frames can also be carried by
@@ -642,8 +619,8 @@ struct mbuf *bp;
 		if(rose_bash)	/* hope we don't have to do this... */
 			pid = PID_IP;	/* mask it and assume IP PID */
 				/* note that this would break netrom over rose ckts */
-
-		if(!(pid == PID_IP || pid == PID_NETROM)){	/* could be rose/netrom */
+		/* could be rose/netrom */
+		if(!(pid == PID_IP || pid == PID_NETROM)){
 			free_p(bp);	/* it may be some kind of ROSE message - may want to
 					later intrepret it, but for now, discard it */
 			return;
@@ -651,7 +628,8 @@ struct mbuf *bp;
 	}
 #endif
 
-	/* Last frame in sequence; kick entire message upstairs */
+	/* Finally, we do something with this frame */
+
 	switch(pid){
 	case PID_IP:		/* DoD Internet Protocol */
 		ip_route(bp,0);

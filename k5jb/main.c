@@ -109,6 +109,7 @@ extern char *mdigilist,*mexlist;
 extern char *netexe;
 #endif
 
+extern int16 paclen;
 extern struct interface *ifaces;
 void version();
 extern struct mbuf *loopq;
@@ -551,6 +552,7 @@ printf("Combios 1 = %lu, Combios 2 - %lu\n",combios_stat[0],combios_stat[1]);
 }
 #endif	/* CPUSTAT */
 
+#define PARAM_MTU
 /* Manipulate I/O device parameters */
 doparam(argc,argv)
 int argc;
@@ -566,8 +568,22 @@ char *argv[];
 		printf("Interface \"%s\" unknown\n",argv[1]);
 		return 1;
 	}
-	if(ifp->ioctl == NULLFP){
-					 printf("Not avail.\n");
+#ifdef PARAM_MTU
+	/* note that there is no prompt if you use a letter other than "m" */
+	/* and ioctl will get some astonishing, but benign, numbers k33 */
+	if(argv[2][0] == 'm'){	/* "mtu" (or "mut", heh!) */
+		if(argc == 4){
+			ifp->mtu = (int16)atoi(argv[3]);
+			if(!ifp->mtu)	/* bad argument, we'll do it for him */
+				ifp->mtu = paclen;
+		}
+		printf("%s mtu is %d\n",argv[1],ifp->mtu);
+		return 0;
+	}
+#endif
+
+	if(ifp->ioctl == NULLFP){	/* e.g. netrom interface */
+		printf("No ioctl\n");
 		return 1;
 	}
 
@@ -715,7 +731,11 @@ struct cmds cmds[] = {
 #endif
 #endif /* NETROM */
 #endif /* AX25 */
-	"param",        doparam,        2, "param <interface>", NULLCHAR,
+#ifdef PARAM_MTU
+	"param",        doparam,        2, "param <interface> mtu | <kiss data>", NULLCHAR,
+#else
+	"param",        doparam,        2, "param <interface> mtu", NULLCHAR,
+#endif
 	"ping",         doping,         0, NULLCHAR,    NULLCHAR,
 #ifdef UNIX /* BSD or SYS5 */
 	"pwd",          docd,           0, NULLCHAR,    NULLCHAR,
@@ -1260,11 +1280,11 @@ char *argv[];
 	if_asy->name = malloc((unsigned)strlen(argv[4])+1);
 	strcpy(if_asy->name,argv[4]);
 	if_asy->mtu = (int16)atoi(argv[6]);
-#ifndef FRAGTEST	/* Disable to test fragmentation.  There is a memory bug
-						 * in the ax25 vc mode if fragmentation used - K5JB
-						 */
-	if(if_asy->mtu > 256)
-		if_asy->mtu = 256;
+#ifndef SEGMENT
+	/* If we aren't going to do segmentation, enforce mtu size - K5JB k33 */
+	 */
+	if(mode == AX25_MODE && if_asy->mtu > paclen)
+		if_asy->mtu = paclen;
 #endif
 	if_asy->dev = dev;
 	if_asy->recv = doslip;
@@ -1330,6 +1350,9 @@ char *argv[];
 			if_asy->hwaddr = malloc(sizeof(addr));
 		memcpy(if_asy->hwaddr,(char *)&addr,sizeof(addr));
 		nrs[dev].iface = if_asy;
+		if_asy->mtu -= 20;	/* k33 */
+		if(if_asy->mtu > 236 || if_asy->mtu < 44)
+			if_asy->mtu = 236;	/* Stomp! */
 		break;
 #endif /* NRS */
 #ifdef  SLFP

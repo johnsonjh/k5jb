@@ -6,14 +6,18 @@
 #include "options.h"
 #include "config.h"
 
-char versionf[] = "K5JB.k31";	/* for FTP and the mbox's use */
+char versionf[] = "K5JB.k33";	/* for FTP and the mbox's use */
 void
 version()
 {
 	printf("        This version is %s with options:\n        ",versionf);
 
 #ifdef AX25
+#ifdef SEGMENT
+	printf("AX.25/SEG");
+#else
 	printf("AX.25");
+#endif
 #ifdef NETROM
 	printf(", Netrom");
 #endif

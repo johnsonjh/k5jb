@@ -36,6 +36,9 @@ char *ax25states[] = {
 
 int domycall(),dodigipeat(),doaxstat(),dot1(),dot2(),dot3(),dot4(),
 	domaxframe(),doaxwindow(),dopaclen(),don2(),doaxreset(),dopthresh();
+#if defined(SEGMENT) && defined(SEG_CMD)
+int dosegment();
+#endif
 #ifdef AX25_HEARD
 int doheard();
 #endif
@@ -63,11 +66,30 @@ static struct cmds axcmds[] = {
 	"reset",	doaxreset,	2, "ax25 reset <axcb>", NULLCHAR,
 	"retry",	don2,		0, NULLCHAR,	NULLCHAR,
 	"status",	doaxstat,	0, NULLCHAR,	NULLCHAR,
+#if defined(SEGMENT) && defined(SEG_CMD)	/* want status to come up with "s" */
+	"segment",	dosegment,	0, NULLCHAR,	NULLCHAR,
+#endif
 	"t1",		dot1,		0, NULLCHAR,	NULLCHAR,
 	"t2",		dot2,		0, NULLCHAR,	NULLCHAR,
 	"t3",		dot3,		0, NULLCHAR,	NULLCHAR,
 	"t4",		dot4,		0, NULLCHAR,	NULLCHAR,
 	"window",	doaxwindow,	0, NULLCHAR,	NULLCHAR,
+
+#if defined(SEGMENT) && defined(SEG_CMD)
+#ifdef SID2
+#ifdef AX25_HEARD
+	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat heard maxframe mboxcall mycall paclen pthresh reset\n   retry segment status t1 t2 t3 t4 window", NULLCHAR
+#else
+	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat maxframe mboxcall mycall paclen pthresh reset retry\n   segment status t1 t2 t3 t4 window",	NULLCHAR
+#endif /* AX25_HEARD */
+#else
+#ifdef AX25_HEARD
+	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat heard maxframe mycall paclen pthresh reset retry\n   segment status t1 t2 t3 t4 window", NULLCHAR
+#else
+	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat maxframe mycall paclen pthresh reset retry\n   segment status t1 t2 t3 t4 window",	NULLCHAR
+#endif /* AX25_HEARD */
+#endif
+#else /* SEGMENT */
 #ifdef SID2
 #ifdef AX25_HEARD
 	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat heard maxframe mboxcall mycall paclen pthresh reset\n   retry status t1 t2 t3 t4 window", NULLCHAR
@@ -78,9 +100,11 @@ static struct cmds axcmds[] = {
 #ifdef AX25_HEARD
 	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat heard maxframe mycall paclen pthresh reset retry\n   status t1 t2 t3 t4 window", NULLCHAR
 #else
-	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat maxframe mycall paclen pthresh reset retry status\n   t1 t2 t3 t4 window",	NULLCHAR
+	NULLCHAR,	NULLFP,0, "ax25 subcommands: digipeat maxframe mycall paclen pthresh reset retry\n   status t1 t2 t3 t4 window",	NULLCHAR
 #endif /* AX25_HEARD */
 #endif
+#endif /* SEGMENT */
+
 };
 /* Multiplexer for top-level ax25 command */
 doax25(argc,argv)
@@ -153,7 +177,7 @@ register struct ax25_cb *axp;
 
 	if(axp == NULLAX25 || axp->interface == NULLIF)
 		return;
-	printf("    &AXB IF   Remote   RB V(S) V(R) Unack P Retry State\n");
+	printf("    &AXB IF   Remote   RB N(S) N(R) Unack V Retry State\n");
 	pax25(tmp,&axp->addr.dest);
 	printf("%8lx %-5s%-9s",(long)axp,axp->interface->name,tmp);
 	putchar(axp->rejsent ? 'R' : ' ');
@@ -221,7 +245,7 @@ char *argv[];
 }
 
 #ifdef SID2
-/* Display or change our AX.25 BBS address */
+/* Display or change our AX.25 BBS Address */
 static
 dombxcall(argc,argv)
 int argc;
@@ -237,6 +261,25 @@ char *argv[];
 	if(setcall(&bbscall,argv[1]) == -1)
 		return -1;
 	bbscall.ssid |= E;
+	return 0;
+}
+#endif
+
+#if defined(SEGMENT) && defined(SEG_CMD)
+extern int rx_segment;
+
+/* Display or change our AX.25 RX Segmentation */
+static
+dosegment(argc,argv)
+int argc;
+char *argv[];
+{
+	if(argc == 2)
+		if(strcmp(argv[1],"on") == 0)
+			rx_segment = 1;
+		else
+			rx_segment = 0;
+	printf("AX.25 RX segmentation (on/off) is %s\n",rx_segment ? "ON" : "OFF");
 	return 0;
 }
 #endif
@@ -493,7 +536,7 @@ int16 cnt;
 	struct mbuf *bp;
 	register char *cp;
 	char c;
-	int send_ax25();
+	void send_ax25();
 
 	if(current == NULLSESSION || current->type != AX25TNC)
 		return;	/* "can't happen" */
@@ -504,7 +547,7 @@ int16 cnt;
 
 	/* Allocate buffer and start it with the PID */
 	bp = alloc_mbuf(cnt+1);
-	*bp->data = PID_FIRST | PID_LAST | PID_NO_L3;
+	*bp->data = PID_NO_L3;
 	bp->cnt++;
 
 	/* Copy keyboard buffer to output, stripping line feeds */
@@ -655,7 +698,7 @@ int16 cnt;
 			break;
 		cp = bp->data;
 		/* Start with the PID */
-		*cp++ = PID_FIRST | PID_LAST | PID_NO_L3;
+		*cp++ = PID_NO_L3;
 		bp->cnt++;
 
 		/* Now send data characters, translating between local

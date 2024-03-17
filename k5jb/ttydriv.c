@@ -6,8 +6,10 @@
  * 3/18/92 - K5JB
  */
 /* TTY input driver */
+/* #define CUTE_FTP in options.h to enable FTP login prompting */
 #include <stdio.h>
 #include <ctype.h>
+#include "options.h"
 #include "config.h"
 
 #ifndef TRUE
@@ -22,9 +24,11 @@ int ttymode;
 #define	TTY_RAW	1
 #define TTY_COOKED	2
 
+#ifdef CUTE_FTP
 int ttyecho=1;
 #define	TTY_NOECHO	0
 #define	TTY_ECHO	1
+#endif
 
 #ifdef	FLOW
 int ttyflow=1;
@@ -66,6 +70,7 @@ cooked()
 #endif
 }
 
+#ifdef CUTE_FTP
 void
 echo()
 {
@@ -77,6 +82,7 @@ noecho()
 {
 	ttyecho = TTY_NOECHO;
 }
+#endif
 
 /* Accept characters from the incoming tty buffer and process them
  * (if in cooked mode) or just pass them directly (if in raw mode).
@@ -180,32 +186,35 @@ char **buf;
 					if(editing && !erase)
 						break;
 #endif
-					if(ttyecho) {
-						while(cp != linebuf){
-							cp--;
-							printf("\b \b");
-						}
-					} else
+#ifdef CUTE_FTP
+					if(!ttyecho)
 						cp = linebuf;
+					else
+#endif
+					while(cp != linebuf){
+						cp--;
+						printf("\b \b");
+					}
 					if(erase)
 						break;
 #ifdef EDIT
-					if(ttyecho){	/* don't need to edit */
-										/* when no echo */
-						cp = linebuf;
-						for(i=0;i<LINESIZE;i++){
-							if(lastline[i] == '\015')
-								break;
-							linebuf[i] = lastline[i];
-							putchar(linebuf[i]);
-							cp++;
-						}
-						if(i){
-							ep = &linebuf[i];
-							editing = TRUE;
-						}
+#ifdef CUTE_FTP
+					if(!ttyecho) 	/* don't need to edit */
+						break;				/* when no echo */
+#endif
+					cp = linebuf;
+					for(i=0;i<LINESIZE;i++){
+						if(lastline[i] == '\015')
+							break;
+						linebuf[i] = lastline[i];
+						putchar(linebuf[i]);
+						cp++;
 					}
-					break;
+					if(i){
+						ep = &linebuf[i];
+						editing = TRUE;
+					}
+				break;
 
 				case CTLD:	/* forward one char */
 					if(editing && cp < ep){
@@ -240,12 +249,14 @@ char **buf;
 					}
 					break;
 				case CTLR:	/* print line buffer */
-					if(ttyecho) {
-						printf("^R\n");
-						rp = linebuf ;
-						while (rp < cp)
-							putchar(*rp++);
-					}
+#ifdef CUTE_FTP
+					if(!ttyecho)
+						break;
+#endif
+					printf("^R\n");
+					rp = linebuf ;
+					while (rp < cp)
+						putchar(*rp++);
 					break ;
 				case CTLV:
 					ttymode = TTY_LIT;
@@ -253,30 +264,36 @@ char **buf;
 				case CTLW:	/* erase word backward */
 					erase = TRUE;
 				case CTLA:	/* move cursor back one word */
-					if(ttyecho){
-						if(cp != linebuf && isspace(*(cp-1))){/* not at end of line */
-							cp--;	/* back up onto the space */
-							putchar('\b');
-						}
-						while (cp != linebuf) {
-							cp--;
-							if(erase)
-								printf("\b \b") ;
-							else
-								printf("\b");
-							if (isspace(*cp)) {
-								putchar(*cp++);
-								break;
-							}
+#ifdef CUTE_FTP
+					if(!ttyecho)
+						break;
+#endif
+					if(cp != linebuf && isspace(*(cp-1))){/* not at end of line */
+						cp--;	/* back up onto the space */
+						putchar('\b');
+					}
+					while (cp != linebuf) {
+						cp--;
+						if(erase)
+							printf("\b \b") ;
+						else
+							printf("\b");
+						if (isspace(*cp)) {
+							putchar(*cp++);
+							break;
 						}
 					}
-					break ;
+				break ;
 
 				default:	/* Ordinary character */
 					*cp++ = c;
 
 				/* ^Z is a common screen clear character - K5JB */
+#ifdef CUTE_FTP
 					if (ttyecho && (c != CTLZ))
+#else
+					if (c != CTLZ)
+#endif
 						putchar(c);
 
 				/* if line is too long, we truncate it */

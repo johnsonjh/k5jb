@@ -73,6 +73,10 @@ struct ax25_cb {
 	void (*t_upcall)();		/* Transmit upcall */
 	void (*s_upcall)();		/* State change upcall */
 	char *user;			/* User pointer */
+/* config.h is always read before lapb.h */
+#ifdef SEGMENT
+	int segremain;			/* used by segmenter */
+#endif
 };
 #define	NULLAX25	((struct ax25_cb *)0)
 extern struct ax25_cb ax25default;

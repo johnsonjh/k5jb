@@ -9,7 +9,8 @@
 #include "lapb.h"
 #include <ctype.h>
 
-void free_q();
+void free_q(),lapb_output(),est_link();
+int sendctl(),start_timer(),stop_timer();
 
 /* Open an AX.25 connection */
 struct ax25_cb *
@@ -63,15 +64,15 @@ char *user;			/* User linkage area */
 }
 
 /* Send data on an AX.25 connection. Caller must provide PID */
-int
+void
 send_ax25(axp,bp)
 struct ax25_cb *axp;
 struct mbuf *bp;
 {
 	if(axp == NULLAX25 || bp == NULLBUF)
-		return -1;
+		return;
 	enqueue(&axp->txq,bp);
-	return lapb_output(axp);
+	lapb_output(axp);
 }
 
 /* Receive incoming data on an AX.25 connection */

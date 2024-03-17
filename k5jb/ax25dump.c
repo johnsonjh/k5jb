@@ -1,6 +1,7 @@
 /* corrected stray characters to stdout when trace file active - K5JB */
 /* 8/19/91 added ROSE and formating changes per N5OWK */
 #include <stdio.h>
+#include "options.h"
 #include "config.h"
 #ifdef AX25
 #ifdef TRACE
@@ -11,10 +12,16 @@
 #include "iface.h"	/* K5JB */
 #include "lapb.h"
 #include "trace.h"
+#ifdef MSDOS
+#include <mem.h>
+#endif
 
 extern FILE *trfp;
+int ntohax25(),pax25(),arp_dump(),ip_dump();	/* latter 3 should have been a void - K5JB */
+void netrom_dump();
 
 /* Dump an AX.25 packet header */
+/* make this void if we mess with trace.c.  Also do main.c */
 ax25_dump(bpp,check)
 struct mbuf **bpp;
 int check;	/* Not used */
@@ -75,21 +82,8 @@ int check;	/* Not used */
 			fprintf(trfp," NS=%d",(control>>1)&7);
 		/* Decode I field */
 		if(pullup(bpp,&pid,1) == 1){	/* Get pid */
-			switch(pid & (PID_FIRST | PID_LAST)){
-			case PID_FIRST:
-				fprintf(trfp," First frag");
-				break;
-			case PID_LAST:
-				fprintf(trfp," Last frag");
-				break;
-			case PID_FIRST|PID_LAST:
-				break;	/* Complete message, say nothing */
-			case 0:
-				fprintf(trfp," Middle frag");
-				break;
-			}
 			fprintf(trfp," pid=");
-			switch(pid & 0x3f){
+			switch(pid){
 			case PID_ARP:
 				fprintf(trfp,"ARP\n");
 				break;
@@ -105,21 +99,26 @@ int check;	/* Not used */
 			case PID_ROSE1:
 				fprintf(trfp,"ROSE\n");
 				break;
+#ifdef SEGMENT
+			case PID_SEGMENT:
+				fprintf(trfp,"Segment\n");
+				break;
+#endif
 			default:
 				fprintf(trfp,"0x%02x\n",pid);	/* N5OWK */
 			}
 			/* Only decode frames that are the first in a
 			 * multi-frame sequence
 			 */
-			switch(pid & (PID_PID | PID_FIRST)){
-			case PID_ARP | PID_FIRST:
+			switch(pid){
+			case PID_ARP:
 				arp_dump(bpp);
 				break;
-			case PID_IP | PID_FIRST:
+			case PID_IP:
 				/* Only checksum complete frames */
-				ip_dump(bpp,pid & PID_LAST);
+				ip_dump(bpp,pid);
 				break;
-			case PID_NETROM | PID_FIRST:
+			case PID_NETROM:
 				netrom_dump(bpp);
 				break;
 			}
@@ -143,7 +142,7 @@ int check;	/* Not used */
 	fflush(stdout);
 }
 /* Display NET/ROM network and transport headers */
-static
+static void
 netrom_dump(bpp)
 struct mbuf **bpp;
 {
@@ -201,7 +200,7 @@ struct mbuf **bpp;
 	pullup(bpp,thdr,5);
 	switch(thdr[4] & 0xf){
 	case 0:	/* network PID extension */
-		if (thdr[0] == PID_IP && thdr[1] == PID_IP)
+		if (thdr[0] == (PID_IP & 0x0f) && thdr[1] == (PID_IP & 0x0f))
 			ip_dump(bpp,1) ;
 		else
 			fprintf(trfp,"         protocol family %x, proto %x",
@@ -217,7 +216,7 @@ struct mbuf **bpp;
 		fprintf(trfp," %s",tmp);
 		pullup(bpp,(char *)&dest,sizeof(struct ax25_addr));
 		pax25(tmp,&dest);
-		fprintf(trfp,"->%s",tmp);
+		fprintf(trfp,"@%s",tmp);
 		break;
 	case 2:	/* Connect acknowledgement */
 		fprintf(trfp,"         conn ack: ur ckt %u/%u my ckt %u/%u",

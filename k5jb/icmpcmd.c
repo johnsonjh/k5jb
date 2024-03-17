@@ -103,9 +103,15 @@ char *argv[];
 	}
 	if(argc > 2){
 		/* Inter-ping time is specified; set up timer structure */
+		int32 want;
+
+		/* hold it to 5 minutes minimum - it is radio, remember? */
+		if((want = atol(argv[2])) < 300)
+			want = 300;
+		want = want * 1000 / MSPTICK;
 		if(pp == NULLPING)
 			pp = add_ping(dest);
-		pp->timer.start = atol(argv[2]) * 1000 / MSPTICK;	/* K5JB */
+		pp->timer.start = want; 	/* K5JB */
 		pp->timer.func = ptimeout;
 		pp->timer.arg = (char *)pp;
 		pp->remote = dest;

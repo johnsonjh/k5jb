@@ -25,6 +25,8 @@
 #define	FLOW		/* Enable local tty flow control */
 #define _FINGER		/* Enable Finger - was in makefile - adds 2924 bytes */
 #define	NETROM		/* NET/ROM network support - adds 20996 bytes */
+#define SEGMENT		/* NOS type ax25 frame segmentation */
+
 /* see options.h for commonly changed options:
 
 	DRSI		DRSI standard driver

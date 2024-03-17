@@ -9,6 +9,7 @@
  */
 
 #include "options.h"
+#include "config.h"
 
 #ifdef KPCPORT
 #include <stdio.h>
@@ -28,6 +29,7 @@
 void	kpc_recv(), doslip();
 int	kpc0_raw(), kpc1_raw();
 int	asy_stop(), ax_send(), ax_output(), kiss_ioctl();
+extern int16 paclen;
 
 /*
  * Attach a serial interface to the kpc-4 or KAM tnc
@@ -54,7 +56,6 @@ char *argv[];
 		printf("Too many asy controllers\n");
 		return -1;
 	}
-
 	/*
 	 *	The kpc-4 and KAM have two ports on one serial line.
 	 *	You multiplex between the two by setting the high
@@ -90,11 +91,11 @@ char *argv[];
 
 	if_pca->mtu    = if_pcb->mtu    = (int16)atoi(argv[5]);
 
-#ifndef FRAGTEST  /* Disable to test fragmentation.  There is a memory bug
-						 * in the ax25 vc mode if fragmentation used - K5JB
-						 */
-	if(if_pca->mtu > 256)
-		if_pca->mtu = if_pcb->mtu = 256;
+#ifndef SEGMENT
+	/* If we aren't going to do segmentation, enforce mtu size limit - K5JB */
+	 */
+	if(if_pca->mtu > paclen)
+		if_pca->mtu = if_pcb->mtu = paclen;
 #endif
 
 	if_pca->dev    = if_pcb->dev    = dev;
@@ -186,7 +187,10 @@ struct mbuf *bp;
  * set in the async handler
  */
 	extern int16 serial_err;        /* defined in ipcmd.c */
+	extern int32 tot_rframes;
 	struct fifo *fp;
+
+	tot_rframes++;
 	fp = &asy[interface->dev].fifo;
 	if(fp->error){  /* contains 8250 line status register */
 		serial_err++;

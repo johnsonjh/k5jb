@@ -38,6 +38,54 @@ char axbdcst[AXALEN];    /* Same thing, network format */
 struct ax25_addr mycall;
 int digipeat = 1;   /* Controls digipeating */
 
+#ifdef SEGMENT
+/* AX.25 transmit frame segmenter used by NOS. Returns queue of segmented
+ * fragments, or original packet if small enough.  Creates paclen - 1 frames.
+ */
+struct mbuf *
+segmenter(bp,ssize)
+struct mbuf *bp;	/* Complete packet */
+int16 ssize;		/* Max size of frame segments */
+{
+	void free_q();
+	struct mbuf *result = NULLBUF;
+	struct mbuf *bptmp, *bp1;
+	int16 len,offset;
+	int segments;
+
+	/* See if packet is too small to segment. Note 1-byte grace factor
+	 * so the PID will not cause segmentation of a 256-byte IP datagram.
+	 */
+	len = len_mbuf(bp);
+	if(len <= ssize+1)
+		return bp;	/* Too small to segment */
+
+	ssize -= 2;		/* ssize now equal to data portion size */
+	segments = 1 + (len - 1) / ssize;	/* # segments  */
+	offset = 0;
+
+	while(segments != 0){
+		offset += dup_p(&bptmp,bp,offset,ssize);
+		if(bptmp == NULLBUF){
+			free_q(&result);
+			break;
+		}
+		/* Make room for segmentation header */
+		if((bp1 = pushdown(bptmp,2)) == NULLBUF){
+			free_p(bptmp);
+			free_q(&result);
+		}
+		bp1->data[0] = PID_SEGMENT;
+		bp1->data[1] = --segments;
+		if(offset == ssize)
+			bp1->data[1] |= SEG_FIRST;
+		enqueue(&result,bp1);
+	}
+	free_p(bp);
+	return result;
+}
+#endif /* SEGMENT */
+
 /* Send IP datagrams across an AX.25 link */
 int
 ax_send(bp,interface,gateway,precedence,delay,throughput,reliability)
@@ -56,8 +104,11 @@ char reliability;
 	struct mbuf *tbp;
 	extern int16 axwindow;
 	void ax_incom();
-	int16 size,bsize,seq;
-	int atohax25(),send_ax25();
+#ifndef SEGMENT
+	int16 size;
+#endif
+	int atohax25();
+	void send_ax25();
 
 	if((hw_addr = res_arp(interface,ARP_AX25,gateway,bp)) == NULLCHAR)
 		return 0; /* Wait for address resolution */
@@ -65,7 +116,7 @@ char reliability;
 	if(delay || (!reliability && (interface->flags == DATAGRAM_MODE))){
 		/* Use UI frame */
 		return (*interface->output)(interface,hw_addr,
-			interface->hwaddr,PID_FIRST|PID_LAST|PID_IP,bp);
+			interface->hwaddr,PID_IP,bp);
 	}
 	/* Reliability is needed; use I-frames in AX.25 connection */
 	memcpy(destaddr.call,hw_addr,ALEN);
@@ -81,34 +132,32 @@ char reliability;
 			return -1;
 		}
 	}
-	/* If datagram is too big for one frame, send all but the last with
-	 * the extension PID. Note: the copy to a new buf is necessary because
-	 * AX.25 may continue retransmitting the frame after a local TCB has
-	 * gone away, and using the buf directly would cause heap garbage to be
-	 * transmitted. Besides, nobody would ever use AX.25 anywhere
-	 * high performance is needed anyway...
-	 */
-	bsize = len_mbuf(bp);
-	seq = 0;
-	while(bsize != 0){
-		size = min(bsize,axp->paclen);
-		/* Allocate buffer, allowing space for PID */
-		if((tbp = alloc_mbuf(size + 1)) == NULLBUF)
-			break;         /* out of memory! */
-		*tbp->data = PID_IP;
-		if(seq++ == 0)
-			*tbp->data |= PID_FIRST;  /* First in sequence */
-		if(size == bsize)
-			*tbp->data |= PID_LAST;       /* That's all of it */
-		/* else more to follow */
-
-		tbp->cnt = 1;
-		tbp->cnt += pullup(&bp,tbp->data + 1,size);
-		send_ax25(axp,tbp);
-		bsize -= size;
+#ifdef SEGMENT	/* NOS style segmenter for ax.25 */
+	if((tbp = pushdown(bp,1)) == NULLBUF){
+		free_p(bp);
+		return -1;
 	}
-	free_p(bp);    /* Shouldn't be necessary */
+	bp = tbp;
+	bp->data[0] = PID_IP;
+	if((tbp = segmenter(bp,axp->paclen)) == NULLBUF){
+		free_p(bp);
+		return -1;
+	}
+	send_ax25(axp,tbp);
+	return 0;	/* nobody uses this */
+#else
+	/* Allocate buffer, allowing space for PID - assume mbuf smaller
+	 * than paclen, enforced elsewhere
+	 */
+	if((tbp = alloc_mbuf((size = len_mbuf(bp)) + 1)) == NULLBUF)
+		return 0;         /* out of memory! What should we return? */
+	*tbp->data = PID_IP;
+
+	tbp->cnt = 1;
+	tbp->cnt += pullup(&bp,tbp->data + 1,size);
+	send_ax25(axp,tbp);
 	return 0;
+#endif /* SEGMENT */
 }
 
 /* Add AX.25 link header and send packet.
@@ -212,7 +261,8 @@ struct mbuf *bp;
 		while (1) {
 			if (curr != -1) {
 				hp = &heard.list[curr];
-				if (addreq(&hp->info.source, &hdr.source) &&
+				if(addreq(&hp->info.source, &hdr.source) &&
+						addreq(&hp->info.dest, &hdr.dest) &&	/* done for W6SWE */
 						hp->ifacename == interface->name){
 					time(&hp->htime);
 					/* if not the first, make it so */
@@ -252,7 +302,7 @@ struct mbuf *bp;
 		if (bp->cnt >= 2) {
 			type = ftype(*bp->data);
 			if(type == I || type == UI){
-				switch(*(bp->data + 1) & 0x3f){	/* note that these accumulate */
+				switch(*(bp->data + 1)){	/* note that these accumulate */
 					case PID_ARP:						/* for a given "from" call */
 						hp->flags |= HEARD_ARP;
 						break;
@@ -343,7 +393,7 @@ struct mbuf *bp;
 	if(uchar(control) == UI){
 		char pid;
 
-		(void) pullchar(&bp);
+		(void)pullup(&bp,&pid,1);	/* toss the first character */
 		if(pullup(&bp,&pid,1) != 1)
 			return;        /* No PID */
 #ifdef NETROM
@@ -352,7 +402,7 @@ struct mbuf *bp;
 		 * field.
 		 */
 		if(nrnodes){
-			if(uchar(pid) == (PID_NETROM | PID_FIRST | PID_LAST))
+			if(uchar(pid) == PID_NETROM)
 				nr_nodercv(interface,&hdr.source,bp) ;
 			else      /* regular UI packets to "nodes" aren't for us */
 				free_p(bp) ;
@@ -360,11 +410,11 @@ struct mbuf *bp;
 		}
 #endif
 			 /* Handle packets. Multi-frame messages are not allowed */
-		switch(pid & (PID_FIRST | PID_LAST | PID_PID)){
-		case (PID_IP | PID_FIRST | PID_LAST):
+		switch(pid){
+		case PID_IP:
 			ip_route(bp,multicast);
 			break;
-		case (PID_ARP | PID_FIRST | PID_LAST):
+		case PID_ARP:
 			arp_input(interface,bp);
 			break;
 		default:
@@ -476,7 +526,6 @@ axarp()
 	memcpy(axbdcst,ax25_bdcst.call,ALEN);
 	axbdcst[ALEN] = ax25_bdcst.ssid;
 
-	arp_init(ARP_AX25,AXALEN,PID_FIRST|PID_LAST|PID_IP,
-		PID_FIRST|PID_LAST|PID_ARP,axbdcst,psax25,setpath);
+	arp_init(ARP_AX25,AXALEN,PID_IP,PID_ARP,axbdcst,psax25,setpath);
 }
 #endif /* AX25 */

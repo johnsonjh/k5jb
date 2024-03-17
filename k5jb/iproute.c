@@ -421,7 +421,7 @@ int32 addr;
 	register struct route *rp;
 	struct route *rt_lookup();
 	struct interface *iface;
-
+	extern int16 paclen;
 	rp = rt_lookup(addr);
 	if(rp == NULLROUTE || rp->interface == NULLIF)
 		return 0;
@@ -432,7 +432,10 @@ int32 addr;
 		return iface->forw->mtu;
 	else
 #endif
-		return iface->mtu;
+		if(iface->flags == CONNECT_MODE)	/* revised to deal with ax25 segmentation */
+			return iface->mtu;		/* in datagram mode we don't want mtu - K5JB */
+		else
+			return iface->mtu < paclen ? iface->mtu : paclen;
 }
 #endif
 /* Look up target in hash table, matching the entry having the largest number

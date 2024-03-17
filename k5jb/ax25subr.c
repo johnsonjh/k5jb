@@ -144,7 +144,7 @@ struct ax25_cb *
 cr_ax25(addr)
 struct ax25_addr *addr;
 {
-	void recover(),send_ack(),pollthem(),disc_stale(),ax_incom();
+	void recover(),dlapb_output(),pollthem(),disc_stale(),ax_incom();
 	register struct ax25_cb *axp;
 	int16 hashval;
 	char i_state;
@@ -184,7 +184,7 @@ struct ax25_addr *addr;
 	axp->t1.arg = (char *)axp;
 
 	axp->t2.start = t2init;
-	axp->t2.func = send_ack;
+	axp->t2.func = dlapb_output;
 	axp->t2.arg = (char *)axp;
 
 	axp->t3.start = t3init;

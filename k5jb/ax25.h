@@ -35,21 +35,15 @@ struct ax25 {
 #define	COMMAND		1
 #define	RESPONSE	2
 
-/* Bit fields in AX.25 Level 3 Protocol IDs (PIDs)
- * The high order two bits control multi-frame messages.
- * The lower 6 bits is the actual PID. Single-frame messages are
- * sent with both the FIRST and LAST bits set, so that the resulting PIDs
- * are compatible with older code.
- */
-#define	PID_FIRST	0x80	/* Frame is first in a message */
-#define	PID_LAST	0x40	/* Frame is last in a message */
-#define	PID_PID		0x3f	/* Protocol ID subfield */
-
-#define	PID_IP		0x0c	/* ARPA Internet Protocol */
-#define	PID_ARP		0x0d	/* ARPA Address Resolution Protocol */
-#define	PID_NETROM	0x0f	/* NET/ROM */
-#define	PID_NO_L3	0x30	/* No level 3 protocol */
+#define	PID_IP		0xcc	/* ARPA Internet Protocol */
+#define	PID_ARP		0xcd	/* ARPA Address Resolution Protocol */
+#define	PID_NETROM	0xcf	/* NET/ROM */
+#define	PID_NO_L3	0xf0	/* No level 3 protocol */
 #define	PID_ROSE1	0x01	/* Rose Switch X.25 Protocol (N5OWK) */
+#define PID_SEGMENT     0x08    /* Segmentation fragment */
+
+#define SEG_FIRST       0x80    /* First segment of a sequence */
+#define SEG_REM         0x7f    /* Mask for # segments remaining */
 
 
 /* from ax25.c */

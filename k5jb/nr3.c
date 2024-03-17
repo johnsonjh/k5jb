@@ -95,8 +95,8 @@ char reliability ;
 		
 	/* Create a "network extension" transport header */
 	n4hdr.opcode = NR4OPPID ;
-	n4hdr.u.pid.family = PID_IP ;
-	n4hdr.u.pid.proto = PID_IP ;
+	n4hdr.u.pid.family = PID_IP & 0x0f ;
+	n4hdr.u.pid.proto = PID_IP & 0x0f;
 
 	if ((pbp = htonnr4(&n4hdr)) == NULLBUF) {
 		free_p(bp) ;
@@ -141,7 +141,10 @@ struct ax25_cb *iaxp ;		/* incoming ax25 control block */
 	struct ax25_cb *axp, *find_ax25(), *open_ax25() ;
 	struct ax25 naxhdr ;
 	struct ax25_addr neighbor, from ;
-	struct mbuf *hbp, *pbp ;
+	struct mbuf *pbp ;
+#ifdef OLDWAY
+	struct mbuf *hbp;
+#endif
 	extern int16 axwindow ;
 	void ax_incom() ;
 	register struct nrnbr_tab *np ;
@@ -150,8 +153,8 @@ struct ax25_cb *iaxp ;		/* incoming ax25 control block */
 	struct nr_bind *find_best() ;
 	struct interface *interface ;
 	unsigned ifnum ;
-	int ip_route(),atohax25(),send_ax25();
-	void nr4input();
+	int ip_route(),atohax25();
+	void nr4input(),send_ax25();
 
 	if (ntohnr3(&n3hdr,&bp) == -1) {
 		free_p(bp) ;
@@ -182,7 +185,7 @@ struct ax25_cb *iaxp ;		/* incoming ax25 control block */
 		/* the neighbor from which this packet was received */
 		/* Note that this doesn't work with digipeated neighbors, */
 		/* at this point. */
-		
+
 		(void) nr_routeadd("      ",&n3hdr.source,ifnum,0,
 									(char *)&from,0,1) ;
 	}
@@ -202,8 +205,8 @@ struct ax25_cb *iaxp ;		/* incoming ax25 control block */
 				return ;
 			}
 			if ((n4hdr.opcode & NR4OPCODE) == 0) {
-				if (n4hdr.u.pid.family == PID_IP
-					&& n4hdr.u.pid.proto == PID_IP)
+				if (n4hdr.u.pid.family == (PID_IP & 0x0f)
+					&& n4hdr.u.pid.proto == (PID_IP & 0x0f))
 					ip_route(bp,0) ;
 				else 					/* we don't do this proto */
 					free_p(bp) ;
@@ -257,30 +260,23 @@ struct ax25_cb *iaxp ;		/* incoming ax25 control block */
 			return ;
 		}
 	}
-		
+
 	if (--n3hdr.ttl == 0) {	/* the packet's time to live is over! */
 		free_p(bp) ;
 		return ;
 	}
-
-	/* allocate and fill PID mbuf */
-	if ((pbp = alloc_mbuf(1)) == NULLBUF) {
-		free_p(bp) ;
-		return ;
-	}
-	pbp->cnt = 1 ;
-	*pbp->data = (PID_FIRST | PID_LAST | PID_NETROM) ;
-
 	/* now format network header */
-	if ((hbp = htonnr3(&n3hdr)) == NULLBUF) {
-		free_p(pbp) ;
-		free_p(bp) ;
-		return ;
+	if((pbp = htonnr3(&n3hdr)) == NULLBUF){
+		free_p(bp);
+		return;
 	}
+	append(&pbp,bp);                /* append data to header */
 
-	append(&pbp,hbp) ;		/* append header to pid */
-	append(&pbp,bp) ;		/* append data to header */
-	send_ax25(axp,pbp) ;	/* pass it off to ax25 code */
+	/* put AX.25 PID on front */
+	bp = pushdown(pbp,1);
+	bp->data[0] = PID_NETROM;
+
+	send_ax25(axp,bp) ;	/* pass it off to ax25 code */
 }
 
 
@@ -319,8 +315,7 @@ unsigned ifno ;
 	 */
 
 	if (!nr_verbose) {
-		(*axif->output)(axif, (char *)&nr_nodebc, axif->hwaddr,
-				 		(PID_FIRST | PID_LAST | PID_NETROM),
+		(*axif->output)(axif, (char *)&nr_nodebc, axif->hwaddr, PID_NETROM,
 				 		hbp) ;	/* send it */
 		return ;
 	}
@@ -363,8 +358,7 @@ unsigned ifno ;
 				didsend = 1 ;	/* indicate that we did broadcast */
 				numdest = 0 ;	/* reset the destination counter */
 				(*axif->output)(axif, (char *)&nr_nodebc, axif->hwaddr,
-						 		(PID_FIRST | PID_LAST | PID_NETROM),
-						 		hbp) ;	/* send it */
+					PID_NETROM, hbp) ;	/* send it */
 				hbp = copy_p(savehdr,NR3NODEHL) ;	/* new header */
 			}
 		}
@@ -398,8 +392,7 @@ unsigned ifno ;
 				didsend = 1 ;	/* indicate that we did broadcast */
 				numdest = 0 ;	/* reset the destination counter */
 				(*axif->output)(axif, (char *)&nr_nodebc, axif->hwaddr,
-						 		(PID_FIRST | PID_LAST | PID_NETROM),
-						 		hbp) ;	/* send it */
+					PID_NETROM, hbp) ;	/* send it */
 				hbp = copy_p(savehdr,NR3NODEHL) ;	/* new header */
 			}
 		}
@@ -409,7 +402,7 @@ unsigned ifno ;
 	/* sent one at all, we broadcast: */
 	if (!didsend || numdest > 0)
 		(*axif->output)(axif, (char *)&nr_nodebc, axif->hwaddr,
-						(PID_FIRST | PID_LAST | PID_NETROM), hbp) ;
+		PID_NETROM, hbp) ;
 
 	free_p(savehdr) ;	/* free the header copy */
 }
@@ -430,21 +423,20 @@ int argc ;
 char *argv[] ;
 {
 	extern int paclen;
-	int16 tpaclen;
 
 	if (nr_interface != (struct interface *)0) {
 		printf("netrom interface already attached\n") ;
 		return -1 ;
 	}
-	tpaclen = paclen - 20;	/* relate mtu to ax25 paclen, but reasonable */
-	if(tpaclen < 44 || tpaclen > NR4MAXINFO)
-		tpaclen = NR4MAXINFO;
 
 	nr3arp() ;
 
 	nr_interface = (struct interface *)calloc(1,sizeof(struct interface)) ;
 	nr_interface->name = "netrom" ;
-	nr_interface->mtu = tpaclen;
+	/* relate mtu to ax25 paclen, but reasonable */
+	nr_interface->mtu = paclen - 20;
+	if(nr_interface->mtu < 44 || nr_interface->mtu > NR4MAXINFO)
+		nr_interface->mtu = NR4MAXINFO;
 	nr_interface->send = nr_send ;
 	nr_interface->next = ifaces ;
 	ifaces = nr_interface ;
